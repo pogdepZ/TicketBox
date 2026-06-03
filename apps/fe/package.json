@@ -1,0 +1,11 @@
+{
+  "name": "@repo/fe",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "echo 'Starting FE dev server...' && sleep 10",
+    "build": "echo 'Building FE...' && sleep 2"
+  },
+  "dependencies": {
+    "@my-org/shared-types": "workspace:*"
+  }
+}
