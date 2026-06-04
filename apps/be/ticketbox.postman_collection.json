@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "75b17bdb-f1c5-4d8c-bc2d-9fbff4d69a01",
     "name": "TicketBox Backend",
-    "description": "Postman collection for the current NestJS backend endpoints. Default baseUrl is http://localhost:3001. Run `npm run dev` before testing. The current POST /user endpoint is still a scaffold and returns a placeholder string.",
+    "description": "Postman collection for the current NestJS backend endpoints. Default baseUrl is http://localhost:3001. Run `npm run dev` before testing. Auth handles account registration/login flows; User handles user/profile management.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -40,6 +40,60 @@
                 "health"
               ]
             }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /auth/register - Register account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status code is 201 or 409', function () {",
+                  "  pm.expect([201, 409]).to.include(pm.response.code);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "  const user = pm.response.json();",
+                  "  pm.collectionVariables.set('userId', user.id);",
+                  "  pm.test('registered user has email', function () {",
+                  "    pm.expect(user.email).to.eql('new.user@ticketbox.local');",
+                  "  });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"new.user@ticketbox.local\",\n  \"phone\": \"0900000005\",\n  \"password\": \"password123\",\n  \"fullName\": \"New User\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Registers a new account. Client sends `password`; the backend hashes it into `passwordHash`."
           },
           "response": []
         }
@@ -173,7 +227,7 @@
           "response": []
         },
         {
-          "name": "POST /user - Scaffold create endpoint",
+          "name": "POST /user - Create managed user",
           "event": [
             {
               "listen": "test",
@@ -197,7 +251,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"new.user@ticketbox.local\",\n  \"phone\": \"0900000005\",\n  \"passwordHash\": \"$2b$10$seeded.new.user.password.hash\",\n  \"fullName\": \"New User\",\n  \"status\": \"ACTIVE\"\n}"
+              "raw": "{\n  \"email\": \"managed.user@ticketbox.local\",\n  \"phone\": \"0900000006\",\n  \"fullName\": \"Managed User\",\n  \"status\": \"ACTIVE\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/user",
@@ -208,7 +262,7 @@
                 "user"
               ]
             },
-            "description": "This endpoint currently returns the scaffold string `This action adds a new user`; it does not create a Prisma user yet."
+            "description": "Creates a user/profile record without account password. Registration belongs to `POST /auth/register`."
           },
           "response": []
         },
