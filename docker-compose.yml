@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: nest-prisma-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nest_prisma_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - nest_prisma_pg_data:/var/lib/postgresql/data
+
+volumes:
+  nest_prisma_pg_data:

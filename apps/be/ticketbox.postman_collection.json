@@ -1,0 +1,932 @@
+{
+  "info": {
+    "_postman_id": "75b17bdb-f1c5-4d8c-bc2d-9fbff4d69a01",
+    "name": "TicketBox Backend",
+    "description": "Postman collection for the NestJS backend endpoints currently registered in src/app.module.ts: Health, Auth, and Concerts. Default baseUrl is http://localhost:3001. Run the backend before testing. Use Register first to generate a test account, then Login, Profile, Refresh, Logout, and Concerts.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('response is wrapped by interceptor', function () {",
+                  "  pm.expect(json).to.have.property('statusCode', 200);",
+                  "  pm.expect(json).to.have.property('data');",
+                  "});",
+                  "",
+                  "pm.test('health status is ok', function () {",
+                  "  pm.expect(json.data).to.eql({ status: 'ok' });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Checks the backend health endpoint from AppController."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "AuthModule endpoints from src/routes/auth/auth.controller.ts. Refresh token is stored as an httpOnly cookie named refreshToken on /auth/refresh.",
+      "item": [
+        {
+          "name": "POST /auth/register - Register test account",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const timestamp = Date.now();",
+                  "pm.collectionVariables.set('testEmail', `ticketbox.user.${timestamp}@example.com`);",
+                  "pm.collectionVariables.set('testPhone', `09${String(timestamp).slice(-8)}`);",
+                  "pm.collectionVariables.set('testPassword', 'password123');",
+                  "pm.collectionVariables.set('testFullName', 'TicketBox Test User');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const user = json.data;",
+                  "",
+                  "pm.test('registered user is returned', function () {",
+                  "  pm.expect(user).to.have.property('id');",
+                  "  pm.expect(user.email).to.eql(pm.collectionVariables.get('testEmail'));",
+                  "});",
+                  "",
+                  "pm.test('registered user has customer role', function () {",
+                  "  pm.expect(user.roles).to.be.an('array');",
+                  "  pm.expect(user.roles.map((role) => role.name)).to.include('customer');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('userId', user.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"phone\": \"{{testPhone}}\",\n  \"password\": \"{{testPassword}}\",\n  \"fullName\": \"{{testFullName}}\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Creates a unique test user each time this request runs. The pre-request script updates testEmail/testPhone/testPassword/testFullName collection variables."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/login - Login and save access token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const data = json.data || json;",
+                  "const accessToken = data && data.accessToken;",
+                  "",
+                  "pm.test('login returns user and access token', function () {",
+                  "  pm.expect(data).to.have.property('user');",
+                  "  pm.expect(data).to.have.property('accessToken');",
+                  "  pm.expect(data.user.email).to.eql(pm.collectionVariables.get('testEmail'));",
+                  "});",
+                  "",
+                  "pm.test('login user has customer role', function () {",
+                  "  pm.expect(data.user.roles).to.be.an('array');",
+                  "  pm.expect(data.user.roles.map((role) => role.name)).to.include('customer');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('accessToken', accessToken);",
+                  "if (pm.environment.name) {",
+                  "  pm.environment.set('accessToken', accessToken);",
+                  "}",
+                  "pm.collectionVariables.set('userId', data.user.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Logs in with the account created by Register. Saves accessToken and userId as collection variables. Postman should also keep the refreshToken cookie returned by the server."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /auth/profile - Current user",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Run POST /auth/login first.');",
+                  "}",
+                  "",
+                  "pm.request.headers.upsert({",
+                  "  key: 'Authorization',",
+                  "  value: `Bearer ${accessToken}`",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const user = pm.response.json().data;",
+                  "",
+                  "pm.test('profile matches logged in user', function () {",
+                  "  pm.expect(user).to.have.property('id', pm.collectionVariables.get('userId'));",
+                  "  pm.expect(user).to.have.property('email', pm.collectionVariables.get('testEmail'));",
+                  "});",
+                  "",
+                  "pm.test('profile returns roles', function () {",
+                  "  pm.expect(user.roles).to.be.an('array');",
+                  "  pm.expect(user.roles.map((role) => role.name)).to.include('customer');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            },
+            "description": "Requires Authorization: Bearer {{accessToken}} from Login or Refresh."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/refresh - Rotate tokens",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const data = pm.response.json().data;",
+                  "const accessToken = data && data.accessToken;",
+                  "",
+                  "pm.test('refresh returns a new access token', function () {",
+                  "  pm.expect(data).to.have.property('accessToken');",
+                  "  pm.expect(data).to.have.property('user');",
+                  "});",
+                  "",
+                  "pm.test('refresh user has roles', function () {",
+                  "  pm.expect(data.user.roles).to.be.an('array');",
+                  "  pm.expect(data.user.roles.map((role) => role.name)).to.include('customer');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('accessToken', accessToken);",
+                  "if (pm.environment.name) {",
+                  "  pm.environment.set('accessToken', accessToken);",
+                  "}",
+                  "pm.collectionVariables.set('userId', data.user.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Uses the httpOnly refreshToken cookie set by Login. Run Login first in the same Postman client/session."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/logout - Clear refresh cookie",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const data = pm.response.json().data;",
+                  "",
+                  "pm.test('logout message returned', function () {",
+                  "  pm.expect(data).to.have.property('message', 'Logged out successfully');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.unset('accessToken');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Clears the refreshToken cookie and removes accessToken from collection variables."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/login - Invalid password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('error response shape is returned', function () {",
+                  "  pm.expect(json).to.have.property('success', false);",
+                  "  pm.expect(json).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"wrong-password\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Negative test for invalid credentials. Run Register first so testEmail exists."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /auth/profile - Missing token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('unauthorized error shape is returned', function () {",
+                  "  pm.expect(json).to.have.property('success', false);",
+                  "  pm.expect(json.metadata).to.have.property('path', '/auth/profile');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            },
+            "description": "Negative test for protected route without Authorization header."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Concerts",
+      "description": "ConcertModule endpoints from src/routes/concert/concert.controller.ts. GET list/detail are public. Create/update/publish/cancel/complete require Authorization: Bearer {{accessToken}} with the matching concert:* permission; update/publish/cancel/complete also require global scope or concert scope for {{concertId}}.",
+      "item": [
+        {
+          "name": "POST /concerts - Create draft concert",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const timestamp = Date.now();",
+                  "const futureDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();",
+                  "pm.collectionVariables.set('concertName', `TicketBox Live ${timestamp}`);",
+                  "pm.collectionVariables.set('concertEventDate', futureDate);",
+                  "",
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Login with a user that has concert:create first.');",
+                  "}",
+                  "",
+                  "pm.request.headers.upsert({",
+                  "  key: 'Authorization',",
+                  "  value: `Bearer ${accessToken}`",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const concert = json.data || json;",
+                  "",
+                  "pm.test('draft concert is returned', function () {",
+                  "  pm.expect(concert).to.have.property('id');",
+                  "  pm.expect(concert.name).to.eql(pm.collectionVariables.get('concertName'));",
+                  "  pm.expect(concert.status).to.eql('draft');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('concertId', concert.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{concertName}}\",\n  \"description\": \"A sample concert created from Postman.\",\n  \"artistName\": \"The TicketBox Band\",\n  \"venueName\": \"TicketBox Arena\",\n  \"venueAddress\": \"123 Nguyen Hue, District 1, Ho Chi Minh City\",\n  \"eventDate\": \"{{concertEventDate}}\",\n  \"seatMapSvg\": \"<svg viewBox=\\\"0 0 100 100\\\"><rect width=\\\"100\\\" height=\\\"100\\\" /></svg>\",\n  \"posterUrl\": \"https://example.com/posters/ticketbox-live.png\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/concerts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "concerts"
+              ]
+            },
+            "description": "Creates a draft concert and saves concertId as a collection variable. Requires concert:create permission."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /concerts - List concerts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const data = json.data || json;",
+                  "",
+                  "pm.test('paginated response is returned', function () {",
+                  "  pm.expect(data).to.have.property('items');",
+                  "  pm.expect(data).to.have.property('meta');",
+                  "  pm.expect(data.meta).to.include.keys(['page', 'limit', 'total', 'totalPages']);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/concerts?page=1&limit=10&status=draft&keyword=TicketBox",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "concerts"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "draft"
+                },
+                {
+                  "key": "keyword",
+                  "value": "TicketBox"
+                },
+                {
+                  "key": "fromDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "toDate",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lists concerts with pagination, status filter, keyword search, and optional date range filters."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /concerts/:id - Concert detail",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('concertId')) {",
+                  "  throw new Error('Missing concertId. Run POST /concerts first.');",
+                  "}",
+                  "",
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Login with a user that has concert:update and scope for this concert first.');",
+                  "}",
+                  "",
+                  "pm.request.headers.upsert({",
+                  "  key: 'Authorization',",
+                  "  value: `Bearer ${accessToken}`",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const concert = (pm.response.json().data || pm.response.json());",
+                  "",
+                  "pm.test('concert detail is returned without related module data', function () {",
+                  "  pm.expect(concert).to.have.property('id', pm.collectionVariables.get('concertId'));",
+                  "  pm.expect(concert).to.not.have.property('ticketTypes');",
+                  "  pm.expect(concert).to.not.have.property('orders');",
+                  "  pm.expect(concert).to.not.have.property('tickets');",
+                  "  pm.expect(concert).to.not.have.property('reservations');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/concerts/{{concertId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "concerts",
+                "{{concertId}}"
+              ]
+            },
+            "description": "Returns one concert only. It intentionally does not include ticket types, orders, tickets, or reservations."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /concerts/:id - Update draft concert",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('concertId')) {",
+                  "  throw new Error('Missing concertId. Run POST /concerts first.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const concert = (pm.response.json().data || pm.response.json());",
+                  "",
+                  "pm.test('draft concert fields are updated', function () {",
+                  "  pm.expect(concert).to.have.property('id', pm.collectionVariables.get('concertId'));",
+                  "  pm.expect(concert.description).to.eql('Updated from Postman before publish.');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated from Postman before publish.\",\n  \"artistName\": \"The Updated TicketBox Band\",\n  \"venueName\": \"TicketBox Arena\",\n  \"venueAddress\": \"123 Nguyen Hue, District 1, Ho Chi Minh City\",\n  \"posterUrl\": \"https://example.com/posters/ticketbox-live-updated.png\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/concerts/{{concertId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "concerts",
+                "{{concertId}}"
+              ]
+            },
+            "description": "Updates allowed fields. Requires concert:update permission and global scope or concert scope for {{concertId}}. Do not send status here."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /concerts/:id/publish - Publish concert",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('concertId')) {",
+                  "  throw new Error('Missing concertId. Run POST /concerts first.');",
+                  "}",
+                  "",
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Login with a user that has concert:publish and scope for this concert first.');",
+                  "}",
+                  "",
+                  "pm.request.headers.upsert({",
+                  "  key: 'Authorization',",
+                  "  value: `Bearer ${accessToken}`",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const concert = (pm.response.json().data || pm.response.json());",
+                  "",
+                  "pm.test('concert is published', function () {",
+                  "  pm.expect(concert.status).to.eql('published');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/concerts/{{concertId}}/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "concerts",
+                "{{concertId}}",
+                "publish"
+              ]
+            },
+            "description": "Publishes only draft concerts. Requires concert:publish permission and global scope or concert scope for {{concertId}}. TicketType readiness is intentionally not checked by ConcertModule."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /concerts/:id/cancel - Cancel concert",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('concertId')) {",
+                  "  throw new Error('Missing concertId. Run POST /concerts first.');",
+                  "}",
+                  "",
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Login with a user that has concert:cancel and scope for this concert first.');",
+                  "}",
+                  "",
+                  "pm.request.headers.upsert({",
+                  "  key: 'Authorization',",
+                  "  value: `Bearer ${accessToken}`",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const concert = (pm.response.json().data || pm.response.json());",
+                  "",
+                  "pm.test('concert is cancelled', function () {",
+                  "  pm.expect(concert.status).to.eql('cancelled');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Cancelled from Postman sample flow.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/concerts/{{concertId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "concerts",
+                "{{concertId}}",
+                "cancel"
+              ]
+            },
+            "description": "Cancels draft or published concerts. Requires concert:cancel permission and global scope or concert scope for {{concertId}}. Refund/payment and notification work belongs to other modules later."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /concerts/:id/complete - Mark complete",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('concertId')) {",
+                  "  throw new Error('Missing concertId. Use a published concert with eventDate in the past.');",
+                  "}",
+                  "",
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Login with a user that has concert:complete and scope for this concert first.');",
+                  "}",
+                  "",
+                  "pm.request.headers.upsert({",
+                  "  key: 'Authorization',",
+                  "  value: `Bearer ${accessToken}`",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/concerts/{{concertId}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "concerts",
+                "{{concertId}}",
+                "complete"
+              ]
+            },
+            "description": "Marks a published concert as completed only after eventDate has passed. Requires concert:complete permission and global scope or concert scope for {{concertId}}. The create flow uses a future date, so use this manually with a suitable published concert."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "testEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testPhone",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testPassword",
+      "value": "password123",
+      "type": "string"
+    },
+    {
+      "key": "testFullName",
+      "value": "TicketBox Test User",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "concertId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "concertName",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "concertEventDate",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
