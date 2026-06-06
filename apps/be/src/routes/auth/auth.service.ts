@@ -1,5 +1,10 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { Prisma, ScopeType } from '../../generated/prisma';
+import {
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Prisma } from '../../generated/prisma';
 import { HashService } from '../../common/crypto/hash.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
@@ -19,6 +24,16 @@ export class AuthService {
   ) {}
   async register(registerDto: RegisterDto) {
     const { password, ...userData } = registerDto;
+    const customerRole = await this.prismaService.role.findUnique({
+      where: { name: 'customer' },
+    });
+
+    if (!customerRole) {
+      throw new InternalServerErrorException(
+        'Default customer role is not seeded',
+      );
+    }
+
     const passwordHash = await this.hashService.hashPassword(password);
     try {
       const user = await this.prismaService.user.create({
@@ -27,13 +42,7 @@ export class AuthService {
           password: passwordHash,
           roles: {
             create: {
-              scopeType: ScopeType.GLOBAL,
-              role: {
-                connectOrCreate: {
-                  where: { name: 'customer' },
-                  create: { name: 'customer' },
-                },
-              },
+              roleId: customerRole.id,
             },
           },
         },

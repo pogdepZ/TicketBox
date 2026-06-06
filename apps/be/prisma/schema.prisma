@@ -19,12 +19,6 @@ enum UserStatus {
   DELETED
 }
 
-enum ScopeType {
-  GLOBAL
-  CONCERT
-  GATE
-}
-
 enum ConcertStatus {
   DRAFT
   PUBLISHED
@@ -222,15 +216,6 @@ model UserRole {
   userId String @map("user_id") @db.Uuid
   roleId String @map("role_id") @db.Uuid
 
-  scopeType ScopeType @default(GLOBAL) @map("scope_type")
-  /// Polymorphic scope target:
-  /// - GLOBAL: NULL
-  /// - CONCERT: concerts.id
-  /// - GATE: checkin_devices.id
-  /// No database FK is used because the target table depends on scopeType.
-  /// The application layer must validate scopeId against the matching resource.
-  scopeId   String?   @map("scope_id") @db.Uuid
-
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -238,7 +223,6 @@ model UserRole {
 
   @@index([userId])
   @@index([roleId])
-  @@index([scopeType, scopeId])
   @@map("user_roles")
 }
 
