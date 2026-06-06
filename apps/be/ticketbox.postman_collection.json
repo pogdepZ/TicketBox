@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "75b17bdb-f1c5-4d8c-bc2d-9fbff4d69a01",
     "name": "TicketBox Backend",
-    "description": "Postman collection for the NestJS backend endpoints currently registered in src/app.module.ts: Health, Auth, and Concerts. Default baseUrl is http://localhost:3001. Run the backend before testing. Use Register first to generate a test account, then Login, Profile, Refresh, Logout, and Concerts.",
+    "description": "Postman collection for the NestJS backend endpoints currently registered in src/app.module.ts: Health, Auth, and Concerts. Default baseUrl is http://localhost:3001. Run the backend and RBAC seed before testing protected Concert routes. Use Seed Admin Login to save an admin accessToken, then run Concerts.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -55,7 +55,7 @@
     },
     {
       "name": "Auth",
-      "description": "AuthModule endpoints from src/routes/auth/auth.controller.ts. Refresh token is stored as an httpOnly cookie named refreshToken on /auth/refresh.",
+      "description": "AuthModule endpoints from src/routes/auth/auth.controller.ts. Refresh token is stored as an httpOnly cookie named refreshToken on /auth/refresh. Use Seed Admin Login after running npm run db:seed with SEED_ADMIN_* env vars when testing protected Concert routes.",
       "item": [
         {
           "name": "POST /auth/register - Register test account",
@@ -154,6 +154,8 @@
                   "});",
                   "",
                   "pm.collectionVariables.set('accessToken', accessToken);",
+                  "pm.collectionVariables.set('activeLoginEmail', pm.collectionVariables.get('testEmail'));",
+                  "pm.collectionVariables.set('activeExpectedRole', 'customer');",
                   "if (pm.environment.name) {",
                   "  pm.environment.set('accessToken', accessToken);",
                   "}",
@@ -185,6 +187,74 @@
               ]
             },
             "description": "Logs in with the account created by Register. Saves accessToken and userId as collection variables. Postman should also keep the refreshToken cookie returned by the server."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/login - Seed admin and save access token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const data = json.data || json;",
+                  "const accessToken = data && data.accessToken;",
+                  "",
+                  "pm.test('admin login returns user and access token', function () {",
+                  "  pm.expect(data).to.have.property('user');",
+                  "  pm.expect(data).to.have.property('accessToken');",
+                  "  pm.expect(data.user.email).to.eql(pm.collectionVariables.get('seedAdminEmail'));",
+                  "});",
+                  "",
+                  "pm.test('admin user has concert permissions', function () {",
+                  "  const permissions = data.user.roles.flatMap((role) => role.permissions || []);",
+                  "  pm.expect(data.user.roles.map((role) => role.name)).to.include('admin');",
+                  "  pm.expect(permissions).to.include('concert:create');",
+                  "  pm.expect(permissions).to.include('concert:update');",
+                  "  pm.expect(permissions).to.include('concert:publish');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('accessToken', accessToken);",
+                  "pm.collectionVariables.set('activeLoginEmail', pm.collectionVariables.get('seedAdminEmail'));",
+                  "pm.collectionVariables.set('activeExpectedRole', 'admin');",
+                  "pm.collectionVariables.set('adminUserId', data.user.id);",
+                  "pm.collectionVariables.set('userId', data.user.id);",
+                  "if (pm.environment.name) {",
+                  "  pm.environment.set('accessToken', accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{seedAdminEmail}}\",\n  \"password\": \"{{seedAdminPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Logs in with the admin user created by prisma/seed.ts. Run npm run db:seed with SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD first. Saves accessToken for protected Concert requests."
           },
           "response": []
         },
@@ -222,12 +292,12 @@
                   "",
                   "pm.test('profile matches logged in user', function () {",
                   "  pm.expect(user).to.have.property('id', pm.collectionVariables.get('userId'));",
-                  "  pm.expect(user).to.have.property('email', pm.collectionVariables.get('testEmail'));",
+                  "  pm.expect(user).to.have.property('email', pm.collectionVariables.get('activeLoginEmail'));",
                   "});",
                   "",
                   "pm.test('profile returns roles', function () {",
                   "  pm.expect(user.roles).to.be.an('array');",
-                  "  pm.expect(user.roles.map((role) => role.name)).to.include('customer');",
+                  "  pm.expect(user.roles.map((role) => role.name)).to.include(pm.collectionVariables.get('activeExpectedRole'));",
                   "});"
                 ]
               }
@@ -272,7 +342,7 @@
                   "",
                   "pm.test('refresh user has roles', function () {",
                   "  pm.expect(data.user.roles).to.be.an('array');",
-                  "  pm.expect(data.user.roles.map((role) => role.name)).to.include('customer');",
+                  "  pm.expect(data.user.roles.map((role) => role.name)).to.include(pm.collectionVariables.get('activeExpectedRole'));",
                   "});",
                   "",
                   "pm.collectionVariables.set('accessToken', accessToken);",
@@ -586,18 +656,7 @@
                 "exec": [
                   "if (!pm.collectionVariables.get('concertId')) {",
                   "  throw new Error('Missing concertId. Run POST /concerts first.');",
-                  "}",
-                  "",
-                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
-                  "",
-                  "if (!accessToken) {",
-                  "  throw new Error('Missing accessToken. Login with a user that has concert:update and scope for this concert first.');",
-                  "}",
-                  "",
-                  "pm.request.headers.upsert({",
-                  "  key: 'Authorization',",
-                  "  value: `Bearer ${accessToken}`",
-                  "});"
+                  "}"
                 ]
               }
             },
@@ -650,7 +709,18 @@
                 "exec": [
                   "if (!pm.collectionVariables.get('concertId')) {",
                   "  throw new Error('Missing concertId. Run POST /concerts first.');",
-                  "}"
+                  "}",
+                  "",
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Login with a user that has concert:update and scope for this concert first.');",
+                  "}",
+                  "",
+                  "pm.request.headers.upsert({",
+                  "  key: 'Authorization',",
+                  "  value: `Bearer ${accessToken}`",
+                  "});"
                 ]
               }
             },
@@ -901,6 +971,36 @@
     {
       "key": "testFullName",
       "value": "TicketBox Test User",
+      "type": "string"
+    },
+    {
+      "key": "seedAdminEmail",
+      "value": "admin@gmail.com",
+      "type": "string"
+    },
+    {
+      "key": "seedAdminPassword",
+      "value": "123456",
+      "type": "string"
+    },
+    {
+      "key": "seedAdminFullName",
+      "value": "System Admin",
+      "type": "string"
+    },
+    {
+      "key": "adminUserId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "activeLoginEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "activeExpectedRole",
+      "value": "",
       "type": "string"
     },
     {
