@@ -17,9 +17,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthUser } from '../auth/dto/user-response.dto';
 import { JwtAuthGuard } from '../auth/guard/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guard/permission.guard';
-import { ScopeGuard } from '../auth/guard/scope.guard';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
-import { ResourceScope } from '../auth/decorators/resource-scope.decorator';
 
 @Controller('concerts')
 export class ConcertController {
@@ -46,25 +44,22 @@ export class ConcertController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, PermissionGuard, ScopeGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermissions('concert:update')
-  @ResourceScope({ type: 'concert', param: 'id' })
   update(@Param('id') id: string, @Body() updateConcertDto: UpdateConcertDto) {
     return this.concertService.update(id, updateConcertDto);
   }
 
   @Patch(':id/publish')
-  @UseGuards(JwtAuthGuard, PermissionGuard, ScopeGuard)
-  @RequirePermissions('concert:publish')
-  @ResourceScope({ type: 'concert', param: 'id' })
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermissions('concert:update')
   publish(@Param('id') id: string) {
     return this.concertService.publish(id);
   }
 
   @Patch(':id/cancel')
-  @UseGuards(JwtAuthGuard, PermissionGuard, ScopeGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermissions('concert:cancel')
-  @ResourceScope({ type: 'concert', param: 'id' })
   cancel(
     @Param('id') id: string,
     @Body() cancelConcertDto: CancelConcertDto = new CancelConcertDto(),
@@ -73,9 +68,8 @@ export class ConcertController {
   }
 
   @Patch(':id/complete')
-  @UseGuards(JwtAuthGuard, PermissionGuard, ScopeGuard)
-  @RequirePermissions('concert:complete')
-  @ResourceScope({ type: 'concert', param: 'id' })
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermissions('concert:update')
   complete(@Param('id') id: string) {
     return this.concertService.complete(id);
   }

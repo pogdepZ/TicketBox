@@ -5,7 +5,6 @@ import {
   Permission,
   PrismaClient,
   Role,
-  ScopeType,
   UserStatus,
 } from '../src/generated/prisma';
 
@@ -21,50 +20,60 @@ const prisma = new PrismaClient({
 
 const permissions = [
   'concert:read',
+  'order:create',
+  'order:read_own',
+  'payment:create',
+  'ticket:read_own',
+  'user:manage',
+  'concert:read_admin',
   'concert:create',
   'concert:update',
-  'concert:publish',
   'concert:cancel',
-  'concert:complete',
-  'ticket:purchase',
-  'ticket:read_own',
-  'ticket:scan',
+  'ticket_type:manage',
+  'order:read_admin',
+  'ticket:read_admin',
   'revenue:read',
-  'guestlist:import',
-  'audit:read',
-  'user:manage',
+  'guest_import:manage',
+  'artist_bio:manage',
+  'checker:manage',
+  'checkin:scan',
+  'checkin:sync',
+  'checkin:snapshot_read',
+  'ticket:verify',
 ] as const;
 
-const roles = ['admin', 'organizer', 'checkin_staff', 'audience'] as const;
+const roles = ['customer', 'admin', 'checker'] as const;
+
+const deprecatedRoles = ['organizer', 'checkin_staff', 'audience'] as const;
 
 const rolePermissions = {
-  admin: [
+  customer: [
     'concert:read',
-    'concert:create',
-    'concert:update',
-    'concert:publish',
-    'concert:cancel',
-    'concert:complete',
-    'ticket:purchase',
+    'order:create',
+    'order:read_own',
+    'payment:create',
     'ticket:read_own',
-    'ticket:scan',
-    'revenue:read',
-    'guestlist:import',
-    'audit:read',
-    'user:manage',
   ],
-  organizer: [
-    'concert:read',
+  admin: [
+    'user:manage',
+    'concert:read_admin',
     'concert:create',
     'concert:update',
-    'concert:publish',
     'concert:cancel',
-    'concert:complete',
+    'ticket_type:manage',
+    'order:read_admin',
+    'ticket:read_admin',
     'revenue:read',
-    'guestlist:import',
+    'guest_import:manage',
+    'artist_bio:manage',
+    'checker:manage',
   ],
-  checkin_staff: ['concert:read', 'ticket:scan'],
-  audience: ['concert:read', 'ticket:purchase', 'ticket:read_own'],
+  checker: [
+    'checkin:scan',
+    'checkin:sync',
+    'checkin:snapshot_read',
+    'ticket:verify',
+  ],
 } satisfies Record<(typeof roles)[number], Array<(typeof permissions)[number]>>;
 
 async function seedPermissions(): Promise<Map<string, Permission>> {
@@ -132,6 +141,59 @@ async function seedRolePermissions(
   }
 }
 
+async function cleanupRolesAndPermissions(
+  roleByName: Map<string, Role>,
+  permissionByCode: Map<string, Permission>,
+): Promise<void> {
+  for (const [roleName, allowedPermissionCodes] of Object.entries(
+    rolePermissions,
+  )) {
+    const role = roleByName.get(roleName);
+
+    if (!role) {
+      throw new Error(`Missing role ${roleName}`);
+    }
+
+    const allowedPermissionIds = allowedPermissionCodes.map((permissionCode) => {
+      const permission = permissionByCode.get(permissionCode);
+
+      if (!permission) {
+        throw new Error(`Missing permission ${permissionCode}`);
+      }
+
+      return permission.id;
+    });
+
+    await prisma.rolePermission.deleteMany({
+      where: {
+        roleId: role.id,
+        permissionId: {
+          notIn: allowedPermissionIds,
+        },
+      },
+    });
+  }
+
+  await prisma.role.deleteMany({
+    where: {
+      name: {
+        in: [...deprecatedRoles],
+      },
+    },
+  });
+
+  await prisma.permission.deleteMany({
+    where: {
+      code: {
+        notIn: [...permissions],
+      },
+      roles: {
+        none: {},
+      },
+    },
+  });
+}
+
 async function seedAdminUser(roleByName: Map<string, Role>): Promise<void> {
   const email = process.env.SEED_ADMIN_EMAIL;
   const password = process.env.SEED_ADMIN_PASSWORD;
@@ -183,23 +245,17 @@ async function seedAdminUser(roleByName: Map<string, Role>): Promise<void> {
   await upsertUserRole({
     userId: adminUser.id,
     roleId: adminRole.id,
-    scopeType: ScopeType.GLOBAL,
-    scopeId: null,
   });
 }
 
 async function upsertUserRole(params: {
   userId: string;
   roleId: string;
-  scopeType: ScopeType;
-  scopeId: string | null;
 }): Promise<void> {
   const existingUserRole = await prisma.userRole.findFirst({
     where: {
       userId: params.userId,
       roleId: params.roleId,
-      scopeType: params.scopeType,
-      scopeId: params.scopeId,
     },
   });
 
@@ -211,8 +267,6 @@ async function upsertUserRole(params: {
     data: {
       userId: params.userId,
       roleId: params.roleId,
-      scopeType: params.scopeType,
-      scopeId: params.scopeId,
     },
   });
 }
@@ -222,6 +276,7 @@ async function main(): Promise<void> {
   const roleByName = await seedRoles();
 
   await seedRolePermissions(roleByName, permissionByCode);
+  await cleanupRolesAndPermissions(roleByName, permissionByCode);
   await seedAdminUser(roleByName);
 
   console.log('RBAC seed completed.');

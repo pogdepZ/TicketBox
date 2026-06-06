@@ -2,8 +2,6 @@ import { UserWithRoles } from '../types/auth-user.types';
 
 export type AuthRole = {
   name: string;
-  scopeType: string;
-  scopeId: string | null;
   permissions: string[];
 };
 
@@ -32,8 +30,6 @@ export class UserResponseDto implements AuthUser {
     this.status = user.status;
     this.roles = user.roles.map((userRole) => ({
       name: userRole.role.name,
-      scopeType: userRole.scopeType,
-      scopeId: userRole.scopeId,
       permissions: userRole.role.permissions.map(
         (rolePermission) => rolePermission.permission.code,
       ),
