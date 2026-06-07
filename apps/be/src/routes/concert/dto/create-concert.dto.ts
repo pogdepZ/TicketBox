@@ -1,45 +1,34 @@
-import {
-  IsISO8601,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  MaxLength,
-} from 'class-validator';
+import { z } from 'zod';
+import { ZodDtoOf } from '../../../common/pipes/zod-validation.pipe';
 
-export class CreateConcertDto {
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(200)
+export const isoDateStringSchema = z.union([
+  z.iso.datetime({ offset: true }),
+  z.iso.date(),
+]);
+
+export const createConcertSchema = z
+  .object({
+    name: z.string().min(1).max(200),
+    description: z.string().optional(),
+    artistName: z.string().max(200).optional(),
+    venueName: z.string().min(1).max(200),
+    venueAddress: z.string().min(1),
+    eventDate: isoDateStringSchema,
+    seatMapSvg: z.string().optional(),
+    // Intentionally not using url validation so local/mock paths can be accepted during storage integration.
+    posterUrl: z.string().max(500).optional(),
+  })
+  .strict();
+
+export class CreateConcertDto implements ZodDtoOf<typeof createConcertSchema> {
+  static schema = createConcertSchema;
+
   name!: string;
-
-  @IsOptional()
-  @IsString()
   description?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
   artistName?: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(200)
   venueName!: string;
-
-  @IsString()
-  @IsNotEmpty()
   venueAddress!: string;
-
-  @IsISO8601()
   eventDate!: string;
-
-  @IsOptional()
-  @IsString()
   seatMapSvg?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  // Intentionally not using @IsUrl so local/mock paths can be accepted during storage integration.
   posterUrl?: string;
 }

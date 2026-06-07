@@ -1,10 +1,16 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { z } from 'zod';
+import { ZodDtoOf } from '../../../common/pipes/zod-validation.pipe';
 
-export class LoginDto {
-  @IsEmail()
-  email?: string;
+export const loginSchema = z
+  .object({
+    email: z.string().email(),
+    password: z.string().min(6),
+  })
+  .strict();
 
-  @IsString()
-  @MinLength(6)
-  password?: string;
+export class LoginDto implements ZodDtoOf<typeof loginSchema> {
+  static schema = loginSchema;
+
+  email!: string;
+  password!: string;
 }

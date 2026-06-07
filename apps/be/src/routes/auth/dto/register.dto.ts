@@ -1,35 +1,23 @@
 import { UserStatus } from '../../../generated/prisma';
-import {
-  IsEmail,
-  IsEnum,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  MaxLength,
-  MinLength,
-} from 'class-validator';
+import { z } from 'zod';
+import { ZodDtoOf } from '../../../common/pipes/zod-validation.pipe';
 
-export class RegisterDto {
-  @IsEmail()
-  @MaxLength(255)
+export const registerSchema = z
+  .object({
+    email: z.string().email().max(255),
+    phone: z.string().max(20).optional(),
+    password: z.string().min(6).max(72),
+    fullName: z.string().min(1).max(100),
+    status: z.nativeEnum(UserStatus).optional(),
+  })
+  .strict();
+
+export class RegisterDto implements ZodDtoOf<typeof registerSchema> {
+  static schema = registerSchema;
+
   email!: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(20)
   phone?: string;
-
-  @IsString()
-  @MinLength(6)
-  @MaxLength(72)
   password!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
   fullName!: string;
-
-  @IsEnum(UserStatus)
-  @IsOptional()
   status?: UserStatus;
 }
