@@ -15,21 +15,21 @@ export default function SuccessPage() {
     <main className="min-h-screen bg-background">
       <Header />
 
-      <section className="max-w-4xl mx-auto px-4 py-12">
-        <div className="text-center mb-12">
-          <div className="flex justify-center mb-6">
-            <div className="p-4 bg-green-500/20 rounded-full">
-              <CheckCircle className="w-12 h-12 text-green-500" />
+      <section className="mx-auto max-w-4xl px-4 py-12">
+        <div className="mb-12 text-center">
+          <div className="mb-6 flex justify-center">
+            <div className="rounded-full bg-accent p-4 text-accent-foreground shadow-xl shadow-accent/15">
+              <CheckCircle className="size-12" />
             </div>
           </div>
-          <h1 className="text-4xl font-bold text-foreground mb-2">Đặt vé thành công!</h1>
-          <p className="text-xl text-muted-foreground mb-8">
+          <h1 className="mb-3 text-4xl font-black tracking-tight text-foreground md:text-5xl">Đặt vé thành công</h1>
+          <p className="mx-auto mb-8 max-w-2xl text-lg leading-8 text-muted-foreground">
             Vé của bạn đã được xác nhận và sẽ được gửi đến email {checkoutMock.customer.email}.
           </p>
         </div>
 
         <div className="mb-12">
-          <h2 className="text-2xl font-bold text-foreground mb-6">Vé của bạn</h2>
+          <h2 className="mb-6 text-2xl font-black text-foreground">Vé của bạn</h2>
           <div className="space-y-6">
             {orderMock.tickets.map((ticket) => (
               <ETicketCard
@@ -48,8 +48,8 @@ export default function SuccessPage() {
           </div>
         </div>
 
-        <div className="bg-card rounded-lg p-8 border border-border mb-12">
-          <h3 className="text-xl font-bold text-foreground mb-4">Thông tin đơn hàng</h3>
+        <div className="mb-12 rounded-[2rem] border border-border bg-card p-6 shadow-sm md:p-8">
+          <h3 className="mb-4 text-xl font-black text-foreground">Thông tin đơn hàng</h3>
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Mã đơn hàng</span>
@@ -65,14 +65,14 @@ export default function SuccessPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tổng tiền</span>
-              <span className="font-bold text-primary text-lg">{total.toLocaleString('vi-VN')}đ</span>
+              <span className="text-lg font-black text-primary">{total.toLocaleString('vi-VN')}đ</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-muted/50 rounded-lg p-8 border border-border mb-12">
-          <h3 className="text-xl font-bold text-foreground mb-4">Các bước tiếp theo</h3>
-          <ol className="space-y-4 list-decimal list-inside text-muted-foreground">
+        <div className="mb-12 rounded-[2rem] border border-border bg-muted/50 p-6 md:p-8">
+          <h3 className="mb-4 text-xl font-black text-foreground">Các bước tiếp theo</h3>
+          <ol className="space-y-4 text-muted-foreground">
             <li>Kiểm tra email xác nhận với toàn bộ chi tiết vé.</li>
             <li>Tải xuống vé điện tử hoặc lưu lại mã QR.</li>
             <li>Đến địa điểm ít nhất 30 phút trước giờ diễn.</li>
@@ -80,20 +80,20 @@ export default function SuccessPage() {
           </ol>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <div className="flex flex-col justify-center gap-4 sm:flex-row">
           <Link
             href="/"
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-card border border-primary text-primary rounded-lg hover:bg-primary/10 transition font-medium"
+            className="flex items-center justify-center gap-2 rounded-full border border-border bg-card px-6 py-3 font-bold text-foreground transition hover:border-primary/40 hover:text-primary active:translate-y-px"
           >
-            <HomeIcon className="w-5 h-5" />
+            <HomeIcon className="size-5" />
             Trang chủ
           </Link>
-          <button className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition font-medium">
-            <Download className="w-5 h-5" />
+          <button className="flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground transition hover:bg-primary/90 active:translate-y-px">
+            <Download className="size-5" />
             Tải xuống vé
           </button>
-          <button className="flex items-center justify-center gap-2 px-6 py-3 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition font-medium">
-            <Share2 className="w-5 h-5" />
+          <button className="flex items-center justify-center gap-2 rounded-full bg-accent px-6 py-3 font-bold text-accent-foreground transition hover:bg-accent/90 active:translate-y-px">
+            <Share2 className="size-5" />
             Chia sẻ
           </button>
         </div>

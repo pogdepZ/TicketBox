@@ -2,55 +2,106 @@ import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { ConcertCard } from '@/components/concert-card';
 import { concerts } from '@/lib/mock-data';
+import Image from 'next/image';
+import Link from 'next/link';
+import { ArrowRight, CalendarDays, MapPin, Sparkles } from 'lucide-react';
 
 export default function HomePage() {
+  const featured = concerts[0];
+
   return (
     <main className="min-h-screen bg-background">
       <Header />
 
-      <section className="relative h-96 bg-gradient-to-r from-primary/20 via-accent/20 to-purple-600/20 flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 opacity-30">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(167,139,250,0.15),transparent_50%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(236,72,153,0.15),transparent_50%)]" />
+      <section className="mx-auto grid max-w-7xl gap-10 px-4 pb-16 pt-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-center lg:pb-20 lg:pt-14">
+        <div>
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-bold text-primary">
+            <Sparkles className="size-4" />
+            Mùa diễn 2026 đã mở bán
+          </div>
+          <h1 className="max-w-3xl text-5xl font-black leading-[0.98] tracking-tight text-foreground md:text-6xl">
+            Chọn show hay. Giữ ghế đẹp.
+          </h1>
+          <p className="mt-6 max-w-xl text-lg leading-8 text-muted-foreground">
+            Đặt vé concert, lễ hội âm nhạc và sân khấu biểu diễn nổi bật tại Việt Nam.
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link
+              href={`/concert/${featured.id}`}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-px"
+            >
+              Xem show nổi bật
+              <ArrowRight className="size-4" />
+            </Link>
+            <Link
+              href="#events"
+              className="inline-flex items-center justify-center rounded-full border border-border bg-card px-6 py-3 font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary active:translate-y-px"
+            >
+              Lịch diễn
+            </Link>
+          </div>
         </div>
 
-        <div className="relative text-center max-w-3xl mx-auto px-4 z-10">
-          <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-4">
-            Khám phá những sự kiện <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">đáng xem</span>
-          </h1>
-          <p className="text-xl text-muted-foreground mb-8">
-            Đặt vé concert, lễ hội âm nhạc và các sân khấu biểu diễn nổi bật trong mùa hè 2026.
-          </p>
-          <button className="px-8 py-3 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 transition">
-            Bắt đầu khám phá
-          </button>
+        <div className="relative">
+          <div className="relative overflow-hidden rounded-[2rem] border border-border bg-foreground shadow-2xl shadow-foreground/10">
+            <div className="relative aspect-[16/11]">
+              <Image src={featured.image} alt={featured.title} fill priority className="object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+              <div className="absolute bottom-5 left-5 right-5 text-white">
+                <p className="text-sm font-bold text-white/70">{featured.artist}</p>
+                <h2 className="mt-1 text-3xl font-black tracking-tight">{featured.title}</h2>
+              </div>
+            </div>
+          </div>
+          <div className="absolute -bottom-8 left-5 right-5 rounded-3xl border border-border bg-card p-5 shadow-xl shadow-foreground/10 md:left-auto md:right-8 md:w-80">
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">Featured ticket</p>
+                <p className="mt-1 text-lg font-black text-foreground">{featured.price.toLocaleString('vi-VN')}đ</p>
+              </div>
+              <span className="rounded-full bg-accent px-3 py-1 text-xs font-bold text-accent-foreground">Đang bán</span>
+            </div>
+            <div className="grid gap-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="size-4 text-primary" />
+                {new Date(featured.date).toLocaleDateString('vi-VN')} · {featured.time}
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="size-4 text-primary" />
+                {featured.venue}, {featured.city}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="max-w-7xl mx-auto px-4 py-16">
-        <div className="mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-2">Sự kiện nổi bật</h2>
-          <p className="text-muted-foreground">Các buổi diễn đang được quan tâm nhất tuần này</p>
+      <section id="events" className="mx-auto max-w-7xl px-4 py-20">
+        <div className="mb-10 max-w-2xl">
+          <h2 className="text-3xl font-black tracking-tight text-foreground md:text-5xl">Sự kiện nổi bật</h2>
+          <p className="mt-3 text-lg text-muted-foreground">Các buổi diễn đang được quan tâm nhất tuần này.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {concerts.map((concert) => (
             <ConcertCard key={concert.id} {...concert} />
           ))}
         </div>
       </section>
 
-      <section className="bg-gradient-to-r from-primary/10 to-accent/10 border-y border-border py-16 my-16">
-        <div className="max-w-4xl mx-auto text-center px-4">
-          <h2 className="text-3xl font-bold text-foreground mb-4">Không tìm thấy sự kiện bạn muốn?</h2>
-          <p className="text-muted-foreground mb-8">Đăng ký để nhận thông báo khi có show mới được mở bán.</p>
-          <div className="flex gap-2 max-w-md mx-auto">
+      <section className="mx-auto max-w-7xl px-4 py-10">
+        <div className="grid gap-8 rounded-[2rem] bg-foreground p-6 text-background md:grid-cols-[1fr_0.9fr] md:p-10">
+          <div>
+            <h2 className="max-w-xl text-3xl font-black tracking-tight md:text-4xl">Nhận thông báo khi show mới mở bán</h2>
+            <p className="mt-3 max-w-lg text-background/65">Theo dõi lịch mở bán theo nghệ sĩ và thành phố bạn quan tâm.</p>
+          </div>
+          <div className="flex flex-col gap-3 self-center sm:flex-row">
             <input
               type="email"
-              placeholder="Nhập email của bạn..."
-              className="flex-1 px-4 py-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="email@example.com"
+              aria-label="Email nhận thông báo"
+              className="min-h-12 flex-1 rounded-full border border-white/15 bg-white/10 px-5 text-background placeholder:text-background/45 focus:outline-none focus:ring-4 focus:ring-primary/30"
             />
-            <button className="px-6 py-2 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 transition">
+            <button className="min-h-12 rounded-full bg-primary px-6 font-bold text-primary-foreground transition hover:bg-primary/90 active:translate-y-px">
               Đăng ký
             </button>
           </div>

@@ -8,24 +8,24 @@ export default function AdminSettingsPage() {
     <AdminLayout>
       <div className="space-y-8">
         <div>
-          <h1 className="text-4xl font-bold text-foreground">Cài đặt</h1>
+          <h1 className="text-4xl font-black tracking-tight text-foreground">Cài đặt</h1>
           <p className="text-muted-foreground mt-1">Quản lý cấu hình hệ thống và thông tin vận hành</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1">
-            <div className="bg-card border border-border rounded-lg overflow-hidden sticky top-8">
+            <div className="sticky top-8 overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
               <nav className="space-y-1 p-4">
-                <button className="w-full text-left px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition font-medium">
+                <button className="w-full rounded-2xl bg-primary/10 px-4 py-2 text-left font-bold text-primary transition hover:bg-primary/20">
                   Chung
                 </button>
-                <button className="w-full text-left px-4 py-2 rounded-lg text-muted-foreground hover:bg-muted transition">
+                <button className="w-full rounded-2xl px-4 py-2 text-left text-muted-foreground transition hover:bg-muted">
                   Thanh toán
                 </button>
-                <button className="w-full text-left px-4 py-2 rounded-lg text-muted-foreground hover:bg-muted transition">
+                <button className="w-full rounded-2xl px-4 py-2 text-left text-muted-foreground transition hover:bg-muted">
                   Email
                 </button>
-                <button className="w-full text-left px-4 py-2 rounded-lg text-muted-foreground hover:bg-muted transition">
+                <button className="w-full rounded-2xl px-4 py-2 text-left text-muted-foreground transition hover:bg-muted">
                   Bảo mật
                 </button>
               </nav>
@@ -33,13 +33,13 @@ export default function AdminSettingsPage() {
           </div>
 
           <div className="lg:col-span-2">
-            <div className="bg-card border border-border rounded-lg p-8 space-y-6">
+            <div className="space-y-6 rounded-[2rem] border border-border bg-card p-5 shadow-sm md:p-8">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">Tên công ty</label>
                 <input
                   type="text"
                   defaultValue="TicketBox Việt Nam"
-                  className="w-full px-4 py-2 bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="h-11 w-full rounded-2xl border border-border bg-muted px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
                 />
               </div>
 
@@ -48,7 +48,7 @@ export default function AdminSettingsPage() {
                 <input
                   type="text"
                   defaultValue={`${admin.name} - ${admin.role}`}
-                  className="w-full px-4 py-2 bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="h-11 w-full rounded-2xl border border-border bg-muted px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
                 />
               </div>
 
@@ -57,7 +57,7 @@ export default function AdminSettingsPage() {
                 <input
                   type="email"
                   defaultValue="support@ticketbox.vn"
-                  className="w-full px-4 py-2 bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="h-11 w-full rounded-2xl border border-border bg-muted px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
                 />
               </div>
 
@@ -66,7 +66,7 @@ export default function AdminSettingsPage() {
                 <input
                   type="number"
                   defaultValue="5"
-                  className="w-full px-4 py-2 bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="h-11 w-full rounded-2xl border border-border bg-muted px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
                 />
               </div>
 
@@ -75,30 +75,30 @@ export default function AdminSettingsPage() {
                 <input
                   type="number"
                   defaultValue="10"
-                  className="w-full px-4 py-2 bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="h-11 w-full rounded-2xl border border-border bg-muted px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
                 />
               </div>
 
               <div className="border-t border-border pt-6">
-                <h3 className="text-lg font-bold text-foreground mb-4">Thông báo</h3>
+                <h3 className="mb-4 text-lg font-black text-foreground">Thông báo</h3>
                 <div className="space-y-3">
                   <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" defaultChecked className="w-4 h-4" />
+                    <input type="checkbox" defaultChecked className="size-4 accent-[var(--primary)]" />
                     <span className="text-foreground">Nhận email khi có đơn hàng mới</span>
                   </label>
                   <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" defaultChecked className="w-4 h-4" />
+                    <input type="checkbox" defaultChecked className="size-4 accent-[var(--primary)]" />
                     <span className="text-foreground">Nhận email khi vé được hoàn lại</span>
                   </label>
                   <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" className="w-4 h-4" />
+                    <input type="checkbox" className="size-4 accent-[var(--primary)]" />
                     <span className="text-foreground">Nhận email báo cáo hằng ngày</span>
                   </label>
                 </div>
               </div>
 
               <div className="border-t border-border pt-6 flex justify-end">
-                <button className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition font-medium">
+                <button className="rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground transition hover:bg-primary/90 active:translate-y-px">
                   Lưu cài đặt
                 </button>
               </div>

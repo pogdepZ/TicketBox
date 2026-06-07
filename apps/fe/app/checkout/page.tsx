@@ -12,25 +12,25 @@ export default function CheckoutPage() {
     <main className="min-h-screen bg-background">
       <Header />
 
-      <div className="max-w-7xl mx-auto px-4 py-12">
+      <div className="mx-auto max-w-7xl px-4 py-10">
         <Link
           href={`/concert/${concert.id}`}
-          className="flex items-center gap-2 text-primary hover:text-primary/80 transition font-medium mb-8"
+          className="mb-8 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="size-4" />
           Quay lại
         </Link>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <div className="bg-card rounded-lg p-8 border border-border mb-8">
-              <h1 className="text-3xl font-bold text-foreground mb-2">Thanh toán</h1>
-              <p className="text-muted-foreground mb-8">Hoàn tất đơn hàng của bạn</p>
+            <div className="mb-8 rounded-[2rem] border border-border bg-card p-5 shadow-sm md:p-8">
+              <h1 className="mb-2 text-4xl font-black tracking-tight text-foreground">Thanh toán</h1>
+              <p className="mb-8 text-muted-foreground">Hoàn tất đơn hàng của bạn.</p>
 
-              <div className="flex gap-4 p-4 bg-accent/10 border border-accent/20 rounded-lg mb-8">
-                <AlertCircle className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
+              <div className="mb-8 flex gap-4 rounded-3xl border border-primary/20 bg-primary/10 p-4">
+                <AlertCircle className="mt-0.5 size-5 flex-shrink-0 text-primary" />
                 <div>
-                  <p className="font-semibold text-foreground mb-1">Lưu ý quan trọng</p>
+                  <p className="mb-1 font-black text-foreground">Lưu ý quan trọng</p>
                   <p className="text-sm text-muted-foreground">
                     Vui lòng hoàn tất thanh toán trong 15 phút. Vé sẽ tự động được mở bán lại nếu đơn hàng quá hạn.
                   </p>
@@ -38,7 +38,7 @@ export default function CheckoutPage() {
               </div>
 
               <div className="mb-8 pb-8 border-b border-border">
-                <h2 className="text-xl font-bold text-foreground mb-4">Thông tin vé</h2>
+                <h2 className="mb-4 text-xl font-black text-foreground">Thông tin vé</h2>
                 <div className="space-y-3">
                   <div className="flex justify-between gap-6">
                     <span className="text-muted-foreground">Sự kiện</span>
@@ -62,14 +62,14 @@ export default function CheckoutPage() {
               </div>
 
               <div className="mb-8">
-                <h2 className="text-xl font-bold text-foreground mb-4">Chọn phương thức thanh toán</h2>
+                <h2 className="mb-4 text-xl font-black text-foreground">Chọn phương thức thanh toán</h2>
                 <div className="space-y-3">
                   {paymentMethods.map((method) => (
                     <label
                       key={method.id}
-                      className="flex items-start p-4 border-2 border-border rounded-lg cursor-pointer hover:border-primary transition"
+                      className="flex cursor-pointer items-start rounded-3xl border border-border p-4 transition hover:border-primary/55 hover:bg-primary/5"
                     >
-                      <input type="radio" name="payment" value={method.id} defaultChecked={method.id === 'card'} className="w-4 h-4 mt-1" />
+                      <input type="radio" name="payment" value={method.id} defaultChecked={method.id === 'card'} className="mt-1 size-4 accent-[var(--primary)]" />
                       <span className="ml-3">
                         <span className="block font-semibold text-foreground">{method.name}</span>
                         <span className="block text-sm text-muted-foreground">{method.description}</span>
@@ -79,24 +79,24 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              <div className="mb-8 p-6 bg-muted rounded-lg border border-border">
-                <h3 className="font-bold text-foreground mb-4">Chi tiết thẻ</h3>
+              <div className="mb-8 rounded-3xl border border-border bg-muted/55 p-6">
+                <h3 className="mb-4 font-black text-foreground">Chi tiết thẻ</h3>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">Số thẻ</label>
                     <input
                       type="text"
                       placeholder="4242 4242 4242 4242"
-                      className="w-full px-4 py-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="h-11 w-full rounded-2xl border border-border bg-card px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">MM/YY</label>
                       <input
                         type="text"
                         placeholder="08/28"
-                        className="w-full px-4 py-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="h-11 w-full rounded-2xl border border-border bg-card px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
                       />
                     </div>
                     <div>
@@ -104,14 +104,14 @@ export default function CheckoutPage() {
                       <input
                         type="text"
                         placeholder="123"
-                        className="w-full px-4 py-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="h-11 w-full rounded-2xl border border-border bg-card px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
                       />
                     </div>
                   </div>
                 </div>
               </div>
 
-              <button className="w-full py-3 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 transition mb-4">
+              <button className="mb-4 w-full rounded-full bg-primary py-3 font-bold text-primary-foreground transition hover:bg-primary/90 active:translate-y-px">
                 Xác nhận thanh toán
               </button>
               <p className="text-xs text-muted-foreground text-center">
