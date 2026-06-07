@@ -15,24 +15,6 @@ Các cơ chế chính:
 
 Redis giúp hệ thống nhanh và chịu tải tốt hơn, nhưng PostgreSQL vẫn là nguồn dữ liệu đúng cuối cùng cho tồn kho vé, order, payment và ticket.
 
-## Phạm vi tuần 1
-
-Tuần 1 cần hoàn thành:
-
-- Thiết kế Redis key cho rate limit, cache, idempotency và circuit breaker.
-- Mô tả thuật toán rate limit dùng cho `POST /orders` và `POST /payments/create`.
-- Mô tả cache-aside cho concert list, concert detail và ticket remaining.
-- Mô tả transaction chống oversell.
-- Mô tả cách enforce per-user limit bằng `UserTicketQuota`.
-- Có pseudo-code đủ để tuần 2 implement.
-
-Tuần 1 chưa cần:
-
-- Benchmark tải thật.
-- Waiting room hoàn chỉnh.
-- Queue mua vé production-grade.
-- Chống bot nâng cao bằng CAPTCHA/device fingerprint.
-
 ## Mục tiêu
 
 - Backend không bị quá tải khi nhiều user gửi request mua vé cùng lúc.
@@ -513,27 +495,3 @@ Hành vi:
 - Retry `POST /orders` với cùng `Idempotency-Key` trả lại order cũ.
 - Retry `POST /payments/create` với cùng `Idempotency-Key` trả lại payment request cũ.
 - Retry webhook từ gateway không xử lý trùng vì `PaymentEvent` unique.
-
-## Tiêu chí chấp nhận tuần 1
-
-- Có file `blueprint/specs/cache-rate-limit.md`.
-- Có mô tả rate limit bằng Redis và thuật toán Token Bucket.
-- Có Redis key dự kiến cho order/payment rate limit.
-- Có mô tả idempotency key cho `POST /orders` và `POST /payments/create`.
-- Có Redis key và database field liên quan idempotency.
-- Có mô tả cache-aside cho concert list/detail/ticket remaining.
-- Có TTL đề xuất cho từng loại cache.
-- Có mô tả transaction chống oversell bằng row-level lock.
-- Có pseudo-code transaction tạo order.
-- Có mô tả enforce per-user limit bằng `UserTicketQuota`.
-- Có mô tả hành vi khi Redis lỗi, database chậm và request retry.
-
-## Ghi chú cho tuần 2
-
-- Implement Redis service dùng chung.
-- Implement rate limit guard/interceptor cho `POST /orders` và `POST /payments/create`.
-- Implement idempotency wrapper dùng Redis + `IdempotencyRecord`.
-- Implement cache-aside cho concert list/detail.
-- Implement transaction tạo order thật.
-- Viết concurrency test cho oversell.
-- Viết concurrency test cho per-user limit.
