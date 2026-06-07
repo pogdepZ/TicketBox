@@ -1,54 +1,53 @@
-import {
-  ArgumentMetadata,
-  BadRequestException,
-  Injectable,
-  PipeTransform,
-} from '@nestjs/common';
-import { z, ZodError, ZodTypeAny } from 'zod';
+import { BadRequestException } from '@nestjs/common';
+import { createZodValidationPipe } from 'nestjs-zod';
 
-type ZodDto = {
-  schema?: ZodTypeAny;
+type ZodIssueLike = {
+  code: string;
+  message: string;
+  path?: Array<string | number>;
 };
 
-@Injectable()
-export class ZodValidationPipe implements PipeTransform {
-  transform(value: unknown, metadata: ArgumentMetadata) {
-    const schema = this.getSchema(metadata.metatype);
+type ValidationErrorDetail = {
+  field: string;
+  message: string;
+  code: string;
+};
 
-    if (!schema) {
-      return value;
-    }
+const formatPath = (path: Array<string | number> = []) =>
+  path.length > 0 ? path.join('.') : 'body';
 
-    try {
-      return schema.parse(value);
-    } catch (error) {
-      if (error instanceof ZodError) {
-        throw new BadRequestException({
-          message: error.issues.map((issue) => ({
-            path: issue.path.join('.'),
-            message: issue.message,
-          })),
-          error: 'Validation failed',
-        });
-      }
-
-      throw error;
-    }
+const getIssues = (error: unknown): ZodIssueLike[] => {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'issues' in error &&
+    Array.isArray((error as { issues?: unknown }).issues)
+  ) {
+    return (error as { issues: ZodIssueLike[] }).issues;
   }
 
-  private getSchema(metatype?: Function): ZodTypeAny | undefined {
-    if (!metatype || this.isNativeType(metatype)) {
-      return undefined;
-    }
+  return [];
+};
 
-    return (metatype as ZodDto).schema;
-  }
+const formatIssue = (issue: ZodIssueLike): ValidationErrorDetail => {
+  const field = formatPath(issue.path);
 
-  private isNativeType(metatype: Function) {
-    return [String, Boolean, Number, Array, Object].includes(
-      metatype as typeof String,
-    );
-  }
-}
+  return {
+    field,
+    message: `${field}: ${issue.message}`,
+    code: issue.code,
+  };
+};
 
-export type ZodDtoOf<T extends ZodTypeAny> = z.infer<T>;
+export const AppZodValidationPipe = createZodValidationPipe({
+  createValidationException: (error: unknown) => {
+    const errors = getIssues(error).map(formatIssue);
+    const messages = errors.map((item) => item.message);
+
+    return new BadRequestException({
+      statusCode: 400,
+      message: messages.length > 0 ? messages : ['Validation failed'],
+      errors,
+    });
+  },
+});

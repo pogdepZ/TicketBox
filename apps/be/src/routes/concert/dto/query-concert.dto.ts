@@ -1,5 +1,5 @@
+import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { ZodDtoOf } from '../../../common/pipes/zod-validation.pipe';
 import { ConcertStatus } from '../types/concert-status.type';
 import { isoDateStringSchema } from './create-concert.dto';
 
@@ -14,13 +14,4 @@ export const queryConcertSchema = z
   })
   .strict();
 
-export class QueryConcertDto implements ZodDtoOf<typeof queryConcertSchema> {
-  static schema = queryConcertSchema;
-
-  page!: number;
-  limit!: number;
-  status?: ConcertStatus;
-  keyword?: string;
-  fromDate?: string;
-  toDate?: string;
-}
+export class QueryConcertDto extends createZodDto(queryConcertSchema) {}

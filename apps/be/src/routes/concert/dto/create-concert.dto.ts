@@ -1,5 +1,5 @@
+import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { ZodDtoOf } from '../../../common/pipes/zod-validation.pipe';
 
 export const isoDateStringSchema = z.union([
   z.iso.datetime({ offset: true }),
@@ -20,15 +20,4 @@ export const createConcertSchema = z
   })
   .strict();
 
-export class CreateConcertDto implements ZodDtoOf<typeof createConcertSchema> {
-  static schema = createConcertSchema;
-
-  name!: string;
-  description?: string;
-  artistName?: string;
-  venueName!: string;
-  venueAddress!: string;
-  eventDate!: string;
-  seatMapSvg?: string;
-  posterUrl?: string;
-}
+export class CreateConcertDto extends createZodDto(createConcertSchema) {}

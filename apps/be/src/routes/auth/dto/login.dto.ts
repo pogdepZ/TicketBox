@@ -1,5 +1,5 @@
+import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { ZodDtoOf } from '../../../common/pipes/zod-validation.pipe';
 
 export const loginSchema = z
   .object({
@@ -8,9 +8,4 @@ export const loginSchema = z
   })
   .strict();
 
-export class LoginDto implements ZodDtoOf<typeof loginSchema> {
-  static schema = loginSchema;
-
-  email!: string;
-  password!: string;
-}
+export class LoginDto extends createZodDto(loginSchema) {}

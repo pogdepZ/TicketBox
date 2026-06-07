@@ -1,5 +1,5 @@
+import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { ZodDtoOf } from '../../../common/pipes/zod-validation.pipe';
 
 export const createOrderItemSchema = z
   .object({
@@ -15,18 +15,6 @@ export const createOrderSchema = z
   })
   .strict();
 
-export class CreateOrderItemDto
-  implements ZodDtoOf<typeof createOrderItemSchema>
-{
-  static schema = createOrderItemSchema;
+export class CreateOrderItemDto extends createZodDto(createOrderItemSchema) {}
 
-  ticketTypeId!: string;
-  quantity!: number;
-}
-
-export class CreateOrderDto implements ZodDtoOf<typeof createOrderSchema> {
-  static schema = createOrderSchema;
-
-  concertId!: string;
-  items!: CreateOrderItemDto[];
-}
+export class CreateOrderDto extends createZodDto(createOrderSchema) {}

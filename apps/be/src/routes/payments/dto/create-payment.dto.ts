@@ -1,5 +1,5 @@
+import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { ZodDtoOf } from '../../../common/pipes/zod-validation.pipe';
 
 export const createPaymentSchema = z
   .object({
@@ -9,10 +9,4 @@ export const createPaymentSchema = z
   })
   .strict();
 
-export class CreatePaymentDto implements ZodDtoOf<typeof createPaymentSchema> {
-  static schema = createPaymentSchema;
-
-  orderId!: string;
-  provider!: 'VNPAY' | 'MOMO';
-  returnUrl?: string;
-}
+export class CreatePaymentDto extends createZodDto(createPaymentSchema) {}

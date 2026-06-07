@@ -1,6 +1,6 @@
+import { createZodDto } from 'nestjs-zod';
 import { UserStatus } from '../../../generated/prisma';
 import { z } from 'zod';
-import { ZodDtoOf } from '../../../common/pipes/zod-validation.pipe';
 
 export const registerSchema = z
   .object({
@@ -12,12 +12,4 @@ export const registerSchema = z
   })
   .strict();
 
-export class RegisterDto implements ZodDtoOf<typeof registerSchema> {
-  static schema = registerSchema;
-
-  email!: string;
-  phone?: string;
-  password!: string;
-  fullName!: string;
-  status?: UserStatus;
-}
+export class RegisterDto extends createZodDto(registerSchema) {}
