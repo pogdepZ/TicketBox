@@ -2,7 +2,7 @@ import { ConcertHero } from '@/components/concert-hero';
 import { SeatMap } from '@/components/seat-map';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
-import { concerts, seats, ticketZones } from '@/lib/mock-data';
+import { concerts, getSeatsByConcertId, getTicketZonesByConcertId } from '@/lib/mock-data';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -20,6 +20,9 @@ export default async function ConcertDetailPage({ params }: ConcertDetailPagePro
   if (!concert) {
     notFound();
   }
+
+  const concertZones = getTicketZonesByConcertId(concert.id);
+  const concertSeats = getSeatsByConcertId(concert.id);
 
   return (
     <main className="min-h-screen bg-background">
@@ -71,7 +74,7 @@ export default async function ConcertDetailPage({ params }: ConcertDetailPagePro
           </div>
         </div>
 
-        <SeatMap concertTitle={concert.title} zones={ticketZones} seats={seats} />
+        <SeatMap concertId={concert.id} concertTitle={concert.title} zones={concertZones} seats={concertSeats} />
       </section>
 
       <Footer />
