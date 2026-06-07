@@ -1,0 +1,52 @@
+# User FE Checklist
+
+Scope: user-facing frontend only. Current implementation should continue using mock data, but the mock shape should stay close to backend concepts so API integration is easier later.
+
+## Current FE Snapshot
+
+- The user pages still use mock data from `lib/mock-data.ts`; no backend API calls are expected yet.
+- The refreshed home page now has working hero links: featured concert and `#events`.
+- `ThemeToggle` exists and persists the selected theme in `localStorage`.
+- Header notifications, account, favorites, newsletter signup, checkout submit, ticket download/share, and footer links are still UI-only.
+- Concert detail still uses shared global `ticketZones` and `seats`, not data scoped by concert id.
+- Vietnamese UI strings were verified with UTF-8 reads; earlier mojibake was terminal output rendering, not source corruption.
+
+## Checklist
+
+- [x] Verify/fix mojibake Vietnamese display strings in user-facing FE files.
+- [x] Standardize user mock data around backend-like concepts: concerts, ticket types, seat zones, reservations, orders, tickets.
+- [x] Home page: hero CTAs link to featured show and event list.
+- [x] Home page: support searching/filtering concerts from mock data.
+- [ ] Home page: implement newsletter/signup mock behavior.
+- [x] Header: navbar search submits to the home event browser with `?q=...`.
+- [ ] Header: add clear mock behavior for account and notifications.
+- [x] Header: theme toggle works with persisted `localStorage` theme.
+- [ ] Concert cards: make favorite action work without accidentally navigating to detail.
+- [ ] Concert detail page: load mock concert, zones, and seats by concert id.
+- [ ] Seat selection flow: create a mock draft reservation and carry it into checkout.
+- [ ] Checkout page: read selected reservation, choose payment method, and validate payment form basics.
+- [ ] Checkout submit: create a mock order and navigate to success by order id.
+- [ ] Success/e-ticket page: render the selected mock order and tickets, including download/share mock behavior.
+- [ ] Footer/static links: replace placeholder `#` links with real routes or intentional disabled/placeholder states.
+- [ ] Verify user flow end to end: home -> concert detail -> seat selection -> checkout -> success.
+
+## Backend Reference
+
+Useful backend concepts already exist in the Prisma schema:
+
+- `Concert`
+- `SeatZone`
+- `TicketType`
+- `Reservation`
+- `Order`
+- `Ticket`
+- `PaymentEvent`
+- `Notification`
+
+Backend routes currently exposed:
+
+- `GET /concerts`
+- `GET /concerts/:id`
+- Auth routes under `/auth`
+
+Reservation, order, ticket, payment, and notification modules are not exposed yet, so user FE work should remain mock-only for now.

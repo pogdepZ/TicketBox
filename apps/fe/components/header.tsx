@@ -1,8 +1,26 @@
+"use client";
+
 import { Bell, Search, Ticket, User } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { FormEvent, useEffect, useState } from 'react';
 import { ThemeToggle } from './theme-toggle';
 
 export function Header() {
+  const router = useRouter();
+  const [keyword, setKeyword] = useState('');
+
+  useEffect(() => {
+    setKeyword(new URLSearchParams(window.location.search).get('q') ?? '');
+  }, []);
+
+  function handleSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const query = keyword.trim();
+    router.push(query ? `/?q=${encodeURIComponent(query)}#events` : '/#events');
+  }
+
   return (
     <header className="sticky top-0 z-30 border-b border-border/80 bg-background/90 backdrop-blur-xl">
       <div className="mx-auto flex h-18 max-w-7xl items-center justify-between gap-4 px-4">
@@ -13,16 +31,19 @@ export function Header() {
           <span>TicketBox</span>
         </Link>
 
-        <div className="hidden flex-1 md:flex">
+        <form onSubmit={handleSearch} className="hidden flex-1 md:flex" role="search">
           <div className="flex-1 relative">
             <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
-              type="text"
+              type="search"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
               placeholder="Tìm concert, nghệ sĩ, địa điểm"
+              aria-label="Tìm kiếm sự kiện"
               className="h-11 w-full rounded-full border border-border bg-card pl-11 pr-4 text-sm shadow-sm transition focus:outline-none focus:ring-4 focus:ring-primary/15"
             />
           </div>
-        </div>
+        </form>
 
         <div className="flex items-center gap-2">
           <Link

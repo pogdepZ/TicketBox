@@ -1,4 +1,53 @@
+export type ConcertStatus = 'DRAFT' | 'PUBLISHED' | 'CANCELLED' | 'COMPLETED';
+export type TicketTypeStatus = 'ACTIVE' | 'PAUSED' | 'SOLD_OUT' | 'HIDDEN';
+export type ReservationStatus = 'HELD' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED';
+export type OrderStatus = 'PENDING_PAYMENT' | 'PAYMENT_PROCESSING' | 'PAID' | 'PAYMENT_FAILED' | 'EXPIRED' | 'CANCELLED';
+export type PaymentMethod = 'CARD' | 'BANK_TRANSFER' | 'WALLET';
+export type TicketStatus = 'ACTIVE' | 'USED' | 'CANCELLED' | 'REFUNDED';
+
 export type TicketZoneStatus = 'available' | 'limited' | 'sold-out';
+export type SeatStatus = 'available' | 'selected' | 'sold' | 'held' | 'disabled';
+
+export interface MockConcert {
+  id: string;
+  name: string;
+  description: string;
+  artistName: string;
+  venueName: string;
+  venueAddress: string;
+  city: string;
+  eventDate: string;
+  posterUrl: string;
+  status: ConcertStatus;
+  genre: string;
+  language: string;
+  ageLimit: string;
+  capacity: number;
+  ticketsSold: number;
+  revenue: number;
+}
+
+export interface MockSeatZone {
+  id: string;
+  concertId: string;
+  code: string;
+  name: string;
+  label: string;
+  color: string;
+  description: string;
+}
+
+export interface MockTicketType {
+  id: string;
+  concertId: string;
+  seatZoneId: string;
+  name: string;
+  price: number;
+  totalQuantity: number;
+  remaining: number;
+  maxPerUser: number;
+  status: TicketTypeStatus;
+}
 
 export interface TicketZone {
   id: string;
@@ -10,9 +59,10 @@ export interface TicketZone {
   color: string;
   description: string;
   status: TicketZoneStatus;
+  concertId?: string;
+  seatZoneId?: string;
+  ticketTypeId?: string;
 }
-
-export type SeatStatus = 'available' | 'selected' | 'sold' | 'held' | 'disabled';
 
 export interface Seat {
   id: string;
@@ -21,229 +71,339 @@ export interface Seat {
   label: string;
   status: Exclude<SeatStatus, 'selected'>;
   zoneId: string;
+  concertId?: string;
+  seatZoneId?: string;
 }
 
-export const concerts = [
+export interface MockReservationItem {
+  id: string;
+  reservationId: string;
+  ticketTypeId: string;
+  quantity: number;
+  unitPrice: number;
+  seatLabels: string[];
+}
+
+export interface MockReservation {
+  id: string;
+  userId: string;
+  concertId: string;
+  status: ReservationStatus;
+  expiresAt: string;
+  createdAt: string;
+  items: MockReservationItem[];
+}
+
+export interface MockOrderItem {
+  id: string;
+  orderId: string;
+  ticketTypeId: string;
+  quantity: number;
+  unitPrice: number;
+  seatLabels: string[];
+}
+
+export interface MockOrder {
+  id: string;
+  orderNumber: string;
+  userId: string;
+  concertId: string;
+  reservationId: string;
+  status: OrderStatus;
+  totalAmount: number;
+  paymentMethod: PaymentMethod;
+  paidAt?: string;
+  expiresAt: string;
+  createdAt: string;
+  items: MockOrderItem[];
+}
+
+export interface MockTicket {
+  id: string;
+  orderId: string;
+  ticketTypeId: string;
+  ownerUserId: string;
+  ticketCode: string;
+  qrPayload: string;
+  seatNumber: string;
+  status: TicketStatus;
+  createdAt: string;
+}
+
+export interface MockUser {
+  id: string;
+  fullName: string;
+  name: string;
+  email: string;
+  phone: string;
+  password?: string;
+  role: string;
+}
+
+export const mockUsers: MockUser[] = [
+  {
+    id: 'user-minh-anh',
+    fullName: 'Nguyễn Minh Anh',
+    name: 'Nguyễn Minh Anh',
+    email: 'minhanh@example.com',
+    phone: '090 123 4567',
+    role: 'Khách hàng',
+  },
+  {
+    id: 'admin-1',
+    fullName: 'Quản trị TicketBox',
+    name: 'Quản trị TicketBox',
+    email: 'admin@ticketbox.vn',
+    phone: '090 000 0000',
+    password: 'admin123',
+    role: 'Quản trị viên',
+  },
+];
+
+export const mockConcerts: MockConcert[] = [
   {
     id: '1',
-    title: 'Đêm Nhạc Ánh Sao',
-    artist: 'Hà Anh Tuấn',
-    date: '2026-07-18',
-    time: '19:30',
-    venue: 'Nhà hát Hòa Bình',
+    name: 'Đêm Nhạc Ánh Sao',
+    artistName: 'Hà Anh Tuấn',
+    eventDate: '2026-07-18T19:30:00+07:00',
+    venueName: 'Nhà hát Hòa Bình',
+    venueAddress: '240 Đường 3/2, Quận 10',
     city: 'TP. Hồ Chí Minh',
-    image: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=900&h=700&fit=crop',
-    description:
-      'Một đêm diễn giàu cảm xúc với dàn nhạc live, sân khấu ánh sáng hiện đại và những bản ballad được phối mới dành riêng cho khán giả Sài Gòn.',
-    price: 850000,
-    capacity: 2400,
-    soldOut: false,
+    posterUrl: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=900&h=700&fit=crop',
+    description: 'Một đêm diễn giàu cảm xúc với dàn nhạc live, sân khấu ánh sáng hiện đại và những bản ballad được phối mới dành riêng cho khán giả Sài Gòn.',
+    status: 'PUBLISHED',
     genre: 'Pop Ballad',
     language: 'Tiếng Việt',
     ageLimit: '13+',
+    capacity: 2400,
     ticketsSold: 1860,
     revenue: 1581000000,
-    status: 'Đang bán',
   },
   {
     id: '2',
-    title: 'Electric Summer Festival',
-    artist: 'DJ Mie, Wukong, Touliver',
-    date: '2026-07-25',
-    time: '20:00',
-    venue: 'Công viên Yên Sở',
+    name: 'Electric Summer Festival',
+    artistName: 'DJ Mie, Wukong, Touliver',
+    eventDate: '2026-07-25T20:00:00+07:00',
+    venueName: 'Công viên Yên Sở',
+    venueAddress: 'Hoàng Mai',
     city: 'Hà Nội',
-    image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=900&h=700&fit=crop',
-    description:
-      'Lễ hội EDM ngoài trời với ba sân khấu, khu ẩm thực, hiệu ứng visual 3D và line-up DJ Việt Nam lẫn quốc tế cho mùa hè 2026.',
-    price: 650000,
-    capacity: 12000,
-    soldOut: false,
+    posterUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=900&h=700&fit=crop',
+    description: 'Lễ hội EDM ngoài trời với ba sân khấu, khu ẩm thực, hiệu ứng visual 3D và line-up DJ Việt Nam lẫn quốc tế cho mùa hè 2026.',
+    status: 'PUBLISHED',
     genre: 'EDM',
     language: 'Tiếng Việt / English',
     ageLimit: '18+',
+    capacity: 12000,
     ticketsSold: 8200,
     revenue: 5330000000,
-    status: 'Đang bán',
   },
   {
     id: '3',
-    title: 'Jazz By The River',
-    artist: 'Saigon Blue Notes',
-    date: '2026-08-02',
-    time: '20:30',
-    venue: 'Bến Bạch Đằng',
+    name: 'Jazz By The River',
+    artistName: 'Saigon Blue Notes',
+    eventDate: '2026-08-02T20:30:00+07:00',
+    venueName: 'Bến Bạch Đằng',
+    venueAddress: 'Quận 1',
     city: 'TP. Hồ Chí Minh',
-    image: 'https://images.unsplash.com/photo-1415201364774-f6f0bb35f28f?w=900&h=700&fit=crop',
-    description:
-      'Không gian jazz thân mật bên sông với saxophone, piano trio và các bản standard kinh điển được trình diễn trong khung cảnh thành phố về đêm.',
-    price: 420000,
-    capacity: 680,
-    soldOut: false,
+    posterUrl: 'https://images.unsplash.com/photo-1415201364774-f6f0bb35f28f?w=900&h=700&fit=crop',
+    description: 'Không gian jazz thân mật bên sông với saxophone, piano trio và các bản standard kinh điển được trình diễn trong khung cảnh thành phố về đêm.',
+    status: 'PUBLISHED',
     genre: 'Jazz',
     language: 'Instrumental',
     ageLimit: '16+',
+    capacity: 680,
     ticketsSold: 512,
     revenue: 215040000,
-    status: 'Sắp hết vé',
   },
   {
     id: '4',
-    title: 'Rock Việt Trở Lại',
-    artist: 'Bức Tường Tribute Band',
-    date: '2026-08-15',
-    time: '19:00',
-    venue: 'Cung Thể thao Tiên Sơn',
+    name: 'Rock Việt Trở Lại',
+    artistName: 'Bức Tường Tribute Band',
+    eventDate: '2026-08-15T19:00:00+07:00',
+    venueName: 'Cung Thể thao Tiên Sơn',
+    venueAddress: 'Hải Châu',
     city: 'Đà Nẵng',
-    image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=900&h=700&fit=crop',
-    description:
-      'Đêm rock bùng nổ với những ca khúc gắn liền nhiều thế hệ, hệ thống âm thanh lớn và khu standing dành cho fan muốn hòa mình vào sân khấu.',
-    price: 500000,
-    capacity: 5200,
-    soldOut: false,
+    posterUrl: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=900&h=700&fit=crop',
+    description: 'Đêm rock bùng nổ với những ca khúc gắn liền nhiều thế hệ, hệ thống âm thanh lớn và khu standing dành cho fan muốn hòa mình vào sân khấu.',
+    status: 'PUBLISHED',
     genre: 'Rock',
     language: 'Tiếng Việt',
     ageLimit: '13+',
+    capacity: 5200,
     ticketsSold: 3940,
     revenue: 1970000000,
-    status: 'Đang bán',
   },
   {
     id: '5',
-    title: 'Indie Night: Thành Phố Mơ',
-    artist: 'Vũ., Ngọt, Chillies',
-    date: '2026-08-29',
-    time: '19:45',
-    venue: 'SECC Hall B',
+    name: 'Indie Night: Thành Phố Mơ',
+    artistName: 'Vũ., Ngọt, Chillies',
+    eventDate: '2026-08-29T19:45:00+07:00',
+    venueName: 'SECC Hall B',
+    venueAddress: 'Quận 7',
     city: 'TP. Hồ Chí Minh',
-    image: 'https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?w=900&h=700&fit=crop',
-    description:
-      'Ba màu sắc indie Việt trên cùng một sân khấu, kết hợp không gian visual tối giản, khu merch và trải nghiệm check-in dành cho cộng đồng fan.',
-    price: 720000,
-    capacity: 7000,
-    soldOut: false,
+    posterUrl: 'https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?w=900&h=700&fit=crop',
+    description: 'Ba màu sắc indie Việt trên cùng một sân khấu, kết hợp không gian visual tối giản, khu merch và trải nghiệm check-in dành cho cộng đồng fan.',
+    status: 'PUBLISHED',
     genre: 'Indie',
     language: 'Tiếng Việt',
     ageLimit: '13+',
+    capacity: 7000,
     ticketsSold: 6100,
     revenue: 4392000000,
-    status: 'Sắp hết vé',
   },
   {
     id: '6',
-    title: 'Classical Morning',
-    artist: 'Vietnam National Symphony Orchestra',
-    date: '2026-09-06',
-    time: '10:00',
-    venue: 'Nhà hát Lớn Hà Nội',
+    name: 'Classical Morning',
+    artistName: 'Vietnam National Symphony Orchestra',
+    eventDate: '2026-09-06T10:00:00+07:00',
+    venueName: 'Nhà hát Lớn Hà Nội',
+    venueAddress: 'Hoàn Kiếm',
     city: 'Hà Nội',
-    image: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=900&h=700&fit=crop',
-    description:
-      'Buổi hòa nhạc buổi sáng với các tác phẩm Mozart, Tchaikovsky và phần giao lưu ngắn cùng nhạc trưởng sau chương trình.',
-    price: 380000,
-    capacity: 900,
-    soldOut: true,
+    posterUrl: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=900&h=700&fit=crop',
+    description: 'Buổi hòa nhạc buổi sáng với các tác phẩm Mozart, Tchaikovsky và phần giao lưu ngắn cùng nhạc trưởng sau chương trình.',
+    status: 'PUBLISHED',
     genre: 'Classical',
     language: 'Instrumental',
     ageLimit: '8+',
+    capacity: 900,
     ticketsSold: 900,
     revenue: 342000000,
-    status: 'Hết vé',
   },
 ];
 
-export const ticketZones: TicketZone[] = [
+const zoneTemplates = [
   {
-    id: 'svip',
+    code: 'svip',
     name: 'SVIP',
     label: 'Khu A',
     price: 1250000,
+    totalQuantity: 160,
     remaining: 18,
-    total: 160,
     color: '#e5484d',
     description: 'Khu trung tâm gần sân khấu nhất, tầm nhìn trực diện và lối vào ưu tiên.',
-    status: 'limited',
   },
   {
-    id: 'vip',
+    code: 'vip',
     name: 'VIP',
     label: 'Khu B',
     price: 850000,
+    totalQuantity: 260,
     remaining: 76,
-    total: 260,
     color: '#e0a82e',
     description: 'Khu ghế phía trước hai cánh, phù hợp khán giả muốn trải nghiệm sân khấu gần.',
-    status: 'available',
   },
   {
-    id: 'premium',
+    code: 'premium',
     name: 'Premium',
     label: 'Khu C',
     price: 650000,
+    totalQuantity: 420,
     remaining: 124,
-    total: 420,
     color: '#3d6f8f',
     description: 'Khu trung tâm tầng dưới, cân bằng giữa tầm nhìn, âm thanh và giá vé.',
-    status: 'available',
   },
   {
-    id: 'standard',
+    code: 'standard',
     name: 'Standard',
     label: 'Khu D',
     price: 420000,
+    totalQuantity: 760,
     remaining: 310,
-    total: 760,
     color: '#123c3a',
     description: 'Khu ghế tiêu chuẩn phía sau, dễ đi theo nhóm và vẫn nhìn rõ toàn cảnh sân khấu.',
-    status: 'available',
   },
   {
-    id: 'economy',
+    code: 'economy',
     name: 'Economy',
     label: 'Khu E',
     price: 250000,
+    totalQuantity: 540,
     remaining: 0,
-    total: 540,
     color: '#64748b',
     description: 'Khu tiết kiệm phía xa sân khấu, hiện đã hết vé cho đợt mở bán này.',
-    status: 'sold-out',
   },
-];
+] as const;
 
-export const ticketTypes = ticketZones.map((zone) => ({
-  id: zone.id,
-  name: zone.name,
-  price: zone.price,
-  description: zone.description,
-  available: zone.remaining,
-}));
+export const mockSeatZones: MockSeatZone[] = mockConcerts.flatMap((concert) =>
+  zoneTemplates.map((zone) => ({
+    id: `seat-zone-${concert.id}-${zone.code}`,
+    concertId: concert.id,
+    code: zone.code,
+    name: zone.name,
+    label: zone.label,
+    color: zone.color,
+    description: zone.description,
+  })),
+);
 
-export const seatZones = ticketZones.map((zone) => ({
-  id: zone.id,
-  name: `${zone.name} / ${zone.label}`,
-  rows: 8,
-  seatsPerRow: 18,
-  price: zone.price,
-  color: zone.color,
-}));
+export const mockTicketTypes: MockTicketType[] = mockSeatZones.map((seatZone) => {
+  const template = zoneTemplates.find((zone) => zone.code === seatZone.code)!;
+  const concertOffset = Number(seatZone.concertId) - 1;
+  const remaining = Math.max(0, template.remaining - concertOffset * 5);
 
-function createZoneSeats(zoneId: string, rowNames: string[], seatsPerRow: number): Seat[] {
+  return {
+    id: `ticket-type-${seatZone.concertId}-${seatZone.code}`,
+    concertId: seatZone.concertId,
+    seatZoneId: seatZone.id,
+    name: template.name,
+    price: template.price,
+    totalQuantity: template.totalQuantity,
+    remaining,
+    maxPerUser: 4,
+    status: remaining === 0 ? 'SOLD_OUT' : 'ACTIVE',
+  };
+});
+
+function toTicketZoneStatus(ticketType: MockTicketType): TicketZoneStatus {
+  if (ticketType.status === 'SOLD_OUT' || ticketType.remaining === 0) {
+    return 'sold-out';
+  }
+
+  return ticketType.remaining / ticketType.totalQuantity <= 0.15 ? 'limited' : 'available';
+}
+
+export function getTicketZonesByConcertId(concertId: string): TicketZone[] {
+  return mockTicketTypes
+    .filter((ticketType) => ticketType.concertId === concertId && ticketType.status !== 'HIDDEN')
+    .map((ticketType) => {
+      const seatZone = mockSeatZones.find((zone) => zone.id === ticketType.seatZoneId)!;
+
+      return {
+        id: seatZone.code,
+        name: seatZone.name,
+        label: seatZone.label,
+        price: ticketType.price,
+        remaining: ticketType.remaining,
+        total: ticketType.totalQuantity,
+        color: seatZone.color,
+        description: seatZone.description,
+        status: toTicketZoneStatus(ticketType),
+        concertId,
+        seatZoneId: seatZone.id,
+        ticketTypeId: ticketType.id,
+      };
+    });
+}
+
+function createZoneSeats(concertId: string, zoneCode: string, rowNames: string[], seatsPerRow: number): Seat[] {
+  const seatZone = mockSeatZones.find((zone) => zone.concertId === concertId && zone.code === zoneCode)!;
   const seats: Seat[] = [];
 
   rowNames.forEach((row, rowIndex) => {
     for (let number = 1; number <= seatsPerRow; number += 1) {
-      const id = `${zoneId}-${row}-${number}`;
-      const isOuterDisabled = (rowIndex === rowNames.length - 1 && (number <= 2 || number >= seatsPerRow - 1));
-      const isSold = (rowIndex + number) % 9 === 0 || (rowIndex === 1 && number >= 7 && number <= 9);
-      const isHeld = (rowIndex + number) % 13 === 0 || (rowIndex === 3 && number === 12);
+      const isOuterDisabled = rowIndex === rowNames.length - 1 && (number <= 2 || number >= seatsPerRow - 1);
+      const isSold = (rowIndex + number + Number(concertId)) % 9 === 0 || (rowIndex === 1 && number >= 7 && number <= 9);
+      const isHeld = (rowIndex + number + Number(concertId)) % 13 === 0 || (rowIndex === 3 && number === 12);
 
       seats.push({
-        id,
+        id: `seat-${concertId}-${zoneCode}-${row}-${number}`,
         row,
         number,
         label: `${row}${number.toString().padStart(2, '0')}`,
         status: isOuterDisabled ? 'disabled' : isSold ? 'sold' : isHeld ? 'held' : 'available',
-        zoneId,
+        zoneId: zoneCode,
+        concertId,
+        seatZoneId: seatZone.id,
       });
     }
   });
@@ -251,67 +411,223 @@ function createZoneSeats(zoneId: string, rowNames: string[], seatsPerRow: number
   return seats;
 }
 
-export const seats: Seat[] = [
-  ...createZoneSeats('svip', ['A', 'B', 'C', 'D', 'E', 'F'], 16),
-  ...createZoneSeats('vip', ['G', 'H', 'I', 'J', 'K', 'L', 'M'], 18),
-  ...createZoneSeats('premium', ['N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U'], 20),
-  ...createZoneSeats('standard', ['V', 'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC'], 22),
-  ...createZoneSeats('economy', ['AD', 'AE', 'AF', 'AG', 'AH', 'AI'], 24).map((seat) => ({
-    ...seat,
-    status: 'sold' as const,
-  })),
+export function getSeatsByConcertId(concertId: string): Seat[] {
+  return [
+    ...createZoneSeats(concertId, 'svip', ['A', 'B', 'C', 'D', 'E', 'F'], 16),
+    ...createZoneSeats(concertId, 'vip', ['G', 'H', 'I', 'J', 'K', 'L', 'M'], 18),
+    ...createZoneSeats(concertId, 'premium', ['N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U'], 20),
+    ...createZoneSeats(concertId, 'standard', ['V', 'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC'], 22),
+    ...createZoneSeats(concertId, 'economy', ['AD', 'AE', 'AF', 'AG', 'AH', 'AI'], 24).map((seat) => ({
+      ...seat,
+      status: 'sold' as const,
+    })),
+  ];
+}
+
+function getTimeFromEventDate(eventDate: string): string {
+  return new Date(eventDate).toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+function getLowestPrice(concertId: string): number {
+  return Math.min(
+    ...mockTicketTypes
+      .filter((ticketType) => ticketType.concertId === concertId)
+      .map((ticketType) => ticketType.price),
+  );
+}
+
+function isConcertSoldOut(concertId: string): boolean {
+  return mockTicketTypes
+    .filter((ticketType) => ticketType.concertId === concertId)
+    .every((ticketType) => ticketType.status === 'SOLD_OUT' || ticketType.remaining === 0);
+}
+
+function toDisplayStatus(concert: MockConcert): string {
+  if (concert.status === 'CANCELLED') return 'Đã hủy';
+  if (concert.status === 'COMPLETED') return 'Đã kết thúc';
+  if (isConcertSoldOut(concert.id)) return 'Hết vé';
+  if (concert.capacity - concert.ticketsSold <= concert.capacity * 0.2) return 'Sắp hết vé';
+  return 'Đang bán';
+}
+
+export const concerts = mockConcerts.map((concert) => ({
+  id: concert.id,
+  title: concert.name,
+  artist: concert.artistName,
+  date: concert.eventDate,
+  time: getTimeFromEventDate(concert.eventDate),
+  venue: concert.venueName,
+  city: concert.city,
+  image: concert.posterUrl,
+  description: concert.description,
+  price: getLowestPrice(concert.id),
+  capacity: concert.capacity,
+  soldOut: isConcertSoldOut(concert.id),
+  genre: concert.genre,
+  language: concert.language,
+  ageLimit: concert.ageLimit,
+  ticketsSold: concert.ticketsSold,
+  revenue: concert.revenue,
+  status: toDisplayStatus(concert),
+}));
+
+export const ticketZones: TicketZone[] = getTicketZonesByConcertId('1');
+
+export const ticketTypes = ticketZones.map((zone) => ({
+  id: zone.ticketTypeId ?? zone.id,
+  name: zone.name,
+  price: zone.price,
+  description: zone.description,
+  available: zone.remaining,
+}));
+
+export const seatZones = ticketZones.map((zone) => ({
+  id: zone.seatZoneId ?? zone.id,
+  name: `${zone.name} / ${zone.label}`,
+  rows: 8,
+  seatsPerRow: 18,
+  price: zone.price,
+  color: zone.color,
+}));
+
+export const seats: Seat[] = getSeatsByConcertId('1');
+
+export const mockReservations: MockReservation[] = [
+  {
+    id: 'reservation-demo-1',
+    userId: 'user-minh-anh',
+    concertId: '1',
+    status: 'HELD',
+    expiresAt: '2026-06-07T20:15:00+07:00',
+    createdAt: '2026-06-07T20:00:00+07:00',
+    items: [
+      {
+        id: 'reservation-item-demo-1',
+        reservationId: 'reservation-demo-1',
+        ticketTypeId: 'ticket-type-1-vip',
+        quantity: 2,
+        unitPrice: 850000,
+        seatLabels: ['G07', 'G08'],
+      },
+    ],
+  },
+];
+
+export const mockOrders: MockOrder[] = [
+  {
+    id: 'order-demo-1',
+    orderNumber: 'ORD-2026-07018',
+    userId: 'user-minh-anh',
+    concertId: '1',
+    reservationId: 'reservation-demo-1',
+    status: 'PAID',
+    totalAmount: 1955000,
+    paymentMethod: 'CARD',
+    paidAt: '2026-06-07T20:05:00+07:00',
+    expiresAt: '2026-06-07T20:15:00+07:00',
+    createdAt: '2026-06-07T20:00:00+07:00',
+    items: [
+      {
+        id: 'order-item-demo-1',
+        orderId: 'order-demo-1',
+        ticketTypeId: 'ticket-type-1-vip',
+        quantity: 2,
+        unitPrice: 850000,
+        seatLabels: ['G07', 'G08'],
+      },
+    ],
+  },
+];
+
+export const mockTickets: MockTicket[] = [
+  {
+    id: 'ticket-demo-1',
+    orderId: 'order-demo-1',
+    ticketTypeId: 'ticket-type-1-vip',
+    ownerUserId: 'user-minh-anh',
+    ticketCode: 'TBX-2026-001234',
+    qrPayload: 'mock-qr-payload-ticket-demo-1',
+    seatNumber: 'G07',
+    status: 'ACTIVE',
+    createdAt: '2026-06-07T20:05:00+07:00',
+  },
+  {
+    id: 'ticket-demo-2',
+    orderId: 'order-demo-1',
+    ticketTypeId: 'ticket-type-1-vip',
+    ownerUserId: 'user-minh-anh',
+    ticketCode: 'TBX-2026-001235',
+    qrPayload: 'mock-qr-payload-ticket-demo-2',
+    seatNumber: 'G08',
+    status: 'ACTIVE',
+    createdAt: '2026-06-07T20:05:00+07:00',
+  },
 ];
 
 export const paymentMethods = [
   {
     id: 'card',
+    gateway: 'CARD' as PaymentMethod,
     name: 'Thẻ tín dụng / ghi nợ',
     description: 'Visa, Mastercard, JCB',
     icon: 'CreditCard',
   },
   {
     id: 'bank',
+    gateway: 'BANK_TRANSFER' as PaymentMethod,
     name: 'Chuyển khoản ngân hàng',
     description: 'QR ngân hàng, xác nhận tự động',
     icon: 'Building2',
   },
   {
     id: 'wallet',
+    gateway: 'WALLET' as PaymentMethod,
     name: 'Ví điện tử',
     description: 'MoMo, ZaloPay, VNPay',
     icon: 'Wallet',
   },
 ];
 
+const demoReservation = mockReservations[0];
+const demoReservationItem = demoReservation.items[0];
+const demoTicketType = mockTicketTypes.find((ticketType) => ticketType.id === demoReservationItem.ticketTypeId)!;
+const demoUser = mockUsers[0];
+
 export const checkoutMock = {
-  concertId: '1',
-  ticketType: 'VIP',
-  quantity: 2,
-  unitPrice: 850000,
-  selectedSeats: ['B07', 'B08'],
+  reservationId: demoReservation.id,
+  concertId: demoReservation.concertId,
+  ticketType: demoTicketType.name,
+  ticketTypeId: demoTicketType.id,
+  quantity: demoReservationItem.quantity,
+  unitPrice: demoReservationItem.unitPrice,
+  selectedSeats: demoReservationItem.seatLabels,
+  expiresAt: demoReservation.expiresAt,
   customer: {
-    name: 'Nguyễn Minh Anh',
-    email: 'minhanh@example.com',
-    phone: '090 123 4567',
+    name: demoUser.fullName,
+    email: demoUser.email,
+    phone: demoUser.phone,
   },
 };
 
+const demoOrder = mockOrders[0];
+
 export const orderMock = {
-  orderNumber: 'ORD-2026-07018',
-  purchaseDate: '2026-06-06',
-  paymentMethod: 'Thẻ tín dụng / ghi nợ',
-  tickets: [
-    {
-      ticketNumber: 'TBX-2026-001234',
-      seatZone: 'B (VIP)',
-      seatNumber: 'B07',
-    },
-    {
-      ticketNumber: 'TBX-2026-001235',
-      seatZone: 'B (VIP)',
-      seatNumber: 'B08',
-    },
-  ],
+  orderId: demoOrder.id,
+  orderNumber: demoOrder.orderNumber,
+  purchaseDate: demoOrder.paidAt ?? demoOrder.createdAt,
+  paymentMethod: paymentMethods.find((method) => method.gateway === demoOrder.paymentMethod)?.name ?? demoOrder.paymentMethod,
+  tickets: mockTickets
+    .filter((ticket) => ticket.orderId === demoOrder.id)
+    .map((ticket) => ({
+      ticketNumber: ticket.ticketCode,
+      seatZone: `${demoTicketType.name} / ${mockSeatZones.find((zone) => zone.id === demoTicketType.seatZoneId)?.label ?? ''}`,
+      seatNumber: ticket.seatNumber,
+      qrPayload: ticket.qrPayload,
+    })),
 };
 
 export const adminStats = {
@@ -329,12 +645,4 @@ export const adminStats = {
   ],
 };
 
-export const adminUsers = [
-  {
-    id: '1',
-    name: 'Nguyễn Minh Anh',
-    email: 'admin@ticketbox.vn',
-    password: 'admin123',
-    role: 'Quản trị viên',
-  },
-];
+export const adminUsers = [mockUsers[1]];
