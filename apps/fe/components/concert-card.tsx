@@ -1,6 +1,9 @@
+"use client";
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { Calendar, Clock, Heart, MapPin } from 'lucide-react';
+import { MouseEvent, useEffect, useState } from 'react';
 
 interface ConcertCardProps {
   id: string;
@@ -15,6 +18,21 @@ interface ConcertCardProps {
   soldOut?: boolean;
 }
 
+const FAVORITES_KEY = 'ticketbox-favorite-concerts';
+
+function getFavorites() {
+  const stored = window.localStorage.getItem(FAVORITES_KEY);
+  if (!stored) {
+    return [];
+  }
+
+  try {
+    return JSON.parse(stored) as string[];
+  } catch {
+    return [];
+  }
+}
+
 export function ConcertCard({
   id,
   title,
@@ -27,10 +45,29 @@ export function ConcertCard({
   price,
   soldOut,
 }: ConcertCardProps) {
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  useEffect(() => {
+    setIsFavorite(getFavorites().includes(id));
+  }, [id]);
+
   const formattedDate = new Date(date).toLocaleDateString('vi-VN', {
     day: '2-digit',
     month: '2-digit',
   });
+
+  function handleToggleFavorite(event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const favorites = getFavorites();
+    const nextFavorites = favorites.includes(id)
+      ? favorites.filter((concertId) => concertId !== id)
+      : [...favorites, id];
+
+    window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(nextFavorites));
+    setIsFavorite(nextFavorites.includes(id));
+  }
 
   return (
     <Link href={`/concert/${id}`} className="group block">
@@ -47,8 +84,17 @@ export function ConcertCard({
             <p className="font-mono text-xs font-semibold text-muted-foreground">NGÀY</p>
             <p className="text-sm font-black text-foreground">{formattedDate}</p>
           </div>
-          <button className="absolute right-4 top-4 grid size-10 place-items-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-primary" aria-label="Lưu sự kiện">
-            <Heart className="size-5" />
+          <button
+            type="button"
+            onClick={handleToggleFavorite}
+            className={`absolute right-4 top-4 grid size-10 place-items-center rounded-full backdrop-blur transition ${
+              isFavorite ? 'bg-primary text-primary-foreground' : 'bg-black/45 text-white hover:bg-primary'
+            }`}
+            aria-pressed={isFavorite}
+            aria-label={isFavorite ? 'Bỏ lưu sự kiện' : 'Lưu sự kiện'}
+            title={isFavorite ? 'Đã lưu' : 'Lưu sự kiện'}
+          >
+            <Heart className={`size-5 ${isFavorite ? 'fill-current' : ''}`} />
           </button>
           {soldOut && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/65">

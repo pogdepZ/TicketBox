@@ -324,6 +324,69 @@ const zoneTemplates = [
   },
 ] as const;
 
+const concertTicketOverrides: Record<string, Partial<Record<string, { price?: number; totalQuantity?: number; remaining?: number }>>> = {
+  '2': {
+    svip: { price: 1800000, totalQuantity: 240, remaining: 42 },
+    vip: { price: 1200000, totalQuantity: 680, remaining: 180 },
+    premium: { price: 850000, totalQuantity: 1800, remaining: 620 },
+    standard: { price: 550000, totalQuantity: 5200, remaining: 2100 },
+    economy: { price: 350000, totalQuantity: 4080, remaining: 1260 },
+  },
+  '3': {
+    svip: { price: 950000, totalQuantity: 48, remaining: 4 },
+    vip: { price: 720000, totalQuantity: 96, remaining: 9 },
+    premium: { price: 520000, totalQuantity: 180, remaining: 28 },
+    standard: { price: 350000, totalQuantity: 260, remaining: 64 },
+    economy: { price: 220000, totalQuantity: 96, remaining: 0 },
+  },
+  '4': {
+    svip: { price: 900000, totalQuantity: 120, remaining: 31 },
+    vip: { price: 700000, totalQuantity: 420, remaining: 115 },
+    premium: { price: 520000, totalQuantity: 980, remaining: 240 },
+    standard: { price: 390000, totalQuantity: 2400, remaining: 720 },
+    economy: { price: 250000, totalQuantity: 1280, remaining: 418 },
+  },
+  '5': {
+    svip: { price: 1500000, totalQuantity: 180, remaining: 8 },
+    vip: { price: 1050000, totalQuantity: 520, remaining: 38 },
+    premium: { price: 780000, totalQuantity: 1400, remaining: 210 },
+    standard: { price: 520000, totalQuantity: 3300, remaining: 520 },
+    economy: { price: 320000, totalQuantity: 1600, remaining: 0 },
+  },
+  '6': {
+    svip: { price: 780000, totalQuantity: 80, remaining: 0 },
+    vip: { price: 620000, totalQuantity: 160, remaining: 0 },
+    premium: { price: 480000, totalQuantity: 260, remaining: 0 },
+    standard: { price: 320000, totalQuantity: 300, remaining: 0 },
+    economy: { price: 180000, totalQuantity: 100, remaining: 0 },
+  },
+};
+
+const concertZoneDescriptions: Record<string, Partial<Record<string, string>>> = {
+  '2': {
+    svip: 'Khu fanpit sát main stage, có lối check-in riêng cho festival ngoài trời.',
+    premium: 'Khu trung tâm cân bằng giữa sân khấu chính, khu food court và màn hình LED phụ.',
+    economy: 'Khu phổ thông sức chứa lớn, phù hợp đi theo nhóm đông trong festival.',
+  },
+  '3': {
+    svip: 'Bàn ghế gần sân khấu jazz, không gian nhỏ nên số lượng rất giới hạn.',
+    vip: 'Khu gần ban nhạc, phù hợp khán giả muốn nghe rõ saxophone và piano trio.',
+    economy: 'Khu tiết kiệm đã hết vé vì venue có sức chứa nhỏ.',
+  },
+  '5': {
+    svip: 'Khu gần sân khấu và khu merch, số lượng còn rất ít.',
+    vip: 'Tầm nhìn đẹp cho line-up indie, đang gần hết vé.',
+    economy: 'Khu tiết kiệm đã bán hết trong đợt mở bán đầu.',
+  },
+  '6': {
+    svip: 'Hạng ghế trung tâm nhà hát đã bán hết.',
+    vip: 'Hạng ghế tầng trệt đã bán hết.',
+    premium: 'Hạng ghế ban công đã bán hết.',
+    standard: 'Hạng ghế tiêu chuẩn đã bán hết.',
+    economy: 'Toàn bộ vé Classical Morning đã bán hết.',
+  },
+};
+
 export const mockSeatZones: MockSeatZone[] = mockConcerts.flatMap((concert) =>
   zoneTemplates.map((zone) => ({
     id: `seat-zone-${concert.id}-${zone.code}`,
@@ -332,22 +395,22 @@ export const mockSeatZones: MockSeatZone[] = mockConcerts.flatMap((concert) =>
     name: zone.name,
     label: zone.label,
     color: zone.color,
-    description: zone.description,
+    description: concertZoneDescriptions[concert.id]?.[zone.code] ?? zone.description,
   })),
 );
 
 export const mockTicketTypes: MockTicketType[] = mockSeatZones.map((seatZone) => {
   const template = zoneTemplates.find((zone) => zone.code === seatZone.code)!;
-  const concertOffset = Number(seatZone.concertId) - 1;
-  const remaining = Math.max(0, template.remaining - concertOffset * 5);
+  const override = concertTicketOverrides[seatZone.concertId]?.[seatZone.code];
+  const remaining = override?.remaining ?? template.remaining;
 
   return {
     id: `ticket-type-${seatZone.concertId}-${seatZone.code}`,
     concertId: seatZone.concertId,
     seatZoneId: seatZone.id,
     name: template.name,
-    price: template.price,
-    totalQuantity: template.totalQuantity,
+    price: override?.price ?? template.price,
+    totalQuantity: override?.totalQuantity ?? template.totalQuantity,
     remaining,
     maxPerUser: 4,
     status: remaining === 0 ? 'SOLD_OUT' : 'ACTIVE',
