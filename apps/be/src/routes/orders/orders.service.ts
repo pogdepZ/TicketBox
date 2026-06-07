@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { randomUUID } from 'crypto';
 
 type MockOrderItem = {
   ticketTypeId: string;
@@ -32,7 +33,7 @@ export class OrdersService {
     return {
       success: true,
       data: {
-        orderId: `mock-order-${Date.now()}`,
+        orderId: randomUUID(),
         concertId: dto.concertId,
         status: 'PENDING_PAYMENT',
         totalAmount,
