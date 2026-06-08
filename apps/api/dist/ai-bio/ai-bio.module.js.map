@@ -1,0 +1,1 @@
+{"version":3,"file":"ai-bio.module.js","sourceRoot":"","sources":["../../src/ai-bio/ai-bio.module.ts"],"names":[],"mappings":";;;;;;;;;AAAA,2CAAwC;AACxC,2DAAsD;AACtD,qDAAgD;AAOzC,IAAM,WAAW,GAAjB,MAAM,WAAW;CAAG,CAAA;AAAd,kCAAW;sBAAX,WAAW;IALvB,IAAA,eAAM,EAAC;QACN,WAAW,EAAE,CAAC,mCAAe,CAAC;QAC9B,SAAS,EAAE,CAAC,6BAAY,CAAC;QACzB,OAAO,EAAE,CAAC,6BAAY,CAAC;KACxB,CAAC;GACW,WAAW,CAAG"}
