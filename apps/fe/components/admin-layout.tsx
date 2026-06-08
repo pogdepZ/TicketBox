@@ -1,5 +1,6 @@
-import { LayoutDashboard, List, Plus, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, List, LogOut, Plus, Settings, Ticket } from 'lucide-react';
 import Link from 'next/link';
+import { ThemeToggle } from './theme-toggle';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -7,56 +8,67 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children }: AdminLayoutProps) {
   return (
-    <div className="flex h-screen bg-background">
-      <aside className="w-64 bg-card border-r border-border flex flex-col">
-        <div className="p-6 border-b border-border">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            TicketBox
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">Quản lý</p>
+    <div className="min-h-screen bg-background lg:flex">
+      <aside className="flex border-b border-sidebar-border bg-sidebar text-sidebar-foreground lg:fixed lg:inset-y-0 lg:w-72 lg:flex-col lg:border-b-0 lg:border-r">
+        <div className="flex min-w-64 items-center gap-3 border-sidebar-border p-4 lg:border-b lg:p-6">
+          <span className="grid size-10 place-items-center rounded-2xl bg-primary text-primary-foreground">
+            <Ticket className="size-5" />
+          </span>
+          <div>
+            <h1 className="text-xl font-black tracking-tight">TicketBox</h1>
+            <p className="mt-0.5 text-xs text-sidebar-foreground/55">Operations</p>
+          </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+        <nav className="flex flex-1 gap-2 overflow-x-auto p-3 lg:flex-col lg:overflow-y-auto lg:p-4">
           <Link
             href="/admin/dashboard"
-            className="flex items-center gap-3 px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition font-medium"
+            className="flex shrink-0 items-center gap-3 rounded-2xl bg-primary px-4 py-2 font-bold text-primary-foreground transition hover:bg-primary/90"
           >
-            <LayoutDashboard className="w-5 h-5" />
+            <LayoutDashboard className="size-5" />
             Dashboard
           </Link>
           <Link
             href="/admin/concerts"
-            className="flex items-center gap-3 px-4 py-2 rounded-lg text-muted-foreground hover:bg-muted transition"
+            className="flex shrink-0 items-center gap-3 rounded-2xl px-4 py-2 text-sidebar-foreground/65 transition hover:bg-sidebar-accent hover:text-sidebar-foreground"
           >
-            <List className="w-5 h-5" />
+            <List className="size-5" />
             Sự kiện
           </Link>
           <Link
             href="/admin/create-concert"
-            className="flex items-center gap-3 px-4 py-2 rounded-lg text-muted-foreground hover:bg-muted transition"
+            className="flex shrink-0 items-center gap-3 rounded-2xl px-4 py-2 text-sidebar-foreground/65 transition hover:bg-sidebar-accent hover:text-sidebar-foreground"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="size-5" />
             Tạo sự kiện
           </Link>
           <Link
             href="/admin/settings"
-            className="flex items-center gap-3 px-4 py-2 rounded-lg text-muted-foreground hover:bg-muted transition"
+            className="flex shrink-0 items-center gap-3 rounded-2xl px-4 py-2 text-sidebar-foreground/65 transition hover:bg-sidebar-accent hover:text-sidebar-foreground"
           >
-            <Settings className="w-5 h-5" />
+            <Settings className="size-5" />
             Cài đặt
           </Link>
         </nav>
 
-        <div className="p-4 border-t border-border">
-          <button className="flex items-center gap-3 w-full px-4 py-2 rounded-lg text-destructive hover:bg-destructive/10 transition font-medium">
-            <LogOut className="w-5 h-5" />
+        <div className="flex items-center p-3 lg:hidden">
+          <ThemeToggle inverse />
+        </div>
+
+        <div className="hidden border-t border-sidebar-border p-4 lg:block">
+          <div className="mb-3 flex items-center justify-between rounded-2xl bg-sidebar-accent p-2 pl-4">
+            <span className="text-sm font-bold text-sidebar-foreground/70">Giao diện</span>
+            <ThemeToggle inverse />
+          </div>
+          <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-2 font-bold text-primary transition hover:bg-sidebar-accent">
+            <LogOut className="size-5" />
             Đăng xuất
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">
-        <div className="p-8">
+      <main className="min-w-0 flex-1 lg:pl-72">
+        <div className="p-4 md:p-8">
           {children}
         </div>
       </main>

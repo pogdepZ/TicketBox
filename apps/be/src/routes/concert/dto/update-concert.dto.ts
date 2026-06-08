@@ -1,9 +1,12 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { IsOptional, IsString } from 'class-validator';
-import { CreateConcertDto } from './create-concert.dto';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
+import { createConcertSchema } from './create-concert.dto';
 
-export class UpdateConcertDto extends PartialType(CreateConcertDto) {
-  @IsOptional()
-  @IsString()
-  artistBio?: string;
-}
+export const updateConcertSchema = createConcertSchema
+  .partial()
+  .extend({
+    artistBio: z.string().optional(),
+  })
+  .strict();
+
+export class UpdateConcertDto extends createZodDto(updateConcertSchema) {}

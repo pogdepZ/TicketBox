@@ -15,20 +15,20 @@ export function ZoneSeatMap({ zone, seats, selectedSeatIds, onToggleSeat, onBack
   const rows = Array.from(new Set(seats.map((seat) => seat.row)));
 
   return (
-    <div className="rounded-lg border border-border bg-card p-5 md:p-8">
+    <div className="rounded-3xl border border-border bg-card p-5 shadow-sm md:p-8">
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <button
             type="button"
             onClick={onBack}
-            className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80"
+            className="mb-4 inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-bold text-foreground transition hover:border-primary/40 hover:text-primary"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="size-4" />
             Đổi hạng vé
           </button>
-          <p className="text-sm font-semibold text-primary">Bước 2</p>
-          <h2 className="text-2xl font-bold text-foreground">Chọn ghế {zone.name} / {zone.label}</h2>
-          <p className="mt-2 text-muted-foreground">
+          <p className="text-sm font-bold text-primary">Bước 2</p>
+          <h2 className="text-2xl font-black tracking-tight text-foreground">Chọn ghế {zone.name} / {zone.label}</h2>
+          <p className="mt-2 max-w-2xl text-muted-foreground">
             Chỉ hiển thị ghế thuộc khu đã chọn. Ghế được bo cong nhẹ theo khoảng cách với sân khấu.
           </p>
         </div>
@@ -37,8 +37,8 @@ export function ZoneSeatMap({ zone, seats, selectedSeatIds, onToggleSeat, onBack
 
       <div className="mb-8 flex justify-center">
         <div className="w-full max-w-3xl">
-          <div className="mx-auto mb-10 flex h-12 max-w-sm items-center justify-center rounded-full border-2 border-primary/50 bg-gradient-to-r from-primary/30 via-accent/30 to-cyan-400/30">
-            <p className="text-sm font-bold text-foreground">Sân khấu</p>
+          <div className="mx-auto mb-10 flex h-12 max-w-sm items-center justify-center rounded-full border border-white/15 bg-foreground shadow-xl shadow-foreground/10">
+            <p className="text-sm font-black text-background">Sân khấu</p>
           </div>
 
           <div className="overflow-x-auto pb-3">
@@ -87,13 +87,13 @@ export function ZoneSeatMap({ zone, seats, selectedSeatIds, onToggleSeat, onBack
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-muted/40 p-4">
+      <div className="rounded-3xl border border-border bg-muted/45 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="font-semibold text-foreground">{zone.name} / {zone.label}</p>
+            <p className="font-black text-foreground">{zone.name} / {zone.label}</p>
             <p className="text-sm text-muted-foreground">{zone.description}</p>
           </div>
-          <p className="text-lg font-bold text-primary">{zone.price.toLocaleString('vi-VN')}đ / vé</p>
+          <p className="text-lg font-black text-primary">{zone.price.toLocaleString('vi-VN')}đ / vé</p>
         </div>
       </div>
     </div>

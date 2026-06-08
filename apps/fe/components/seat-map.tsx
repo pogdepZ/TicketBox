@@ -6,8 +6,10 @@ import type { Seat, TicketZone } from '@/lib/mock-data';
 import { OrderSummary } from '@/components/checkout/OrderSummary';
 import { VenueMapOverview } from '@/components/seat-map/VenueMapOverview';
 import { ZoneSeatMap } from '@/components/seat-map/ZoneSeatMap';
+import { createDraftReservation } from '@/lib/mock-reservation';
 
 interface SeatMapProps {
+  concertId: string;
   concertTitle: string;
   zones: TicketZone[];
   seats: Seat[];
@@ -15,7 +17,7 @@ interface SeatMapProps {
 
 type FlowStep = 'overview' | 'seats';
 
-export function SeatMap({ concertTitle, zones, seats }: SeatMapProps) {
+export function SeatMap({ concertId, concertTitle, zones, seats }: SeatMapProps) {
   const router = useRouter();
   const [step, setStep] = useState<FlowStep>('overview');
   const [selectedZone, setSelectedZone] = useState<TicketZone | undefined>();
@@ -67,7 +69,19 @@ export function SeatMap({ concertTitle, zones, seats }: SeatMapProps) {
 
   const primaryLabel = step === 'overview' ? 'Tiếp tục chọn ghế' : 'Tiếp tục thanh toán';
   const primaryDisabled = step === 'overview' ? !selectedZone : selectedSeats.length === 0;
-  const primaryAction = step === 'overview' ? handleContinueToSeats : () => router.push('/checkout');
+  const primaryAction = step === 'overview' ? handleContinueToSeats : () => {
+    if (!selectedZone || selectedSeats.length === 0) {
+      return;
+    }
+
+    createDraftReservation({
+      concertId,
+      concertTitle,
+      selectedZone,
+      selectedSeats,
+    });
+    router.push('/checkout');
+  };
 
   const summary = (
     <OrderSummary

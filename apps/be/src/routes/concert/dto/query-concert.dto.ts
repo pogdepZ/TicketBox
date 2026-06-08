@@ -1,42 +1,17 @@
-import { Type } from 'class-transformer';
-import {
-  IsEnum,
-  IsISO8601,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-} from 'class-validator';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 import { ConcertStatus } from '../types/concert-status.type';
+import { isoDateStringSchema } from './create-concert.dto';
 
-export class QueryConcertDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page = 1;
+export const queryConcertSchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+    status: z.nativeEnum(ConcertStatus).optional(),
+    keyword: z.string().optional(),
+    fromDate: isoDateStringSchema.optional(),
+    toDate: isoDateStringSchema.optional(),
+  })
+  .strict();
 
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit = 10;
-
-  @IsOptional()
-  @IsEnum(ConcertStatus)
-  status?: ConcertStatus;
-
-  @IsOptional()
-  @IsString()
-  keyword?: string;
-
-  @IsOptional()
-  @IsISO8601()
-  fromDate?: string;
-
-  @IsOptional()
-  @IsISO8601()
-  toDate?: string;
-}
+export class QueryConcertDto extends createZodDto(queryConcertSchema) {}

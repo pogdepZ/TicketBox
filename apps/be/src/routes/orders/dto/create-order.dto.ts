@@ -1,31 +1,20 @@
-import {
-  ArrayMinSize,
-  IsArray,
-  IsInt,
-  IsUUID,
-  Max,
-  Min,
-  ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 
-export class CreateOrderItemDto {
-  @IsUUID()
-  ticketTypeId!: string;
+export const createOrderItemSchema = z
+  .object({
+    ticketTypeId: z.string().uuid(),
+    quantity: z.coerce.number().int().min(1).max(10),
+  })
+  .strict();
 
-  @IsInt()
-  @Min(1)
-  @Max(10)
-  quantity!: number;
-}
+export const createOrderSchema = z
+  .object({
+    concertId: z.string().uuid(),
+    items: z.array(createOrderItemSchema).min(1),
+  })
+  .strict();
 
-export class CreateOrderDto {
-  @IsUUID()
-  concertId!: string;
+export class CreateOrderItemDto extends createZodDto(createOrderItemSchema) {}
 
-  @IsArray()
-  @ArrayMinSize(1)
-  @ValidateNested({ each: true })
-  @Type(() => CreateOrderItemDto)
-  items!: CreateOrderItemDto[];
-}
+export class CreateOrderDto extends createZodDto(createOrderSchema) {}

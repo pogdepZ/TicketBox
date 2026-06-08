@@ -3,11 +3,13 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { CreateConcertDto } from './dto/create-concert.dto';
 import { UpdateConcertDto } from './dto/update-concert.dto';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../../common/prisma/prisma.service';
 import {
   Concert,
   ConcertStatus as PrismaConcertStatus,
@@ -17,6 +19,11 @@ import { QueryConcertDto } from './dto/query-concert.dto';
 import { ConcertResponseDto } from './dto/concert-response.dto';
 import { toPrismaConcertStatus } from './types/concert-status.type';
 import { CancelConcertDto } from './dto/cancel-concert.dto';
+import { RedisService } from '../../common/redis/redis.service';
+
+const CONCERT_CACHE_TTL_SECONDS = 60;
+const CONCERT_LIST_CACHE_KEY = 'cache:concert:list';
+const CONCERT_DETAIL_CACHE_KEY_PREFIX = 'cache:concert';
 
 type PaginatedConcerts = {
   items: ConcertResponseDto[];
@@ -30,7 +37,12 @@ type PaginatedConcerts = {
 
 @Injectable()
 export class ConcertService {
-  constructor(private readonly prismaService: PrismaService) {}
+  private readonly logger = new Logger(ConcertService.name);
+
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly redisService: RedisService,
+  ) {}
 
   async create(
     createConcertDto: CreateConcertDto,
@@ -38,7 +50,6 @@ export class ConcertService {
   ): Promise<ConcertResponseDto> {
     const eventDate = this.parseDate(createConcertDto.eventDate, 'eventDate');
     this.validateEventDateInFuture(eventDate);
-
     const concert = await this.prismaService.concert.create({
       data: {
         name: createConcertDto.name.trim(),
@@ -54,15 +65,25 @@ export class ConcertService {
       },
     });
 
-    // TODO: invalidate concert cache after create/update/publish/cancel.
+    await this.invalidateConcertCache(concert.id);
     // TODO: emit audit log event: concert.created.
     return this.toResponse(concert);
   }
 
   async findAll(query: QueryConcertDto): Promise<PaginatedConcerts> {
-    const where = this.buildWhereQuery(query);
+    const cacheKey = this.buildConcertListCacheKey(query);
+    const cached = await this.getCache<PaginatedConcerts>(cacheKey);
 
-    return this.findMany(where, query.page, query.limit);
+    if (cached) {
+      return cached;
+    }
+
+    const where = this.buildWhereQuery(query);
+    const concerts = await this.findMany(where, query.page, query.limit);
+
+    await this.setCache(cacheKey, concerts);
+
+    return concerts;
   }
 
   private async findMany(
@@ -95,10 +116,20 @@ export class ConcertService {
   }
 
   async findOne(id: string): Promise<ConcertResponseDto> {
+    const cacheKey = this.buildConcertDetailCacheKey(id);
+    const cached = await this.getCache<ConcertResponseDto>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
     const concert = await this.findConcertOrThrow(id);
+    const response = this.toResponse(concert);
+
+    await this.setCache(cacheKey, response);
 
     // TODO: include ticketTypes or related data only through owning modules when needed.
-    return this.toResponse(concert);
+    return response;
   }
 
   async update(
@@ -114,7 +145,7 @@ export class ConcertService {
       data,
     });
 
-    // TODO: invalidate concert cache after create/update/publish/cancel.
+    await this.invalidateConcertCache(id);
     // TODO: emit audit log event: concert.updated.
     return this.toResponse(updatedConcert);
   }
@@ -134,7 +165,7 @@ export class ConcertService {
       data: { status: PrismaConcertStatus.PUBLISHED },
     });
 
-    // TODO: invalidate concert cache after create/update/publish/cancel.
+    await this.invalidateConcertCache(id);
     // TODO: emit audit log event: concert.published.
     return this.toResponse(updatedConcert);
   }
@@ -159,7 +190,7 @@ export class ConcertService {
     });
 
     // TODO: PaymentModule/NotificationModule handle refund and notifications later.
-    // TODO: invalidate concert cache after create/update/publish/cancel.
+    await this.invalidateConcertCache(id);
     // TODO: emit audit log event: concert.cancelled.
     return this.toResponse(updatedConcert);
   }
@@ -180,6 +211,7 @@ export class ConcertService {
       data: { status: PrismaConcertStatus.COMPLETED },
     });
 
+    await this.invalidateConcertCache(id);
     // TODO: emit audit log event: concert.completed.
     return this.toResponse(updatedConcert);
   }
@@ -355,5 +387,54 @@ export class ConcertService {
 
   private toResponse(concert: Concert): ConcertResponseDto {
     return new ConcertResponseDto(concert);
+  }
+
+  private buildConcertListCacheKey(query: QueryConcertDto): string {
+    const normalizedQuery = {
+      page: query.page,
+      limit: query.limit,
+      status: query.status ?? null,
+      keyword: query.keyword?.trim() || null,
+      fromDate: query.fromDate ?? null,
+      toDate: query.toDate ?? null,
+    };
+
+    const hash = createHash('sha1')
+      .update(JSON.stringify(normalizedQuery))
+      .digest('hex');
+
+    return `${CONCERT_LIST_CACHE_KEY}:${hash}`;
+  }
+
+  private buildConcertDetailCacheKey(id: string): string {
+    return `${CONCERT_DETAIL_CACHE_KEY_PREFIX}:${id}`;
+  }
+
+  private async getCache<T>(key: string): Promise<T | null> {
+    try {
+      return await this.redisService.getJson<T>(key);
+    } catch (error) {
+      this.logger.warn(`Failed to read Redis cache for key ${key}`, error);
+      return null;
+    }
+  }
+
+  private async setCache(key: string, value: unknown): Promise<void> {
+    try {
+      await this.redisService.setJson(key, value, CONCERT_CACHE_TTL_SECONDS);
+    } catch (error) {
+      this.logger.warn(`Failed to write Redis cache for key ${key}`, error);
+    }
+  }
+
+  private async invalidateConcertCache(concertId: string): Promise<void> {
+    try {
+      await Promise.all([
+        this.redisService.delPattern(`${CONCERT_LIST_CACHE_KEY}*`),
+        this.redisService.del(this.buildConcertDetailCacheKey(concertId)),
+      ]);
+    } catch (error) {
+      this.logger.warn(`Failed to invalidate concert cache for ${concertId}`, error);
+    }
   }
 }

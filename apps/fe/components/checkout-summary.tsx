@@ -23,7 +23,7 @@ export function CheckoutSummary({
     price: unitPrice,
     remaining: 0,
     total: 0,
-    color: '#a78bfa',
+    color: '#e5484d',
     description: 'Thông tin vé đang được giữ cho đơn hàng này.',
     status: 'available',
   };

@@ -123,8 +123,6 @@ checkin:snapshot_read
 ticket:verify
 ```
 
-Response user khong co `scopeType` hoac `scopeId`.
-
 ## Data Shapes
 
 ### AuthUser

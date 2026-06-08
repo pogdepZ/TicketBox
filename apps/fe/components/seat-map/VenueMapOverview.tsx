@@ -26,16 +26,16 @@ const zoneLabelPositions: Record<string, { x: number; y: number; priceY: number 
 export function VenueMapOverview({ zones, selectedZone, onSelectZone }: VenueMapOverviewProps) {
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-border bg-card p-5 md:p-8">
+      <div className="rounded-3xl border border-border bg-card p-5 shadow-sm md:p-8">
         <div className="mb-6">
-          <p className="text-sm font-semibold text-primary">Bước 1</p>
-          <h2 className="text-2xl font-bold text-foreground">Chọn hạng vé theo sơ đồ sân khấu</h2>
-          <p className="mt-2 text-muted-foreground">
+          <p className="text-sm font-bold text-primary">Bước 1</p>
+          <h2 className="text-2xl font-black tracking-tight text-foreground">Chọn hạng vé theo sơ đồ sân khấu</h2>
+          <p className="mt-2 max-w-2xl text-muted-foreground">
             Xem vị trí từng khu trước khi chuyển sang chọn ghế chi tiết. Bản đồ này chỉ dùng để chọn hạng vé.
           </p>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-border bg-gradient-to-b from-muted/80 via-background to-card p-3">
+        <div className="overflow-hidden rounded-[1.5rem] border border-border bg-[radial-gradient(circle_at_top,#263636_0%,#111817_38%,#0b0f0e_100%)] p-3 shadow-inner">
           <svg viewBox="0 70 760 590" className="h-auto w-full" role="img" aria-label="Sơ đồ khu vé sân khấu">
             <defs>
               <filter id="venueGlow" x="-20%" y="-20%" width="140%" height="140%">
@@ -47,12 +47,12 @@ export function VenueMapOverview({ zones, selectedZone, onSelectZone }: VenueMap
               </filter>
               <filter id="selectedZoneGlow" x="-25%" y="-25%" width="150%" height="150%">
                 <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#ffffff" floodOpacity="0.55" />
-                <feDropShadow dx="0" dy="0" stdDeviation="12" floodColor="#a78bfa" floodOpacity="0.35" />
+                <feDropShadow dx="0" dy="0" stdDeviation="12" floodColor="#e5484d" floodOpacity="0.38" />
               </filter>
               <linearGradient id="stageGradient" x1="0" x2="1">
-                <stop offset="0%" stopColor="#8b5cf6" />
-                <stop offset="50%" stopColor="#ec4899" />
-                <stop offset="100%" stopColor="#38bdf8" />
+                <stop offset="0%" stopColor="#e5484d" />
+                <stop offset="52%" stopColor="#e0a82e" />
+                <stop offset="100%" stopColor="#3d6f8f" />
               </linearGradient>
             </defs>
 

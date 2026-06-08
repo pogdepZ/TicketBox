@@ -12,5 +12,16 @@ services:
     volumes:
       - nest_prisma_pg_data:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine
+    container_name: ticketbox-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ticketbox_redis_data:/data
+    command: redis-server --appendonly yes
+
 volumes:
   nest_prisma_pg_data:
+  ticketbox_redis_data:

@@ -2,7 +2,7 @@ import { ConcertHero } from '@/components/concert-hero';
 import { SeatMap } from '@/components/seat-map';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
-import { concerts, seats, ticketZones } from '@/lib/mock-data';
+import { concerts, getSeatsByConcertId, getTicketZonesByConcertId } from '@/lib/mock-data';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -21,16 +21,19 @@ export default async function ConcertDetailPage({ params }: ConcertDetailPagePro
     notFound();
   }
 
+  const concertZones = getTicketZonesByConcertId(concert.id);
+  const concertSeats = getSeatsByConcertId(concert.id);
+
   return (
     <main className="min-h-screen bg-background">
       <Header />
 
-      <div className="max-w-7xl mx-auto px-4 py-4">
+      <div className="mx-auto max-w-7xl px-4 py-5">
         <Link
           href="/"
-          className="flex items-center gap-2 text-primary hover:text-primary/80 transition font-medium"
+          className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="size-4" />
           Quay lại
         </Link>
       </div>
@@ -46,33 +49,32 @@ export default async function ConcertDetailPage({ params }: ConcertDetailPagePro
         capacity={concert.capacity}
       />
 
-      <section className="max-w-7xl mx-auto px-4 py-12 pb-64 lg:pb-12">
-        <div className="bg-card rounded-lg p-8 border border-border mb-8">
-          <h2 className="text-2xl font-bold text-foreground mb-4">Về sự kiện</h2>
-          <p className="text-muted-foreground leading-relaxed mb-6">
+      <section className="mx-auto max-w-7xl px-4 py-12 pb-64 lg:pb-14">
+        <div className="mb-10 grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+          <div>
+            <h2 className="text-3xl font-black tracking-tight text-foreground md:text-4xl">Về sự kiện</h2>
+          </div>
+          <div>
+            <p className="text-lg leading-8 text-muted-foreground">
             {concert.description}
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-muted rounded-lg">
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Thể loại</p>
-              <p className="font-semibold text-foreground">{concert.genre}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Sức chứa</p>
-              <p className="font-semibold text-foreground">{concert.capacity.toLocaleString('vi-VN')}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Ngôn ngữ</p>
-              <p className="font-semibold text-foreground">{concert.language}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Độ tuổi</p>
-              <p className="font-semibold text-foreground">{concert.ageLimit}</p>
+            <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-4">
+              {[
+                ['Thể loại', concert.genre],
+                ['Sức chứa', concert.capacity.toLocaleString('vi-VN')],
+                ['Ngôn ngữ', concert.language],
+                ['Độ tuổi', concert.ageLimit],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                  <p className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+                  <p className="font-black text-foreground">{value}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        <SeatMap concertTitle={concert.title} zones={ticketZones} seats={seats} />
+        <SeatMap concertId={concert.id} concertTitle={concert.title} zones={concertZones} seats={concertSeats} />
       </section>
 
       <Footer />

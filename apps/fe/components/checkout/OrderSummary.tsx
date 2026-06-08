@@ -31,7 +31,7 @@ export function OrderSummary({
 
   if (compact) {
     return (
-      <div className="rounded-t-lg border border-border bg-card p-4 shadow-2xl">
+      <div className="rounded-t-3xl border border-border bg-card p-4 shadow-2xl shadow-foreground/15">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <p className="text-xs text-muted-foreground">{selectedZone ? `${selectedZone.name} / ${selectedZone.label}` : 'Chưa chọn khu'}</p>
@@ -45,7 +45,7 @@ export function OrderSummary({
           type="button"
           disabled={primaryDisabled}
           onClick={onPrimaryAction}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 font-bold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 font-bold text-primary-foreground transition hover:bg-primary/90 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45"
         >
           {primaryLabel}
           <ArrowRight className="h-4 w-4" />
@@ -55,12 +55,12 @@ export function OrderSummary({
   }
 
   return (
-    <div className="sticky top-6 rounded-lg border border-border bg-card p-6">
+    <div className="sticky top-24 rounded-3xl border border-border bg-card p-6 shadow-xl shadow-foreground/5">
       <div className="mb-5 flex items-center gap-2">
-        <div className="rounded-lg bg-primary/15 p-2 text-primary">
-          <Ticket className="h-5 w-5" />
+        <div className="rounded-2xl bg-primary/12 p-2.5 text-primary">
+          <Ticket className="size-5" />
         </div>
-        <h3 className="text-xl font-bold text-foreground">Chi tiết đơn hàng</h3>
+        <h3 className="text-xl font-black text-foreground">Chi tiết đơn hàng</h3>
       </div>
 
       <div className="space-y-4 border-b border-border pb-5">
@@ -89,7 +89,7 @@ export function OrderSummary({
         </div>
 
         {selectedZone && (
-          <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+          <div className="rounded-2xl bg-muted/60 p-3 text-sm text-muted-foreground">
             <div className="mb-1 flex justify-between gap-3">
               <span>Giá vé</span>
               <span className="font-semibold text-foreground">{selectedZone.price.toLocaleString('vi-VN')}đ</span>
@@ -106,7 +106,7 @@ export function OrderSummary({
           {selectedSeats.length > 0 ? (
             <div className="mt-2 flex flex-wrap gap-2">
               {selectedSeats.map((seat) => (
-                <span key={seat.id} className="rounded bg-primary/20 px-2 py-1 text-sm font-semibold text-primary">
+                <span key={seat.id} className="rounded-full bg-primary/12 px-3 py-1 text-sm font-bold text-primary">
                   {seat.label}
                 </span>
               ))}
@@ -138,14 +138,14 @@ export function OrderSummary({
 
       <div className="flex items-center justify-between py-5">
         <span className="font-bold text-foreground">Tổng cộng</span>
-        <span className="text-2xl font-bold text-primary">{total.toLocaleString('vi-VN')}đ</span>
+        <span className="text-2xl font-black text-primary">{total.toLocaleString('vi-VN')}đ</span>
       </div>
 
       <button
         type="button"
         disabled={primaryDisabled}
         onClick={onPrimaryAction}
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 font-bold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 font-bold text-primary-foreground transition hover:bg-primary/90 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45"
       >
         {primaryLabel}
         <ArrowRight className="h-4 w-4" />

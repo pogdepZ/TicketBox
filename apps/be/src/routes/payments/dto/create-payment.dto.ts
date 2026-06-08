@@ -1,13 +1,12 @@
-import { IsIn, IsOptional, IsUrl, IsUUID } from 'class-validator';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 
-export class CreatePaymentDto {
-  @IsUUID()
-  orderId!: string;
+export const createPaymentSchema = z
+  .object({
+    orderId: z.string().uuid(),
+    provider: z.enum(['VNPAY', 'MOMO']),
+    returnUrl: z.string().url().optional(),
+  })
+  .strict();
 
-  @IsIn(['VNPAY', 'MOMO'])
-  provider!: 'VNPAY' | 'MOMO';
-
-  @IsOptional()
-  @IsUrl({ require_tld: false })
-  returnUrl?: string;
-}
+export class CreatePaymentDto extends createZodDto(createPaymentSchema) {}

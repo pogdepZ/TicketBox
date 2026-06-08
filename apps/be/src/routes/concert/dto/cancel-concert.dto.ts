@@ -1,8 +1,11 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 
-export class CancelConcertDto {
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  reason?: string;
-}
+export const cancelConcertSchema = z
+  .object({
+    reason: z.string().max(500).optional(),
+  })
+  .strict()
+  .default({});
+
+export class CancelConcertDto extends createZodDto(cancelConcertSchema) {}
