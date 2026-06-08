@@ -1,0 +1,1 @@
+export const REDIS_DEFAULT_KEY_TTL_SECONDS = 60;

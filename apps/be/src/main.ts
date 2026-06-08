@@ -6,7 +6,12 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/response.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const isProduction = process.env.NODE_ENV === 'production';
+  const app = await NestFactory.create(AppModule, {
+    logger: isProduction
+    ? ['error', 'warn']
+    : ['log', 'debug', 'error', 'warn', 'verbose'],
+  });
   app.enableCors({
     origin: process.env.CORS_ORIGIN,
     credentials: true,
