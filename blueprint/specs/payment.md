@@ -15,10 +15,10 @@ Payment không chịu trách nhiệm giữ vé. Vé đã được giữ ở `Res
 
 ## Actor và quyền truy cập
 
-- Khán giả đã đăng nhập được tạo payment cho order của chính mình.
+- Role `customer` (Khán giả) đã đăng nhập được tạo payment cho order của chính mình.
 - Backend nhận webhook từ payment gateway qua endpoint public có kiểm tra chữ ký hoặc secret.
-- Ban tổ chức chỉ xem thống kê payment, không can thiệp trực tiếp vào luồng thanh toán của user.
-- Nhân sự soát vé không có quyền truy cập payment API.
+- Role `admin` (Ban tổ chức) chỉ xem thống kê payment, không can thiệp trực tiếp vào luồng thanh toán của user.
+- Role `checker` (Nhân sự soát vé) không có quyền truy cập payment API.
 
 ## Dữ liệu liên quan
 

@@ -14,9 +14,9 @@ Cơ chế nhất quán chính là **PostgreSQL transaction + row-level lock**. R
 
 ## Actor và quyền truy cập
 
-- Khán giả đã đăng nhập có quyền tạo order và thanh toán order của chính mình.
-- Ban tổ chức không tạo order thay khán giả trong luồng public ticketing.
-- Nhân sự soát vé không được truy cập API tạo order.
+- Role `customer` (Khán giả) đã đăng nhập có quyền tạo order và thanh toán order của chính mình.
+- Role `admin` (Ban tổ chức / Quản trị viên) không tạo order thay khán giả trong luồng public ticketing.
+- Role `checker` (Nhân sự soát vé) không được truy cập API tạo order.
 
 API ticketing cần kiểm tra JWT trước khi xử lý. User id lấy từ access token, không nhận `userId` từ request body để tránh giả mạo.
 

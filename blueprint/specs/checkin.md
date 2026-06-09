@@ -1,0 +1,58 @@
+# Đặc tả: Offline Check-in
+
+## 1. Mô tả
+
+Nhân sự soát vé (vai trò `checker`) dùng mobile app/PWA để quét QR e-ticket. App phải hoạt động được khi mất mạng và đồng bộ lại khi có kết nối.
+
+## 2. Luồng online
+
+1. `checker` đăng nhập mobile app.
+2. `checker` chọn cấu hình concert/gate trên UI (chỉ là cấu hình hiển thị và vận hành thực tế trên giao diện, không phải là phân quyền).
+3. `checker` quét QR.
+4. App gửi request tới backend.
+5. Backend verify QR, kiểm tra quyền `checker` (permission `checkin:scan`) và trạng thái ticket.
+6. Nếu ticket active, backend update ticket thành used.
+7. App hiển thị check-in thành công.
+
+## 3. Luồng offline
+
+1. Trước sự kiện, app đồng bộ public key và tải danh sách vé (cấu hình concert/gate) để lưu offline.
+2. Khi mất mạng, `checker` vẫn quét QR.
+3. App verify chữ ký QR offline.
+4. App kiểm tra local database đã quét ticket này chưa.
+5. App lưu check-in event vào local queue.
+6. App hiển thị trạng thái “Tạm chấp nhận offline”.
+7. Khi có mạng, app gửi batch sync.
+8. Server xử lý từng event idempotently.
+9. Server trả kết quả accepted/rejected/conflict.
+10. App cập nhật local status.
+
+## 4. Kịch bản lỗi
+
+| Tình huống | Xử lý |
+|---|---|
+| QR sai chữ ký | Từ chối ngay |
+| QR hết hạn/sai concert | Từ chối |
+| Ticket đã quét trên cùng thiết bị | Cảnh báo trùng |
+| Ticket đã used trên server | Reject khi sync |
+| Hai thiết bị offline cùng quét một vé | Server accept event đầu tiên sync, event sau conflict |
+| App mất mạng khi sync | Giữ local queue và retry sau |
+
+## 5. Ràng buộc
+
+- Mỗi local event có `client_event_id`.
+- Server dùng `(device_id, client_event_id)` để idempotency.
+- Không xóa local queue cho đến khi server ACK.
+- Offline không thể chống double-scan tuyệt đối giữa nhiều thiết bị; hệ thống phát hiện và ghi log khi sync.
+- Quyền truy cập API check-in của `checker` bao gồm các permission:
+  * `ticket:verify`
+  * `checkin:scan`
+  * `checkin:sync`
+  * `checkin:snapshot_read`
+
+## 6. Tiêu chí chấp nhận
+
+- App quét được QR khi mất mạng.
+- Dữ liệu offline không mất sau khi đóng app.
+- Sync lại không tạo duplicate check-in event.
+- Vé đã used không thể accepted lần hai trên server.
