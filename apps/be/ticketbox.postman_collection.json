@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "75b17bdb-f1c5-4d8c-bc2d-9fbff4d69a01",
     "name": "TicketBox Backend",
-    "description": "Postman collection for the NestJS backend endpoints currently registered in src/app.module.ts: Health, Auth, and Concerts. Default baseUrl is http://localhost:3000. Run the backend and RBAC seed before testing protected Concert routes. Use Seed Admin Login to save an admin accessToken, then run Concerts.",
+    "description": "Postman collection for all NestJS backend endpoints currently registered in apps/be/src: Health, Auth, Concerts, Orders, Payments, Checkin, Guest List CSV import, and Artist Bio PDF upload. Default baseUrl is http://localhost:3001. Run the backend and RBAC seed before testing protected Concert routes. Use Seed Admin Login to save an admin accessToken, then run Concerts/Admin Uploads. NotificationsController and TicketsModule currently expose no HTTP endpoints.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -1309,6 +1309,338 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Checkin",
+      "description": "CheckinModule endpoints from src/routes/checkin/checkin.controller.ts. These are current mock endpoints and do not require JWT in the controller.",
+      "item": [
+        {
+          "name": "POST /checkin/scan - Scan QR code",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('checkinQrCodeData')) {",
+                  "  pm.collectionVariables.set('checkinQrCodeData', `TICKETBOX-${Date.now()}`);",
+                  "}",
+                  "",
+                  "if (!pm.collectionVariables.get('checkinStaffId')) {",
+                  "  pm.collectionVariables.set('checkinStaffId', 'staff-mock-001');",
+                  "}",
+                  "",
+                  "if (!pm.collectionVariables.get('checkinConcertId')) {",
+                  "  pm.collectionVariables.set('checkinConcertId', pm.collectionVariables.get('concertId') || pm.collectionVariables.get('mockConcertId') || '11111111-1111-4111-8111-111111111111');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const payload = json.data;",
+                  "const data = payload.data;",
+                  "",
+                  "pm.test('global interceptor wraps checkin scan payload', function () {",
+                  "  pm.expect(json).to.have.property('statusCode', 201);",
+                  "  pm.expect(payload).to.have.property('success', true);",
+                  "  pm.expect(payload).to.have.property('message', 'Check-in processed successfully');",
+                  "});",
+                  "",
+                  "pm.test('mock scan result is returned', function () {",
+                  "  pm.expect(data).to.have.property('ticketId', 'ticket-mock-001');",
+                  "  pm.expect(data).to.have.property('status', 'SUCCESS');",
+                  "  pm.expect(data).to.have.property('checkedInAt');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('checkinTicketId', data.ticketId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qrCodeData\": \"{{checkinQrCodeData}}\",\n  \"staffId\": \"{{checkinStaffId}}\",\n  \"concertId\": \"{{checkinConcertId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/checkin/scan",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "checkin",
+                "scan"
+              ]
+            },
+            "description": "Processes one QR scan. Current service returns a mock SUCCESS result."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /checkin/sync - Sync offline checkins",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('checkinSyncedAt', new Date().toISOString());",
+                  "",
+                  "if (!pm.collectionVariables.get('checkinTicketId')) {",
+                  "  pm.collectionVariables.set('checkinTicketId', 'ticket-mock-001');",
+                  "}",
+                  "",
+                  "if (!pm.collectionVariables.get('checkinQrCodeData')) {",
+                  "  pm.collectionVariables.set('checkinQrCodeData', `TICKETBOX-${Date.now()}`);",
+                  "}",
+                  "",
+                  "if (!pm.collectionVariables.get('checkinStaffId')) {",
+                  "  pm.collectionVariables.set('checkinStaffId', 'staff-mock-001');",
+                  "}",
+                  "",
+                  "if (!pm.collectionVariables.get('checkinConcertId')) {",
+                  "  pm.collectionVariables.set('checkinConcertId', pm.collectionVariables.get('concertId') || pm.collectionVariables.get('mockConcertId') || '11111111-1111-4111-8111-111111111111');",
+                  "}",
+                  "",
+                  "if (!pm.collectionVariables.get('checkinSourceDeviceId')) {",
+                  "  pm.collectionVariables.set('checkinSourceDeviceId', 'device-postman-001');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const payload = json.data;",
+                  "const data = payload.data;",
+                  "",
+                  "pm.test('global interceptor wraps checkin sync payload', function () {",
+                  "  pm.expect(json).to.have.property('statusCode', 201);",
+                  "  pm.expect(payload).to.have.property('success', true);",
+                  "  pm.expect(payload.message).to.match(/^Synced 1 check-in records$/);",
+                  "});",
+                  "",
+                  "pm.test('sync result is returned', function () {",
+                  "  pm.expect(data.results).to.be.an('array').with.lengthOf(1);",
+                  "  pm.expect(data.results[0]).to.have.property('ticketId', pm.collectionVariables.get('checkinTicketId'));",
+                  "  pm.expect(data.results[0]).to.have.property('status', 'SYNCED');",
+                  "  pm.expect(data.results[0]).to.have.property('serverId');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"ticketId\": \"{{checkinTicketId}}\",\n      \"qrCodeData\": \"{{checkinQrCodeData}}\",\n      \"concertId\": \"{{checkinConcertId}}\",\n      \"staffId\": \"{{checkinStaffId}}\",\n      \"sourceDeviceId\": \"{{checkinSourceDeviceId}}\",\n      \"checkedAt\": \"{{checkinSyncedAt}}\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/checkin/sync",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "checkin",
+                "sync"
+              ]
+            },
+            "description": "Syncs offline check-in records from a device. Current service returns mock SYNCED results."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin Concert Uploads",
+      "description": "Admin/concert upload endpoints from GuestListModule and AiBioModule. Controllers currently do not enforce JWT, but run Seed Admin Login first if you want to follow the admin flow. In Postman, set guestListCsvFilePath and artistBioPdfFilePath to local files before running.",
+      "item": [
+        {
+          "name": "POST /admin/concerts/:id/guest-list/import - Import guest CSV",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('concertId') && pm.collectionVariables.get('mockConcertId')) {",
+                  "  pm.collectionVariables.set('concertId', pm.collectionVariables.get('mockConcertId'));",
+                  "}",
+                  "",
+                  "if (!pm.collectionVariables.get('guestListCsvFilePath')) {",
+                  "  console.warn('Set guestListCsvFilePath to a local CSV path before sending this request.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const payload = json.data;",
+                  "const data = payload.data;",
+                  "",
+                  "pm.test('global interceptor wraps guest-list import payload', function () {",
+                  "  pm.expect(json).to.have.property('statusCode', 201);",
+                  "  pm.expect(payload).to.have.property('success', true);",
+                  "  pm.expect(payload.message).to.match(/^Imported /);",
+                  "});",
+                  "",
+                  "pm.test('mock import counts are returned', function () {",
+                  "  pm.expect(data).to.have.property('imported', 10);",
+                  "  pm.expect(data).to.have.property('duplicates', 2);",
+                  "  pm.expect(data).to.have.property('errors', 0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "{{guestListCsvFilePath}}",
+                  "description": "CSV file field expected by FileInterceptor('file')."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/concerts/{{concertId}}/guest-list/import",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "concerts",
+                "{{concertId}}",
+                "guest-list",
+                "import"
+              ]
+            },
+            "description": "Imports a guest-list CSV for a concert. Current service returns mock counts and only uses file.originalname."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /admin/concerts/:id/artist-bio/upload - Upload artist bio PDF",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('concertId') && pm.collectionVariables.get('mockConcertId')) {",
+                  "  pm.collectionVariables.set('concertId', pm.collectionVariables.get('mockConcertId'));",
+                  "}",
+                  "",
+                  "if (!pm.collectionVariables.get('artistBioPdfFilePath')) {",
+                  "  console.warn('Set artistBioPdfFilePath to a local PDF path before sending this request.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const payload = json.data;",
+                  "const data = payload.data;",
+                  "",
+                  "pm.test('global interceptor wraps artist-bio upload payload', function () {",
+                  "  pm.expect(json).to.have.property('statusCode', 201);",
+                  "  pm.expect(payload).to.have.property('success', true);",
+                  "  pm.expect(payload).to.have.property('message', 'Artist bio generated successfully from PDF');",
+                  "});",
+                  "",
+                  "pm.test('mock AI bio is returned', function () {",
+                  "  pm.expect(data).to.have.property('bio');",
+                  "  pm.expect(data.bio).to.include(pm.collectionVariables.get('concertId'));",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('artistBio', data.bio);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "{{artistBioPdfFilePath}}",
+                  "description": "PDF file field expected by FileInterceptor('file')."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/concerts/{{concertId}}/artist-bio/upload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "concerts",
+                "{{concertId}}",
+                "artist-bio",
+                "upload"
+              ]
+            },
+            "description": "Uploads artist press-kit PDF and returns a mock generated bio. Current service only uses file.originalname."
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "variable": [
@@ -1419,6 +1751,51 @@
     },
     {
       "key": "paymentIdempotencyKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "checkinQrCodeData",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "checkinStaffId",
+      "value": "staff-mock-001",
+      "type": "string"
+    },
+    {
+      "key": "checkinConcertId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "checkinTicketId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "checkinSourceDeviceId",
+      "value": "device-postman-001",
+      "type": "string"
+    },
+    {
+      "key": "checkinSyncedAt",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "guestListCsvFilePath",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "artistBioPdfFilePath",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "artistBio",
       "value": "",
       "type": "string"
     }
