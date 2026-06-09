@@ -15,7 +15,11 @@ import { PaymentsModule } from './routes/payments/payments.module';
 import { TicketsModule } from './routes/tickets/tickets.module';
 import { AppZodValidationPipe } from './common/pipes/zod-validation.pipe';
 import { RedisModule } from './common/redis/redis.module';
- 
+import { CheckinModule } from './routes/checkin/checkin.module';
+import { NotificationsModule } from './routes/notifications/notifications.module';
+import { AiBioModule } from './routes/ai-bio/ai-bio.module';
+import { GuestListModule } from './routes/guest-list/guest-list.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -30,6 +34,10 @@ import { RedisModule } from './common/redis/redis.module';
     PaymentsModule,
     TicketsModule,
     RedisModule,
+    CheckinModule,
+    NotificationsModule,
+    AiBioModule,
+    GuestListModule,
   ],
   controllers: [AppController],
   providers: [
