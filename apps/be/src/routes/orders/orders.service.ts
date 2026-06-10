@@ -167,7 +167,7 @@ export class OrdersService {
           user.id,
           item.ticketTypeId,
         );
-        this.inventory.checkQuota(quota, tt.maxPerUser, item.quantity);
+        //this.inventory.checkQuota(quota, tt.maxPerUser, item.quantity);
 
         enrichedItems.push({ ticketType: tt, quantity: item.quantity });
       }

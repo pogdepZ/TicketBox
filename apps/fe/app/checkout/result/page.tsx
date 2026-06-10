@@ -13,22 +13,43 @@ function CheckoutResultContent() {
   // Extract VNPAY parameters
   const responseCode = searchParams.get('vnp_ResponseCode');
   const transactionStatus = searchParams.get('vnp_TransactionStatus');
-  const amountStr = searchParams.get('vnp_Amount');
-  const txnRef = searchParams.get('vnp_TxnRef');
+  const vnpAmountStr = searchParams.get('vnp_Amount');
+  const vnpTxnRef = searchParams.get('vnp_TxnRef');
   const bankCode = searchParams.get('vnp_BankCode');
-  const transactionNo = searchParams.get('vnp_TransactionNo');
-  const payDateStr = searchParams.get('vnp_PayDate');
+  const vnpTransactionNo = searchParams.get('vnp_TransactionNo');
+  const vnpPayDateStr = searchParams.get('vnp_PayDate');
 
-  // VNPAY uses responseCode '00' for success
-  const isSuccess = responseCode === '00' || transactionStatus === '00';
+  // Extract MoMo parameters
+  const momoResultCode = searchParams.get('resultCode');
+  const momoTxnRef = searchParams.get('orderId');
+  const momoTransactionNo = searchParams.get('transId');
+  const momoAmountStr = searchParams.get('amount');
+  const momoPayDateStr = searchParams.get('responseTime');
+  const momoMessage = searchParams.get('message');
+  const momoPayType = searchParams.get('payType');
+
+  const provider = momoResultCode !== null ? 'MOMO' : 'VNPAY';
+  const txnRef = provider === 'MOMO' ? momoTxnRef : vnpTxnRef;
+  const transactionNo = provider === 'MOMO' ? momoTransactionNo : vnpTransactionNo;
+  const amountStr = provider === 'MOMO' ? momoAmountStr : vnpAmountStr;
+  const payDateStr = provider === 'MOMO' ? momoPayDateStr : vnpPayDateStr;
+  const isSuccess =
+    provider === 'MOMO'
+      ? momoResultCode === '0'
+      : responseCode === '00' || transactionStatus === '00';
 
   // Format amount
   const rawAmount = amountStr ? Number(amountStr) : 0;
-  const amountInVnd = rawAmount / 100;
+  const amountInVnd = provider === 'MOMO' ? rawAmount : rawAmount / 100;
 
   // Format payDate (YYYYMMDDHHmmss -> DD/MM/YYYY HH:mm:ss)
   const formatPayDate = (dateStr: string | null) => {
-    if (!dateStr || dateStr.length < 14) return 'N/A';
+    if (!dateStr) return 'N/A';
+    if (provider === 'MOMO') {
+      return new Date(Number(dateStr)).toLocaleString('vi-VN');
+    }
+    if (dateStr.length < 14) return 'N/A';
+
     const year = dateStr.slice(0, 4);
     const month = dateStr.slice(4, 6);
     const day = dateStr.slice(6, 8);
@@ -68,7 +89,7 @@ function CheckoutResultContent() {
         <div className="space-y-4">
           <div className="flex justify-between border-b border-border/50 pb-3">
             <span className="text-muted-foreground">Nhà cung cấp</span>
-            <span className="font-bold text-foreground">VNPAY</span>
+            <span className="font-bold text-foreground">{provider}</span>
           </div>
 
           {txnRef && (
@@ -80,7 +101,7 @@ function CheckoutResultContent() {
 
           {transactionNo && (
             <div className="flex justify-between border-b border-border/50 pb-3">
-              <span className="text-muted-foreground">Mã giao dịch VNPAY</span>
+              <span className="text-muted-foreground">Mã giao dịch {provider}</span>
               <span className="font-mono font-bold text-foreground">{transactionNo}</span>
             </div>
           )}
@@ -98,6 +119,20 @@ function CheckoutResultContent() {
             <div className="flex justify-between border-b border-border/50 pb-3">
               <span className="text-muted-foreground">Ngân hàng</span>
               <span className="font-semibold text-foreground">{bankCode}</span>
+            </div>
+          )}
+
+          {momoPayType && (
+            <div className="flex justify-between border-b border-border/50 pb-3">
+              <span className="text-muted-foreground">Kênh thanh toán</span>
+              <span className="font-semibold text-foreground">{momoPayType}</span>
+            </div>
+          )}
+
+          {momoMessage && (
+            <div className="flex justify-between border-b border-border/50 pb-3">
+              <span className="text-muted-foreground">Thông báo</span>
+              <span className="text-right font-semibold text-foreground">{momoMessage}</span>
             </div>
           )}
 

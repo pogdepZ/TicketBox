@@ -31,6 +31,7 @@ import {
 } from '../../generated/prisma';
 
 type Provider = 'VNPAY' | 'MOMO';
+type WebhookSignatureMode = 'MOCK' | 'GATEWAY_VERIFIED';
 
 @Injectable()
 export class PaymentsService {
@@ -100,7 +101,7 @@ export class PaymentsService {
     // Circuit breaker check
     await this.circuitBreaker.assertAvailable(dto.provider as Provider);
 
-    return this.prisma.$transaction(async (tx) => {
+    const paymentRequest = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(
         `SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`,
         dto.orderId,
@@ -142,15 +143,9 @@ export class PaymentsService {
         return {
           orderId: order.id,
           paymentRef: order.paymentRef,
-          provider: order.paymentMethod,
+          provider,
           orderStatus: order.status,
           paymentStatus: this.toPaymentStatus(order.status),
-          paymentUrl: this.gateway.buildPaymentUrl(
-            provider,
-            order.paymentRef,
-            order.totalAmount.toString(),
-            dto.returnUrl,
-          ),
           expiresAt: order.expiresAt.toISOString(),
           amount: order.totalAmount.toString(),
           currency: 'VND',
@@ -168,25 +163,30 @@ export class PaymentsService {
         },
       });
 
-      const paymentUrl = this.gateway.buildPaymentUrl(
-        dto.provider as Provider,
-        paymentRef,
-        updated.totalAmount.toString(),
-        dto.returnUrl,
-      );
-
       return {
         orderId: updated.id,
         paymentRef,
         provider: dto.provider,
         orderStatus: updated.status,
         paymentStatus: this.toPaymentStatus(updated.status),
-        paymentUrl,
         expiresAt: updated.expiresAt.toISOString(),
         amount: updated.totalAmount.toString(),
         currency: 'VND',
       };
     });
+
+    const paymentUrl = await this.gateway.buildPaymentUrl(
+      paymentRequest.provider as Provider,
+      paymentRequest.paymentRef,
+      paymentRequest.amount,
+      new Date(paymentRequest.expiresAt),
+      dto.returnUrl,
+    );
+
+    return {
+      ...paymentRequest,
+      paymentUrl,
+    };
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -196,9 +196,12 @@ export class PaymentsService {
   async handleWebhook(
     provider: Provider,
     dto: PaymentWebhookDto,
+    signatureMode: WebhookSignatureMode = 'MOCK',
   ): Promise<{ processed: boolean; orderStatus: string; paymentStatus: string; retryAction?: string }> {
     // Verify signature
-    this.gateway.assertValidSignature(provider, dto, dto.signature);
+    if (signatureMode === 'MOCK') {
+      this.gateway.assertValidSignature(provider, dto, dto.signature);
+    }
 
     // Lấy order theo paymentRef
     const order = await this.prisma.order.findFirst({
@@ -264,6 +267,25 @@ export class PaymentsService {
     };
   }
 
+  async handleIncomingWebhook(
+    provider: Provider,
+    payload: Record<string, unknown>,
+  ): Promise<{ processed: boolean; orderStatus: string; paymentStatus: string; retryAction?: string }> {
+    if (provider === 'MOMO' && this.gateway.isMomoIpnPayload(payload)) {
+      if (!this.gateway.verifyMomoSignature(payload)) {
+        throw new UnauthorizedException('Invalid MOMO signature');
+      }
+
+      const dto = this.gateway.normalizeMomoIpnPayload(payload);
+      return this.handleWebhook(provider, {
+        ...dto,
+        signature: String(payload.signature),
+      }, 'GATEWAY_VERIFIED');
+    }
+
+    return this.handleWebhook(provider, payload as unknown as PaymentWebhookDto);
+  }
+
   /**
    * GET Webhook / IPN handler (specifically for VNPAY).
    * Verifies the SHA-512 signature and maps parameters to unified payload.
@@ -293,7 +315,16 @@ export class PaymentsService {
         signature: query['vnp_SecureHash'],
       };
 
-      const result = await this.handleWebhook(provider, mockDto);
+      const result = await this.handleWebhook(provider, mockDto, 'GATEWAY_VERIFIED');
+      return {
+        processed: result.processed,
+        orderStatus: result.orderStatus,
+        paymentStatus: result.paymentStatus,
+      };
+    }
+
+    if (provider === 'MOMO' && this.gateway.isMomoIpnPayload(query)) {
+      const result = await this.handleIncomingWebhook(provider, query);
       return {
         processed: result.processed,
         orderStatus: result.orderStatus,

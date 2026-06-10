@@ -10,14 +10,14 @@ Base URL: `/payments`
 |---|---|---|
 | Controller | `payments.controller.ts` | Khai báo API tạo payment, webhook, mock-trigger dev-only, polling status |
 | Core service | `payments.service.ts` | Điều phối create payment, xử lý webhook success/fail/timeout, lock order, issue ticket, queue notification |
-| Mock gateway | `payment-gateway.service.ts` | Sinh `paymentRef`, build mock payment URL, ký/verify HMAC-SHA256 webhook |
+| Payment gateway | `payment-gateway.service.ts` | Sinh `paymentRef`, build VNPAY/MoMo sandbox payment URL, ký/verify HMAC-SHA256 webhook |
 | Payment event | `payment-event.service.ts` | Insert `PaymentEvent` idempotent theo unique `(gateway, gatewayTransactionId, eventType)` |
 | Ticket issuer | `ticket-issuer.service.ts` | Sinh `Ticket`, `ticketCode`, và QR JWT bằng `JWT_TICKET_SECRET` |
 | Circuit breaker | `payment-circuit-breaker.service.ts` | Redis circuit breaker theo provider, timeout nhiều lần sẽ tạm chặn create payment |
 | DTO | `dto/create-payment.dto.ts` | Validate `POST /payments/create` |
 | DTO | `dto/payment-webhook.dto.ts` | Validate webhook/mock-trigger payload |
 | DTO | `dto/payment-status-response.dto.ts` | Chuẩn response polling status |
-| Env | `config/env.validation.ts` | Validate `JWT_TICKET_SECRET`, `MOCK_VNPAY_SECRET`, `MOCK_MOMO_SECRET` |
+| Env | `config/env.validation.ts` | Validate `JWT_TICKET_SECRET`, VNPAY sandbox, MoMo sandbox và mock webhook secrets |
 
 ### Hành vi chính
 
@@ -91,7 +91,7 @@ Base URL: `/payments`
     "provider": "VNPAY",
     "orderStatus": "PAYMENT_PROCESSING",
     "paymentStatus": "PROCESSING",
-    "paymentUrl": "http://localhost:3000/mock-payment?provider=VNPAY&paymentRef=VNPAY-...&returnUrl=...",
+    "paymentUrl": "https://test-payment.momo.vn/v2/gateway/pay?t=...",
     "expiresAt": "2025-06-09T12:10:00.000Z",
     "amount": "3600000",
     "currency": "VND"
@@ -115,13 +115,55 @@ Base URL: `/payments`
 
 ---
 
+## MoMo sandbox config
+
+Backend gọi MoMo One-Time Payment sandbox bằng `POST /v2/gateway/api/create` với `requestType = captureWallet`.
+
+```env
+MOMO_PARTNER_CODE="MOMO"
+MOMO_ACCESS_KEY="F8BBA842ECF85"
+MOMO_SECRET_KEY="K951B6PE1waDMi640xX08PD3vg6EkVlz"
+MOMO_ENDPOINT="https://test-payment.momo.vn/v2/gateway/api/create"
+MOMO_REDIRECT_URL="http://localhost:3000/checkout/result"
+MOMO_IPN_URL="http://localhost:3001/payments/webhooks/MOMO"
+MOMO_REQUEST_TYPE="captureWallet"
+```
+
+Khi tạo payment với `"provider": "MOMO"`, BE trả `paymentUrl` là `payUrl` từ MoMo sandbox. MoMo IPN sẽ POST body gốc về `MOMO_IPN_URL`; BE verify chữ ký MoMo rồi map về payload chung để xử lý order/ticket.
+
+Theo docs MoMo One-Time Payment, request tạo thanh toán dùng endpoint `/v2/gateway/api/create`; signature tạo payment ký HMAC SHA256 trên chuỗi `accessKey`, `amount`, `extraData`, `ipnUrl`, `orderId`, `orderInfo`, `partnerCode`, `redirectUrl`, `requestId`, `requestType`; IPN/redirect trả các field như `orderId`, `requestId`, `amount`, `resultCode`, `transId`, `payType`, `responseTime` và `signature`.
+
 ## 2. `POST /payments/webhooks/:provider` – Nhận webhook
 
 **Quyền:** Public (không cần JWT). Bảo vệ bằng HMAC-SHA256 signature.
 
 `:provider` = `VNPAY` hoặc `MOMO`
 
+Với `MOMO` sandbox thật, body là payload IPN gốc từ MoMo, ví dụ:
+
+```json
+{
+  "partnerCode": "MOMO",
+  "orderId": "MOMO-20260610120000-00001",
+  "requestId": "MOMO-20260610120000-00001",
+  "amount": 1000,
+  "orderInfo": "Thanh toan don hang MOMO-20260610120000-00001",
+  "orderType": "momo_wallet",
+  "transId": 4088878653,
+  "resultCode": 0,
+  "message": "Successful.",
+  "payType": "qr",
+  "responseTime": 1721720663942,
+  "extraData": "",
+  "signature": "<momo-hmac-sha256>"
+}
+```
+
+`resultCode = 0` được map thành `SUCCESS`, còn các mã khác được map thành `FAILED`.
+
 ### Request Body
+
+Mock webhook nội bộ vẫn hỗ trợ payload chung sau:
 
 ```json
 {

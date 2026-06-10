@@ -1192,6 +1192,89 @@
           "response": []
         },
         {
+          "name": "POST /payments/create - Create MOMO payment",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Run Auth > Register/Login first.');",
+                  "}",
+                  "pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${accessToken}` });",
+                  "if (!pm.collectionVariables.get('orderId')) {",
+                  "  throw new Error('Missing orderId. Run POST /orders first. Use a fresh unpaid order for MoMo create.');",
+                  "}",
+                  "pm.collectionVariables.set('paymentIdempotencyKey', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
+                  "const json = pm.response.json();",
+                  "const data = unwrapResponse(json);",
+                  "pm.test('MoMo payment request is returned', function () {",
+                  "  pm.expect(data).to.have.property('orderId', pm.collectionVariables.get('orderId'));",
+                  "  pm.expect(data).to.have.property('paymentRef');",
+                  "  pm.expect(data).to.have.property('provider', 'MOMO');",
+                  "  pm.expect(data.paymentRef).to.match(/^MOMO-/);",
+                  "  pm.expect(data).to.have.property('orderStatus', 'PAYMENT_PROCESSING');",
+                  "  pm.expect(data).to.have.property('paymentStatus', 'PROCESSING');",
+                  "  pm.expect(data).to.have.property('paymentUrl');",
+                  "  pm.expect(data.paymentUrl).to.match(/^https?:\\/\\//);",
+                  "  pm.expect(data).to.have.property('amount');",
+                  "  pm.expect(data).to.have.property('currency', 'VND');",
+                  "});",
+                  "pm.collectionVariables.set('paymentRef', data.paymentRef);",
+                  "pm.collectionVariables.set('paymentAmount', data.amount);",
+                  "pm.collectionVariables.set('paymentWebhookProvider', 'MOMO');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{paymentIdempotencyKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"provider\": \"MOMO\",\n  \"returnUrl\": \"http://localhost:3000/checkout/result\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "create"
+              ]
+            },
+            "description": "Creates a MoMo sandbox payment request for orderId. Run this on a fresh unpaid order before creating any VNPAY payment for the same order. Saves paymentRef and paymentAmount."
+          },
+          "response": []
+        },
+        {
           "name": "GET /payments/:paymentRef/status - Before webhook",
           "event": [
             {
@@ -1314,6 +1397,260 @@
               ]
             },
             "description": "Dev-only endpoint. It signs a valid HMAC and runs the real webhook handler."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /payments/webhooks/mock-trigger - Simulate MOMO SUCCESS",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('paymentRef')) {",
+                  "  throw new Error('Missing paymentRef. Run POST /payments/create - Create MOMO payment first.');",
+                  "}",
+                  "if (!pm.collectionVariables.get('paymentAmount')) {",
+                  "  throw new Error('Missing paymentAmount. Run POST /payments/create first.');",
+                  "}",
+                  "pm.collectionVariables.set('gatewayTransactionId', `MOMO-TXN-${Date.now()}`);",
+                  "pm.collectionVariables.set('paymentWebhookProvider', 'MOMO');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
+                  "const json = pm.response.json();",
+                  "const data = unwrapResponse(json);",
+                  "pm.test('MoMo webhook processed', function () {",
+                  "  pm.expect(data).to.have.property('processed', true);",
+                  "  pm.expect(data).to.have.property('orderStatus');",
+                  "  pm.expect(data).to.have.property('paymentStatus');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"MOMO\",\n  \"paymentRef\": \"{{paymentRef}}\",\n  \"gatewayTransactionId\": \"{{gatewayTransactionId}}\",\n  \"eventType\": \"SUCCESS\",\n  \"amount\": {{paymentAmount}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/webhooks/mock-trigger",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "webhooks",
+                "mock-trigger"
+              ]
+            },
+            "description": "Dev-only endpoint. It signs a valid MoMo mock HMAC and runs the real webhook handler."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /payments/webhooks/:provider - MOMO SUCCESS with mock HMAC",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('paymentRef')) {",
+                  "  throw new Error('Missing paymentRef. Run POST /payments/create - Create MOMO payment first.');",
+                  "}",
+                  "if (!pm.collectionVariables.get('paymentAmount')) {",
+                  "  throw new Error('Missing paymentAmount. Run POST /payments/create first.');",
+                  "}",
+                  "const provider = 'MOMO';",
+                  "const currency = 'VND';",
+                  "const eventType = 'SUCCESS';",
+                  "const gatewayTransactionId = `MOMO-HMAC-${Date.now()}`;",
+                  "const amount = String(pm.collectionVariables.get('paymentAmount')).replace(/,/g, '').trim();",
+                  "const secret = pm.collectionVariables.get('mockMomoSecret') || 'mock-momo-secret';",
+                  "const message = [provider, pm.collectionVariables.get('paymentRef'), gatewayTransactionId, eventType, amount, currency].join(':');",
+                  "const signature = CryptoJS.HmacSHA256(message, secret).toString(CryptoJS.enc.Hex);",
+                  "pm.collectionVariables.set('gatewayTransactionId', gatewayTransactionId);",
+                  "pm.collectionVariables.set('paymentWebhookProvider', provider);",
+                  "pm.collectionVariables.set('paymentWebhookEventType', eventType);",
+                  "pm.collectionVariables.set('paymentWebhookCurrency', currency);",
+                  "pm.collectionVariables.set('paymentWebhookSignature', signature);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
+                  "const json = pm.response.json();",
+                  "const data = unwrapResponse(json);",
+                  "pm.test('signed MoMo mock webhook is processed', function () {",
+                  "  pm.expect(data).to.have.property('processed', true);",
+                  "  pm.expect(data).to.have.property('orderStatus');",
+                  "  pm.expect(data).to.have.property('paymentStatus');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentRef\": \"{{paymentRef}}\",\n  \"gatewayTransactionId\": \"{{gatewayTransactionId}}\",\n  \"eventType\": \"{{paymentWebhookEventType}}\",\n  \"amount\": {{paymentAmount}},\n  \"currency\": \"{{paymentWebhookCurrency}}\",\n  \"signature\": \"{{paymentWebhookSignature}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/webhooks/{{paymentWebhookProvider}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "webhooks",
+                "{{paymentWebhookProvider}}"
+              ]
+            },
+            "description": "Calls the real public webhook endpoint for MOMO using the internal mock webhook signature format."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /payments/webhooks/MOMO - Sandbox IPN SUCCESS",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('paymentRef')) {",
+                  "  throw new Error('Missing paymentRef. Run POST /payments/create - Create MOMO payment first.');",
+                  "}",
+                  "if (!pm.collectionVariables.get('paymentAmount')) {",
+                  "  throw new Error('Missing paymentAmount. Run POST /payments/create first.');",
+                  "}",
+                  "const partnerCode = pm.collectionVariables.get('momoPartnerCode') || 'MOMO';",
+                  "const accessKey = pm.collectionVariables.get('momoAccessKey') || 'F8BBA842ECF85';",
+                  "const secretKey = pm.collectionVariables.get('momoSecretKey') || 'K951B6PE1waDMi640xX08PD3vg6EkVlz';",
+                  "const paymentRef = pm.collectionVariables.get('paymentRef');",
+                  "const amount = String(pm.collectionVariables.get('paymentAmount')).replace(/,/g, '').trim();",
+                  "const requestId = paymentRef;",
+                  "const orderInfo = `Thanh toan don hang ${paymentRef}`;",
+                  "const orderType = 'momo_wallet';",
+                  "const transId = String(Date.now());",
+                  "const resultCode = '0';",
+                  "const message = 'Successful.';",
+                  "const payType = 'qr';",
+                  "const responseTime = String(Date.now());",
+                  "const extraData = '';",
+                  "const rawSignature = [",
+                  "  `accessKey=${accessKey}`,",
+                  "  `amount=${amount}`,",
+                  "  `extraData=${extraData}`,",
+                  "  `message=${message}`,",
+                  "  `orderId=${paymentRef}`,",
+                  "  `orderInfo=${orderInfo}`,",
+                  "  `orderType=${orderType}`,",
+                  "  `partnerCode=${partnerCode}`,",
+                  "  `payType=${payType}`,",
+                  "  `requestId=${requestId}`,",
+                  "  `responseTime=${responseTime}`,",
+                  "  `resultCode=${resultCode}`,",
+                  "  `transId=${transId}`",
+                  "].join('&');",
+                  "const signature = CryptoJS.HmacSHA256(rawSignature, secretKey).toString(CryptoJS.enc.Hex);",
+                  "pm.collectionVariables.set('momoPartnerCode', partnerCode);",
+                  "pm.collectionVariables.set('momoRequestId', requestId);",
+                  "pm.collectionVariables.set('momoOrderInfo', orderInfo);",
+                  "pm.collectionVariables.set('momoOrderType', orderType);",
+                  "pm.collectionVariables.set('momoTransId', transId);",
+                  "pm.collectionVariables.set('momoResultCode', resultCode);",
+                  "pm.collectionVariables.set('momoMessage', message);",
+                  "pm.collectionVariables.set('momoPayType', payType);",
+                  "pm.collectionVariables.set('momoResponseTime', responseTime);",
+                  "pm.collectionVariables.set('momoExtraData', extraData);",
+                  "pm.collectionVariables.set('momoSignature', signature);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
+                  "const json = pm.response.json();",
+                  "const data = unwrapResponse(json);",
+                  "pm.test('MoMo sandbox-style IPN is processed', function () {",
+                  "  pm.expect(data).to.have.property('processed', true);",
+                  "  pm.expect(data).to.have.property('orderStatus');",
+                  "  pm.expect(data).to.have.property('paymentStatus');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partnerCode\": \"{{momoPartnerCode}}\",\n  \"orderId\": \"{{paymentRef}}\",\n  \"requestId\": \"{{momoRequestId}}\",\n  \"amount\": {{paymentAmount}},\n  \"orderInfo\": \"{{momoOrderInfo}}\",\n  \"orderType\": \"{{momoOrderType}}\",\n  \"transId\": \"{{momoTransId}}\",\n  \"resultCode\": {{momoResultCode}},\n  \"message\": \"{{momoMessage}}\",\n  \"payType\": \"{{momoPayType}}\",\n  \"responseTime\": {{momoResponseTime}},\n  \"extraData\": \"{{momoExtraData}}\",\n  \"signature\": \"{{momoSignature}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/webhooks/MOMO",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "webhooks",
+                "MOMO"
+              ]
+            },
+            "description": "Simulates a real MoMo sandbox IPN body and signs it with MOMO_SECRET_KEY format, not the internal mock webhook secret."
           },
           "response": []
         },
@@ -2192,6 +2529,71 @@
     },
     {
       "key": "firstTicketCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoPartnerCode",
+      "value": "MOMO",
+      "type": "string"
+    },
+    {
+      "key": "momoAccessKey",
+      "value": "F8BBA842ECF85",
+      "type": "string"
+    },
+    {
+      "key": "momoSecretKey",
+      "value": "K951B6PE1waDMi640xX08PD3vg6EkVlz",
+      "type": "string"
+    },
+    {
+      "key": "momoRequestId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoOrderInfo",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoOrderType",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoTransId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoResultCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoMessage",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoPayType",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoResponseTime",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoExtraData",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoSignature",
       "value": "",
       "type": "string"
     }

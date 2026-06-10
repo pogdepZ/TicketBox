@@ -14,12 +14,9 @@ import {
 import { PaymentsService } from './payments.service';
 import { PaymentGatewayService } from './payment-gateway.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
-import { PaymentWebhookDto } from './dto/payment-webhook.dto';
 import { AuthUser } from '../auth/dto/user-response.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guard/jwt-auth.guard';
-import { RolesGuard } from '../auth/guard/roles.guard';
 import { ConfigService } from '@nestjs/config';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
 
@@ -89,14 +86,18 @@ export class PaymentsController {
       currency: 'VND',
     });
 
-    const result = await this.paymentsService.handleWebhook(body.provider, {
-      paymentRef: body.paymentRef,
-      gatewayTransactionId: body.gatewayTransactionId,
-      eventType: body.eventType,
-      amount: body.amount,
-      currency: 'VND',
-      signature,
-    });
+    const result = await this.paymentsService.handleWebhook(
+      body.provider,
+      {
+        paymentRef: body.paymentRef,
+        gatewayTransactionId: body.gatewayTransactionId,
+        eventType: body.eventType,
+        amount: body.amount,
+        currency: 'VND',
+        signature,
+      },
+      'MOCK',
+    );
 
     return result;
   }
@@ -111,7 +112,7 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   async webhook(
     @Param('provider') provider: string,
-    @Body() dto: PaymentWebhookDto,
+    @Body() body: Record<string, unknown>,
   ) {
     const validProviders: Provider[] = ['VNPAY', 'MOMO'];
 
@@ -119,9 +120,9 @@ export class PaymentsController {
       throw new BadRequestException(`Unknown payment provider: ${provider}`);
     }
 
-    const result = await this.paymentsService.handleWebhook(
+    const result = await this.paymentsService.handleIncomingWebhook(
       provider.toUpperCase() as Provider,
-      dto,
+      body,
     );
 
     return result;
