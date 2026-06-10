@@ -455,6 +455,7 @@ model PaymentEvent {
   rawPayload     Json    @map("raw_payload")
   signatureValid Boolean @default(false) @map("signature_valid")
 
+  status      String    @default("PROCESSING") @db.VarChar(20)
   processedAt DateTime? @map("processed_at") @db.Timestamptz(6)
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -462,6 +463,7 @@ model PaymentEvent {
 
   @@unique([gateway, gatewayTransactionId, eventType])
   @@index([orderId])
+  @@index([status])
   @@index([createdAt])
   @@map("payment_events")
 }

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './common/prisma/prisma.module';
@@ -27,6 +28,7 @@ import { GuestListModule } from './routes/guest-list/guest-list.module';
       validate,
       load: [databaseConfig, jwtConfig, redisConfig],
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     ConcertModule,
     AuthModule,

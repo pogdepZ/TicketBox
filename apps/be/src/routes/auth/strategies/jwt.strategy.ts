@@ -4,15 +4,17 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 
-import { UserResponseDto } from '../dto/user-response.dto';
+import { AuthUser, UserResponseDto } from '../dto/user-response.dto';
 import { authUserInclude } from '../types/auth-user.types';
 import { JwtPayload } from '../types/jwt-payload.type';
+import { AuthCacheService } from '../auth-cache.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     private readonly configService: ConfigService,
     private readonly prismaService: PrismaService,
+    private readonly authCacheService: AuthCacheService,
   ) {
     const accessSecret = configService.get<string>('JWT_ACCESS_SECRET');
     if (!accessSecret) {
@@ -25,7 +27,17 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  async validate(payload: JwtPayload) {
+  async validate(payload: JwtPayload): Promise<AuthUser> {
+    const cachedUser = await this.authCacheService.getUser(payload.sub);
+
+    if (cachedUser) {
+      if (cachedUser.status !== 'ACTIVE') {
+        throw new UnauthorizedException('User is not active');
+      }
+
+      return cachedUser;
+    }
+
     const user = await this.prismaService.user.findUnique({
       where: {
         id: payload.sub,
@@ -44,6 +56,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('User is not active');
     }
 
-    return new UserResponseDto(user);
+    const authUser = new UserResponseDto(user);
+    await this.authCacheService.setUser(authUser);
+
+    return authUser;
   }
 }

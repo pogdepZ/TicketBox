@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "75b17bdb-f1c5-4d8c-bc2d-9fbff4d69a01",
     "name": "TicketBox Backend",
-    "description": "Postman collection for all NestJS backend endpoints currently registered in apps/be/src: Health, Auth, Concerts, Orders, Payments, Checkin, Guest List CSV import, and Artist Bio PDF upload. Default baseUrl is http://localhost:3001. Run the backend and RBAC seed before testing protected Concert routes. Use Seed Admin Login to save an admin accessToken, then run Concerts/Admin Uploads. NotificationsController and TicketsModule currently expose no HTTP endpoints.",
+    "description": "Postman collection for TicketBox backend endpoints. Includes real Orders + Payments flow using global interceptor response format. Set concertId + ticketTypeId from prisma seed output before running Orders + Payments.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -221,8 +221,9 @@
                   "});",
                   "",
                   "pm.test('admin user has RBAC admin permissions', function () {",
-                  "  const permissions = data.user.roles.flatMap((role) => role.permissions || []);",
-                  "  pm.expect(data.user.roles.map((role) => role.name)).to.include('admin');",
+                  "  const roles = data.user && Array.isArray(data.user.roles) ? data.user.roles : [];",
+                  "  const permissions = roles.flatMap((role) => role.permissions || []);",
+                  "  pm.expect(roles.map((role) => role.name)).to.include('admin');",
                   "  pm.expect(permissions).to.include('concert:read_admin');",
                   "  pm.expect(permissions).to.include('concert:create');",
                   "  pm.expect(permissions).to.include('concert:update');",
@@ -231,19 +232,21 @@
                   "  pm.expect(permissions).to.include('order:read_admin');",
                   "  pm.expect(permissions).to.include('ticket:read_admin');",
                   "  pm.expect(permissions).to.include('checker:manage');",
-                  "  data.user.roles.forEach((role) => {",
+                  "  roles.forEach((role) => {",
                   "    pm.expect(role).to.not.have.property('scopeType');",
                   "    pm.expect(role).to.not.have.property('scopeId');",
                   "  });",
                   "});",
                   "",
-                  "pm.collectionVariables.set('accessToken', accessToken);",
-                  "pm.collectionVariables.set('activeLoginEmail', pm.collectionVariables.get('seedAdminEmail'));",
-                  "pm.collectionVariables.set('activeExpectedRole', 'admin');",
-                  "pm.collectionVariables.set('adminUserId', data.user.id);",
-                  "pm.collectionVariables.set('userId', data.user.id);",
-                  "if (pm.environment.name) {",
-                  "  pm.environment.set('accessToken', accessToken);",
+                  "if (data.user && accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', accessToken);",
+                  "  pm.collectionVariables.set('activeLoginEmail', pm.collectionVariables.get('seedAdminEmail'));",
+                  "  pm.collectionVariables.set('activeExpectedRole', 'admin');",
+                  "  pm.collectionVariables.set('adminUserId', data.user.id);",
+                  "  pm.collectionVariables.set('userId', data.user.id);",
+                  "  if (pm.environment.name) {",
+                  "    pm.environment.set('accessToken', accessToken);",
+                  "  }",
                   "}"
                 ]
               }
@@ -565,7 +568,7 @@
                   "  pm.expect(concert.status).to.eql('draft');",
                   "});",
                   "",
-                  "pm.collectionVariables.set('concertId', concert.id);"
+                  "pm.collectionVariables.set('draftConcertId', concert.id);"
                 ]
               }
             }
@@ -671,8 +674,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if (!pm.collectionVariables.get('concertId')) {",
-                  "  throw new Error('Missing concertId. Run POST /concerts first.');",
+                  "if (!pm.collectionVariables.get('draftConcertId')) {",
+                  "  throw new Error('Missing draftConcertId. Run POST /concerts first.');",
                   "}"
                 ]
               }
@@ -689,7 +692,7 @@
                   "const concert = (pm.response.json().data || pm.response.json());",
                   "",
                   "pm.test('concert detail is returned without related module data', function () {",
-                  "  pm.expect(concert).to.have.property('id', pm.collectionVariables.get('concertId'));",
+                  "  pm.expect(concert).to.have.property('id', pm.collectionVariables.get('draftConcertId'));",
                   "  pm.expect(concert).to.not.have.property('ticketTypes');",
                   "  pm.expect(concert).to.not.have.property('orders');",
                   "  pm.expect(concert).to.not.have.property('tickets');",
@@ -703,13 +706,13 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/concerts/{{concertId}}",
+              "raw": "{{baseUrl}}/concerts/{{draftConcertId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "concerts",
-                "{{concertId}}"
+                "{{draftConcertId}}"
               ]
             },
             "description": "Returns one concert only. It intentionally does not include ticket types, orders, tickets, or reservations."
@@ -724,8 +727,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if (!pm.collectionVariables.get('concertId')) {",
-                  "  throw new Error('Missing concertId. Run POST /concerts first.');",
+                  "if (!pm.collectionVariables.get('draftConcertId')) {",
+                  "  throw new Error('Missing draftConcertId. Run POST /concerts first.');",
                   "}",
                   "",
                   "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
@@ -753,7 +756,7 @@
                   "const concert = (pm.response.json().data || pm.response.json());",
                   "",
                   "pm.test('draft concert fields are updated', function () {",
-                  "  pm.expect(concert).to.have.property('id', pm.collectionVariables.get('concertId'));",
+                  "  pm.expect(concert).to.have.property('id', pm.collectionVariables.get('draftConcertId'));",
                   "  pm.expect(concert.description).to.eql('Updated from Postman before publish.');",
                   "});"
                 ]
@@ -773,13 +776,13 @@
               "raw": "{\n  \"description\": \"Updated from Postman before publish.\",\n  \"artistName\": \"The Updated TicketBox Band\",\n  \"venueName\": \"TicketBox Arena\",\n  \"venueAddress\": \"123 Nguyen Hue, District 1, Ho Chi Minh City\",\n  \"posterUrl\": \"https://example.com/posters/ticketbox-live-updated.png\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/concerts/{{concertId}}",
+              "raw": "{{baseUrl}}/concerts/{{draftConcertId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "concerts",
-                "{{concertId}}"
+                "{{draftConcertId}}"
               ]
             },
             "description": "Updates allowed fields. Requires concert:update permission. Do not send status here."
@@ -794,8 +797,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if (!pm.collectionVariables.get('concertId')) {",
-                  "  throw new Error('Missing concertId. Run POST /concerts first.');",
+                  "if (!pm.collectionVariables.get('draftConcertId')) {",
+                  "  throw new Error('Missing draftConcertId. Run POST /concerts first.');",
                   "}",
                   "",
                   "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
@@ -833,13 +836,13 @@
             "method": "PATCH",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/concerts/{{concertId}}/publish",
+              "raw": "{{baseUrl}}/concerts/{{draftConcertId}}/publish",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "concerts",
-                "{{concertId}}",
+                "{{draftConcertId}}",
                 "publish"
               ]
             },
@@ -855,8 +858,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if (!pm.collectionVariables.get('concertId')) {",
-                  "  throw new Error('Missing concertId. Run POST /concerts first.');",
+                  "if (!pm.collectionVariables.get('draftConcertId')) {",
+                  "  throw new Error('Missing draftConcertId. Run POST /concerts first.');",
                   "}",
                   "",
                   "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
@@ -903,13 +906,13 @@
               "raw": "{\n  \"reason\": \"Cancelled from Postman sample flow.\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/concerts/{{concertId}}/cancel",
+              "raw": "{{baseUrl}}/concerts/{{draftConcertId}}/cancel",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "concerts",
-                "{{concertId}}",
+                "{{draftConcertId}}",
                 "cancel"
               ]
             },
@@ -925,8 +928,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if (!pm.collectionVariables.get('concertId')) {",
-                  "  throw new Error('Missing concertId. Use a published concert with eventDate in the past.');",
+                  "if (!pm.collectionVariables.get('draftConcertId')) {",
+                  "  throw new Error('Missing draftConcertId. Use a published concert with eventDate in the past.');",
                   "}",
                   "",
                   "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
@@ -947,13 +950,13 @@
             "method": "PATCH",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/concerts/{{concertId}}/complete",
+              "raw": "{{baseUrl}}/concerts/{{draftConcertId}}/complete",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "concerts",
-                "{{concertId}}",
+                "{{draftConcertId}}",
                 "complete"
               ]
             },
@@ -964,25 +967,31 @@
       ]
     },
     {
-      "name": "Ticketing + Payment Mock",
-      "description": "Week 1 mock endpoints owned by Person B. These endpoints currently do not require JWT so frontend can test checkout flow early. Responses are wrapped by the global interceptor, so the mock payload is under json.data.",
+      "name": "Orders + Payments",
+      "description": "Real order/payment flow. Requires a customer accessToken, concertId, and ticketTypeId from seeded or manually created data. Run Auth > Register/Login first, then set concertId and ticketTypeId collection variables from prisma seed output before POST /orders. The flow saves orderId, paymentRef, paymentAmount, and firstTicketId for later requests.",
       "item": [
         {
-          "name": "POST /orders - Create mock order",
+          "name": "POST /orders - Create real order and hold tickets",
           "event": [
             {
               "listen": "prerequest",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.collectionVariables.set('orderIdempotencyKey', `order-${Date.now()}`);",
-                  "",
-                  "if (!pm.collectionVariables.get('mockConcertId')) {",
-                  "  pm.collectionVariables.set('mockConcertId', '11111111-1111-4111-8111-111111111111');",
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Run Auth > Register/Login first.');",
                   "}",
-                  "",
-                  "if (!pm.collectionVariables.get('mockTicketTypeId')) {",
-                  "  pm.collectionVariables.set('mockTicketTypeId', '22222222-2222-4222-8222-222222222222');",
+                  "pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${accessToken}` });",
+                  "if (!pm.collectionVariables.get('concertId')) {",
+                  "  throw new Error('Missing concertId. Set it from a published concert.');",
+                  "}",
+                  "if (!pm.collectionVariables.get('ticketTypeId')) {",
+                  "  throw new Error('Missing ticketTypeId. Set it from DB/seed ticket_types for the selected concert.');",
+                  "}",
+                  "pm.collectionVariables.set('orderIdempotencyKey', pm.variables.replaceIn('{{$guid}}'));",
+                  "if (!pm.collectionVariables.get('orderQuantity')) {",
+                  "  pm.collectionVariables.set('orderQuantity', '1');",
                   "}"
                 ]
               }
@@ -996,30 +1005,21 @@
                   "  pm.response.to.have.status(201);",
                   "});",
                   "",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
                   "const json = pm.response.json();",
-                  "const payload = json.data;",
-                  "const order = payload.data;",
+                  "const data = unwrapResponse(json);",
                   "",
-                  "pm.test('global interceptor wraps mock order payload', function () {",
-                  "  pm.expect(json).to.have.property('statusCode', 201);",
-                  "  pm.expect(payload).to.have.property('success', true);",
-                  "  pm.expect(payload).to.have.property('message', 'Mock order created');",
+                  "pm.test('order is created and pending payment', function () {",
+                  "  pm.expect(data).to.have.property('orderId');",
+                  "  pm.expect(data).to.have.property('status', 'PENDING_PAYMENT');",
+                  "  pm.expect(data).to.have.property('expiresAt');",
+                  "  pm.expect(data.items).to.be.an('array').that.is.not.empty;",
                   "});",
                   "",
-                  "pm.test('mock order is returned', function () {",
-                  "  pm.expect(order).to.have.property('orderId');",
-                  "  pm.expect(order).to.have.property('concertId', pm.collectionVariables.get('mockConcertId'));",
-                  "  pm.expect(order).to.have.property('status', 'PENDING_PAYMENT');",
-                  "  pm.expect(order).to.have.property('totalAmount').that.is.a('number');",
-                  "  pm.expect(order).to.have.property('expiresAt');",
-                  "  pm.expect(order.items).to.be.an('array').with.lengthOf(1);",
-                  "});",
-                  "",
-                  "pm.test('idempotency key is echoed', function () {",
-                  "  pm.expect(order.idempotencyKey).to.eql(pm.collectionVariables.get('orderIdempotencyKey'));",
-                  "});",
-                  "",
-                  "pm.collectionVariables.set('mockOrderId', order.orderId);"
+                  "pm.collectionVariables.set('orderId', data.orderId);",
+                  "pm.collectionVariables.set('paymentAmount', data.totalAmount);"
                 ]
               }
             }
@@ -1038,7 +1038,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"concertId\": \"{{mockConcertId}}\",\n  \"items\": [\n    {\n      \"ticketTypeId\": \"{{mockTicketTypeId}}\",\n      \"quantity\": 2\n    }\n  ]\n}"
+              "raw": "{\n  \"concertId\": \"{{concertId}}\",\n  \"items\": [\n    {\n      \"ticketTypeId\": \"{{ticketTypeId}}\",\n      \"quantity\": {{orderQuantity}}\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/orders",
@@ -1049,7 +1049,800 @@
                 "orders"
               ]
             },
-            "description": "Creates a Week 1 mock order. Saves mockOrderId for POST /payments/create."
+            "description": "Creates a real order with Reservation=HELD and Order=PENDING_PAYMENT. Saves orderId and paymentAmount."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /orders/:id - Read created order",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Run Auth > Register/Login first.');",
+                  "}",
+                  "pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${accessToken}` });",
+                  "if (!pm.collectionVariables.get('orderId')) {",
+                  "  throw new Error('Missing orderId. Run POST /orders first.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
+                  "const json = pm.response.json();",
+                  "const data = unwrapResponse(json);",
+                  "pm.test('order detail is returned', function () {",
+                  "  pm.expect(data).to.have.property('orderId', pm.collectionVariables.get('orderId'));",
+                  "  pm.expect(data).to.have.property('items');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}"
+              ]
+            },
+            "description": "Reads order detail for the owner or admin."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /payments/create - Create VNPAY payment",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Run Auth > Register/Login first.');",
+                  "}",
+                  "pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${accessToken}` });",
+                  "if (!pm.collectionVariables.get('orderId')) {",
+                  "  throw new Error('Missing orderId. Run POST /orders first.');",
+                  "}",
+                  "pm.collectionVariables.set('paymentIdempotencyKey', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
+                  "const json = pm.response.json();",
+                  "const data = unwrapResponse(json);",
+                  "pm.test('payment request is returned', function () {",
+                  "  pm.expect(data).to.have.property('orderId', pm.collectionVariables.get('orderId'));",
+                  "  pm.expect(data).to.have.property('paymentRef');",
+                  "  pm.expect(data).to.have.property('provider', 'VNPAY');",
+                  "  pm.expect(data.paymentRef).to.match(/^VNPAY-/);",
+                  "  pm.expect(data).to.have.property('orderStatus', 'PAYMENT_PROCESSING');",
+                  "  pm.expect(data).to.have.property('paymentStatus', 'PROCESSING');\n  pm.expect(data).to.have.property('paymentUrl');\n  pm.expect(data.paymentUrl).to.match(/^https?:\\/\\//);",
+                  "  pm.expect(data).to.have.property('amount');",
+                  "  pm.expect(data).to.have.property('currency', 'VND');",
+                  "});",
+                  "pm.collectionVariables.set('paymentRef', data.paymentRef);",
+                  "pm.collectionVariables.set('paymentAmount', data.amount);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{paymentIdempotencyKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"provider\": \"VNPAY\",\n  \"returnUrl\": \"http://localhost:3000/checkout/result\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "create"
+              ]
+            },
+            "description": "Creates or returns the active payment request for orderId. Saves paymentRef and paymentAmount."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /payments/create - Create MOMO payment",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Run Auth > Register/Login first.');",
+                  "}",
+                  "pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${accessToken}` });",
+                  "if (!pm.collectionVariables.get('orderId')) {",
+                  "  throw new Error('Missing orderId. Run POST /orders first. Use a fresh unpaid order for MoMo create.');",
+                  "}",
+                  "pm.collectionVariables.set('paymentIdempotencyKey', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
+                  "const json = pm.response.json();",
+                  "const data = unwrapResponse(json);",
+                  "pm.test('MoMo payment request is returned', function () {",
+                  "  pm.expect(data).to.have.property('orderId', pm.collectionVariables.get('orderId'));",
+                  "  pm.expect(data).to.have.property('paymentRef');",
+                  "  pm.expect(data).to.have.property('provider', 'MOMO');",
+                  "  pm.expect(data.paymentRef).to.match(/^MOMO-/);",
+                  "  pm.expect(data).to.have.property('orderStatus', 'PAYMENT_PROCESSING');",
+                  "  pm.expect(data).to.have.property('paymentStatus', 'PROCESSING');",
+                  "  pm.expect(data).to.have.property('paymentUrl');",
+                  "  pm.expect(data.paymentUrl).to.match(/^https?:\\/\\//);",
+                  "  pm.expect(data).to.have.property('amount');",
+                  "  pm.expect(data).to.have.property('currency', 'VND');",
+                  "});",
+                  "pm.collectionVariables.set('paymentRef', data.paymentRef);",
+                  "pm.collectionVariables.set('paymentAmount', data.amount);",
+                  "pm.collectionVariables.set('paymentWebhookProvider', 'MOMO');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{paymentIdempotencyKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"provider\": \"MOMO\",\n  \"returnUrl\": \"http://localhost:3000/checkout/result\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "create"
+              ]
+            },
+            "description": "Creates a MoMo sandbox payment request for orderId. Run this on a fresh unpaid order before creating any VNPAY payment for the same order. Saves paymentRef and paymentAmount."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /payments/:paymentRef/status - Before webhook",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Run Auth > Register/Login first.');",
+                  "}",
+                  "pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${accessToken}` });",
+                  "if (!pm.collectionVariables.get('paymentRef')) {",
+                  "  throw new Error('Missing paymentRef. Run POST /payments/create first.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
+                  "const json = pm.response.json();",
+                  "const data = unwrapResponse(json);",
+                  "pm.test('payment status is returned', function () {",
+                  "  pm.expect(data).to.have.property('paymentRef', pm.collectionVariables.get('paymentRef'));",
+                  "  pm.expect(data).to.have.property('orderStatus');",
+                  "  pm.expect(data).to.have.property('paymentStatus');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payments/{{paymentRef}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "{{paymentRef}}",
+                "status"
+              ]
+            },
+            "description": "Polls payment status. Tickets are returned only when orderStatus is PAID."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /payments/webhooks/mock-trigger - Simulate SUCCESS",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('paymentRef')) {",
+                  "  throw new Error('Missing paymentRef. Run POST /payments/create first.');",
+                  "}",
+                  "if (!pm.collectionVariables.get('paymentAmount')) {",
+                  "  throw new Error('Missing paymentAmount. Run POST /payments/create first.');",
+                  "}",
+                  "pm.collectionVariables.set('gatewayTransactionId', `VNPAY-TXN-${Date.now()}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
+                  "const json = pm.response.json();",
+                  "const data = unwrapResponse(json);",
+                  "pm.test('webhook processed', function () {",
+                  "  pm.expect(data).to.have.property('processed', true);",
+                  "  pm.expect(data).to.have.property('orderStatus');",
+                  "  pm.expect(data).to.have.property('paymentStatus');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"VNPAY\",\n  \"paymentRef\": \"{{paymentRef}}\",\n  \"gatewayTransactionId\": \"{{gatewayTransactionId}}\",\n  \"eventType\": \"SUCCESS\",\n  \"amount\": {{paymentAmount}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/webhooks/mock-trigger",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "webhooks",
+                "mock-trigger"
+              ]
+            },
+            "description": "Dev-only endpoint. It signs a valid HMAC and runs the real webhook handler."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /payments/webhooks/mock-trigger - Simulate MOMO SUCCESS",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('paymentRef')) {",
+                  "  throw new Error('Missing paymentRef. Run POST /payments/create - Create MOMO payment first.');",
+                  "}",
+                  "if (!pm.collectionVariables.get('paymentAmount')) {",
+                  "  throw new Error('Missing paymentAmount. Run POST /payments/create first.');",
+                  "}",
+                  "pm.collectionVariables.set('gatewayTransactionId', `MOMO-TXN-${Date.now()}`);",
+                  "pm.collectionVariables.set('paymentWebhookProvider', 'MOMO');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
+                  "const json = pm.response.json();",
+                  "const data = unwrapResponse(json);",
+                  "pm.test('MoMo webhook processed', function () {",
+                  "  pm.expect(data).to.have.property('processed', true);",
+                  "  pm.expect(data).to.have.property('orderStatus');",
+                  "  pm.expect(data).to.have.property('paymentStatus');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"MOMO\",\n  \"paymentRef\": \"{{paymentRef}}\",\n  \"gatewayTransactionId\": \"{{gatewayTransactionId}}\",\n  \"eventType\": \"SUCCESS\",\n  \"amount\": {{paymentAmount}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/webhooks/mock-trigger",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "webhooks",
+                "mock-trigger"
+              ]
+            },
+            "description": "Dev-only endpoint. It signs a valid MoMo mock HMAC and runs the real webhook handler."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /payments/webhooks/:provider - MOMO SUCCESS with mock HMAC",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('paymentRef')) {",
+                  "  throw new Error('Missing paymentRef. Run POST /payments/create - Create MOMO payment first.');",
+                  "}",
+                  "if (!pm.collectionVariables.get('paymentAmount')) {",
+                  "  throw new Error('Missing paymentAmount. Run POST /payments/create first.');",
+                  "}",
+                  "const provider = 'MOMO';",
+                  "const currency = 'VND';",
+                  "const eventType = 'SUCCESS';",
+                  "const gatewayTransactionId = `MOMO-HMAC-${Date.now()}`;",
+                  "const amount = String(pm.collectionVariables.get('paymentAmount')).replace(/,/g, '').trim();",
+                  "const secret = pm.collectionVariables.get('mockMomoSecret') || 'mock-momo-secret';",
+                  "const message = [provider, pm.collectionVariables.get('paymentRef'), gatewayTransactionId, eventType, amount, currency].join(':');",
+                  "const signature = CryptoJS.HmacSHA256(message, secret).toString(CryptoJS.enc.Hex);",
+                  "pm.collectionVariables.set('gatewayTransactionId', gatewayTransactionId);",
+                  "pm.collectionVariables.set('paymentWebhookProvider', provider);",
+                  "pm.collectionVariables.set('paymentWebhookEventType', eventType);",
+                  "pm.collectionVariables.set('paymentWebhookCurrency', currency);",
+                  "pm.collectionVariables.set('paymentWebhookSignature', signature);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
+                  "const json = pm.response.json();",
+                  "const data = unwrapResponse(json);",
+                  "pm.test('signed MoMo mock webhook is processed', function () {",
+                  "  pm.expect(data).to.have.property('processed', true);",
+                  "  pm.expect(data).to.have.property('orderStatus');",
+                  "  pm.expect(data).to.have.property('paymentStatus');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentRef\": \"{{paymentRef}}\",\n  \"gatewayTransactionId\": \"{{gatewayTransactionId}}\",\n  \"eventType\": \"{{paymentWebhookEventType}}\",\n  \"amount\": {{paymentAmount}},\n  \"currency\": \"{{paymentWebhookCurrency}}\",\n  \"signature\": \"{{paymentWebhookSignature}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/webhooks/{{paymentWebhookProvider}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "webhooks",
+                "{{paymentWebhookProvider}}"
+              ]
+            },
+            "description": "Calls the real public webhook endpoint for MOMO using the internal mock webhook signature format."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /payments/webhooks/MOMO - Sandbox IPN SUCCESS",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('paymentRef')) {",
+                  "  throw new Error('Missing paymentRef. Run POST /payments/create - Create MOMO payment first.');",
+                  "}",
+                  "if (!pm.collectionVariables.get('paymentAmount')) {",
+                  "  throw new Error('Missing paymentAmount. Run POST /payments/create first.');",
+                  "}",
+                  "const partnerCode = pm.collectionVariables.get('momoPartnerCode') || 'MOMO';",
+                  "const accessKey = pm.collectionVariables.get('momoAccessKey') || 'F8BBA842ECF85';",
+                  "const secretKey = pm.collectionVariables.get('momoSecretKey') || 'K951B6PE1waDMi640xX08PD3vg6EkVlz';",
+                  "const paymentRef = pm.collectionVariables.get('paymentRef');",
+                  "const amount = String(pm.collectionVariables.get('paymentAmount')).replace(/,/g, '').trim();",
+                  "const requestId = paymentRef;",
+                  "const orderInfo = `Thanh toan don hang ${paymentRef}`;",
+                  "const orderType = 'momo_wallet';",
+                  "const transId = String(Date.now());",
+                  "const resultCode = '0';",
+                  "const message = 'Successful.';",
+                  "const payType = 'qr';",
+                  "const responseTime = String(Date.now());",
+                  "const extraData = '';",
+                  "const rawSignature = [",
+                  "  `accessKey=${accessKey}`,",
+                  "  `amount=${amount}`,",
+                  "  `extraData=${extraData}`,",
+                  "  `message=${message}`,",
+                  "  `orderId=${paymentRef}`,",
+                  "  `orderInfo=${orderInfo}`,",
+                  "  `orderType=${orderType}`,",
+                  "  `partnerCode=${partnerCode}`,",
+                  "  `payType=${payType}`,",
+                  "  `requestId=${requestId}`,",
+                  "  `responseTime=${responseTime}`,",
+                  "  `resultCode=${resultCode}`,",
+                  "  `transId=${transId}`",
+                  "].join('&');",
+                  "const signature = CryptoJS.HmacSHA256(rawSignature, secretKey).toString(CryptoJS.enc.Hex);",
+                  "pm.collectionVariables.set('momoPartnerCode', partnerCode);",
+                  "pm.collectionVariables.set('momoRequestId', requestId);",
+                  "pm.collectionVariables.set('momoOrderInfo', orderInfo);",
+                  "pm.collectionVariables.set('momoOrderType', orderType);",
+                  "pm.collectionVariables.set('momoTransId', transId);",
+                  "pm.collectionVariables.set('momoResultCode', resultCode);",
+                  "pm.collectionVariables.set('momoMessage', message);",
+                  "pm.collectionVariables.set('momoPayType', payType);",
+                  "pm.collectionVariables.set('momoResponseTime', responseTime);",
+                  "pm.collectionVariables.set('momoExtraData', extraData);",
+                  "pm.collectionVariables.set('momoSignature', signature);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
+                  "const json = pm.response.json();",
+                  "const data = unwrapResponse(json);",
+                  "pm.test('MoMo sandbox-style IPN is processed', function () {",
+                  "  pm.expect(data).to.have.property('processed', true);",
+                  "  pm.expect(data).to.have.property('orderStatus');",
+                  "  pm.expect(data).to.have.property('paymentStatus');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partnerCode\": \"{{momoPartnerCode}}\",\n  \"orderId\": \"{{paymentRef}}\",\n  \"requestId\": \"{{momoRequestId}}\",\n  \"amount\": {{paymentAmount}},\n  \"orderInfo\": \"{{momoOrderInfo}}\",\n  \"orderType\": \"{{momoOrderType}}\",\n  \"transId\": \"{{momoTransId}}\",\n  \"resultCode\": {{momoResultCode}},\n  \"message\": \"{{momoMessage}}\",\n  \"payType\": \"{{momoPayType}}\",\n  \"responseTime\": {{momoResponseTime}},\n  \"extraData\": \"{{momoExtraData}}\",\n  \"signature\": \"{{momoSignature}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/webhooks/MOMO",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "webhooks",
+                "MOMO"
+              ]
+            },
+            "description": "Simulates a real MoMo sandbox IPN body and signs it with MOMO_SECRET_KEY format, not the internal mock webhook secret."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /payments/webhooks/:provider - Duplicate SUCCESS with HMAC",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('paymentRef')) {",
+                  "  throw new Error('Missing paymentRef. Run POST /payments/create first.');",
+                  "}",
+                  "if (!pm.collectionVariables.get('paymentAmount')) {",
+                  "  throw new Error('Missing paymentAmount. Run POST /payments/create first.');",
+                  "}",
+                  "if (!pm.collectionVariables.get('gatewayTransactionId')) {",
+                  "  throw new Error('Missing gatewayTransactionId. Run mock-trigger SUCCESS first.');",
+                  "}",
+                  "const provider = 'VNPAY';",
+                  "const currency = 'VND';",
+                  "const eventType = 'SUCCESS';",
+                  "const amount = String(pm.collectionVariables.get('paymentAmount')).replace(/,/g, '').trim();",
+                  "const secret = pm.collectionVariables.get('mockVnpaySecret') || 'mock-vnpay-secret';",
+                  "const message = [provider, pm.collectionVariables.get('paymentRef'), pm.collectionVariables.get('gatewayTransactionId'), eventType, amount, currency].join(':');",
+                  "const signature = CryptoJS.HmacSHA256(message, secret).toString(CryptoJS.enc.Hex);",
+                  "pm.collectionVariables.set('paymentWebhookProvider', provider);",
+                  "pm.collectionVariables.set('paymentWebhookEventType', eventType);",
+                  "pm.collectionVariables.set('paymentWebhookCurrency', currency);",
+                  "pm.collectionVariables.set('paymentWebhookSignature', signature);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
+                  "const json = pm.response.json();",
+                  "const data = unwrapResponse(json);",
+                  "pm.test('signed webhook endpoint is idempotent', function () {",
+                  "  pm.expect(data).to.have.property('processed', true);",
+                  "  pm.expect(data).to.have.property('orderStatus', 'PAID');",
+                  "  pm.expect(data).to.have.property('paymentStatus', 'SUCCEEDED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentRef\": \"{{paymentRef}}\",\n  \"gatewayTransactionId\": \"{{gatewayTransactionId}}\",\n  \"eventType\": \"{{paymentWebhookEventType}}\",\n  \"amount\": {{paymentAmount}},\n  \"currency\": \"{{paymentWebhookCurrency}}\",\n  \"signature\": \"{{paymentWebhookSignature}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/webhooks/{{paymentWebhookProvider}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "webhooks",
+                "{{paymentWebhookProvider}}"
+              ]
+            },
+            "description": "Calls the real public webhook endpoint with HMAC-SHA256. Run after mock-trigger SUCCESS so it verifies duplicate webhook idempotency."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /payments/:paymentRef/status - After SUCCESS",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Run Auth > Register/Login first.');",
+                  "}",
+                  "pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${accessToken}` });",
+                  "if (!pm.collectionVariables.get('paymentRef')) {",
+                  "  throw new Error('Missing paymentRef. Run POST /payments/create first.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
+                  "const json = pm.response.json();",
+                  "const data = unwrapResponse(json);",
+                  "pm.test('payment is paid and tickets are returned', function () {",
+                  "  pm.expect(data).to.have.property('orderStatus', 'PAID');",
+                  "  pm.expect(data).to.have.property('paymentStatus', 'SUCCEEDED');",
+                  "  pm.expect(data.tickets).to.be.an('array').that.is.not.empty;",
+                  "});",
+                  "if (data.tickets && data.tickets.length > 0) {",
+                  "  pm.collectionVariables.set('firstTicketId', data.tickets[0].ticketId);",
+                  "  pm.collectionVariables.set('firstTicketCode', data.tickets[0].ticketCode);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payments/{{paymentRef}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "{{paymentRef}}",
+                "status"
+              ]
+            },
+            "description": "Polls status after mock SUCCESS. Saves firstTicketId/firstTicketCode."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /orders/:id/cancel - Cancel current order",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Run Auth > Register/Login first.');",
+                  "}",
+                  "pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${accessToken}` });",
+                  "if (!pm.collectionVariables.get('orderId')) {",
+                  "  throw new Error('Missing orderId. Create a fresh unpaid order first.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200 or 409 depending on current order state', function () {",
+                  "  pm.expect([200, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}",
+                "cancel"
+              ]
+            },
+            "description": "Cancels only unpaid PENDING_PAYMENT orders. In this sequence it usually runs after SUCCESS and should return 409. Create a fresh unpaid order and run this before payment to test the 200 path."
           },
           "response": []
         },
@@ -1057,19 +1850,26 @@
           "name": "POST /orders - Validation error",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Run Auth > Register/Login first.');",
+                  "}",
+                  "pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${accessToken}` });",
+                  "pm.collectionVariables.set('orderIdempotencyKey', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status code is 400 or 500 depending on current validation filter', function () {",
-                  "  pm.expect([400, 500]).to.include(pm.response.code);",
-                  "});",
-                  "",
-                  "const json = pm.response.json();",
-                  "",
-                  "pm.test('error response is returned', function () {",
-                  "  pm.expect(json).to.have.property('success', false);",
-                  "  pm.expect(json).to.have.property('message');",
+                  "pm.test('status code is 400', function () {",
+                  "  pm.response.to.have.status(400);",
                   "});"
                 ]
               }
@@ -1084,7 +1884,7 @@
               },
               {
                 "key": "Idempotency-Key",
-                "value": "order-invalid-body"
+                "value": "{{orderIdempotencyKey}}"
               }
             ],
             "body": {
@@ -1105,174 +1905,32 @@
           "response": []
         },
         {
-          "name": "POST /payments/create - Create VNPAY mock payment",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('paymentIdempotencyKey', `payment-${Date.now()}`);",
-                  "",
-                  "if (!pm.collectionVariables.get('mockOrderId')) {",
-                  "  pm.collectionVariables.set('mockOrderId', '00000000-0000-4000-8000-000000000000');",
-                  "}"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status code is 201', function () {",
-                  "  pm.response.to.have.status(201);",
-                  "});",
-                  "",
-                  "const json = pm.response.json();",
-                  "const payload = json.data;",
-                  "const payment = payload.data;",
-                  "",
-                  "pm.test('global interceptor wraps mock payment payload', function () {",
-                  "  pm.expect(json).to.have.property('statusCode', 201);",
-                  "  pm.expect(payload).to.have.property('success', true);",
-                  "  pm.expect(payload).to.have.property('message', 'Mock payment request created');",
-                  "});",
-                  "",
-                  "pm.test('mock VNPAY payment is returned', function () {",
-                  "  pm.expect(payment).to.have.property('orderId', pm.collectionVariables.get('mockOrderId'));",
-                  "  pm.expect(payment).to.have.property('paymentRef');",
-                  "  pm.expect(payment.paymentRef).to.match(/^VNPAY-/);",
-                  "  pm.expect(payment).to.have.property('provider', 'VNPAY');",
-                  "  pm.expect(payment).to.have.property('status', 'PAYMENT_PROCESSING');",
-                  "  pm.expect(payment).to.have.property('paymentUrl');",
-                  "  pm.expect(payment.mockEvents).to.include.members(['SUCCESS', 'FAILED', 'TIMEOUT']);",
-                  "});",
-                  "",
-                  "pm.test('idempotency key is echoed', function () {",
-                  "  pm.expect(payment.idempotencyKey).to.eql(pm.collectionVariables.get('paymentIdempotencyKey'));",
-                  "});",
-                  "",
-                  "pm.collectionVariables.set('mockPaymentRef', payment.paymentRef);"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "{{paymentIdempotencyKey}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"orderId\": \"{{mockOrderId}}\",\n  \"provider\": \"VNPAY\",\n  \"returnUrl\": \"http://localhost:3000/checkout/result\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/payments/create",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "payments",
-                "create"
-              ]
-            },
-            "description": "Creates a Week 1 mock VNPAY payment request from mockOrderId."
-          },
-          "response": []
-        },
-        {
-          "name": "POST /payments/create - Create MoMo mock payment",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('paymentIdempotencyKey', `payment-momo-${Date.now()}`);",
-                  "",
-                  "if (!pm.collectionVariables.get('mockOrderId')) {",
-                  "  pm.collectionVariables.set('mockOrderId', '00000000-0000-4000-8000-000000000000');",
-                  "}"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status code is 201', function () {",
-                  "  pm.response.to.have.status(201);",
-                  "});",
-                  "",
-                  "const json = pm.response.json();",
-                  "const payment = json.data.data;",
-                  "",
-                  "pm.test('mock MoMo payment is returned', function () {",
-                  "  pm.expect(payment).to.have.property('provider', 'MOMO');",
-                  "  pm.expect(payment.paymentRef).to.match(/^MOMO-/);",
-                  "  pm.expect(payment).to.have.property('status', 'PAYMENT_PROCESSING');",
-                  "  pm.expect(payment.paymentUrl).to.include('provider=MOMO');",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "{{paymentIdempotencyKey}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"orderId\": \"{{mockOrderId}}\",\n  \"provider\": \"MOMO\",\n  \"returnUrl\": \"http://localhost:3000/checkout/result\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/payments/create",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "payments",
-                "create"
-              ]
-            },
-            "description": "Creates a Week 1 mock MoMo payment request."
-          },
-          "response": []
-        },
-        {
           "name": "POST /payments/create - Invalid provider",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Run Auth > Register/Login first.');",
+                  "}",
+                  "pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${accessToken}` });",
+                  "pm.collectionVariables.set('paymentIdempotencyKey', pm.variables.replaceIn('{{$guid}}'));",
+                  "if (!pm.collectionVariables.get('orderId')) {",
+                  "  pm.collectionVariables.set('orderId', '00000000-0000-4000-8000-000000000000');",
+                  "}"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status code is 400 or 500 depending on current validation filter', function () {",
-                  "  pm.expect([400, 500]).to.include(pm.response.code);",
-                  "});",
-                  "",
-                  "const json = pm.response.json();",
-                  "",
-                  "pm.test('error response is returned', function () {",
-                  "  pm.expect(json).to.have.property('success', false);",
-                  "  pm.expect(json).to.have.property('message');",
+                  "pm.test('status code is 400', function () {",
+                  "  pm.response.to.have.status(400);",
                   "});"
                 ]
               }
@@ -1287,12 +1945,12 @@
               },
               {
                 "key": "Idempotency-Key",
-                "value": "payment-invalid-provider"
+                "value": "{{paymentIdempotencyKey}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"orderId\": \"00000000-0000-4000-8000-000000000000\",\n  \"provider\": \"CASH\"\n}"
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"provider\": \"CASH\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/payments/create",
@@ -1711,6 +2369,11 @@
     },
     {
       "key": "concertId",
+      "value": "0e491afa-772b-43c0-9009-e6847aacf517",
+      "type": "string"
+    },
+    {
+      "key": "draftConcertId",
       "value": "",
       "type": "string"
     },
@@ -1796,6 +2459,141 @@
     },
     {
       "key": "artistBio",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ticketTypeId",
+      "value": "71d2f154-74b4-40af-a9b3-802209884d58",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderQuantity",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "paymentRef",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "paymentAmount",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "mockVnpaySecret",
+      "value": "mock-vnpay-secret",
+      "type": "string"
+    },
+    {
+      "key": "mockMomoSecret",
+      "value": "mock-momo-secret",
+      "type": "string"
+    },
+    {
+      "key": "gatewayTransactionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "paymentWebhookProvider",
+      "value": "VNPAY",
+      "type": "string"
+    },
+    {
+      "key": "paymentWebhookEventType",
+      "value": "SUCCESS",
+      "type": "string"
+    },
+    {
+      "key": "paymentWebhookCurrency",
+      "value": "VND",
+      "type": "string"
+    },
+    {
+      "key": "paymentWebhookSignature",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "firstTicketId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "firstTicketCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoPartnerCode",
+      "value": "MOMO",
+      "type": "string"
+    },
+    {
+      "key": "momoAccessKey",
+      "value": "F8BBA842ECF85",
+      "type": "string"
+    },
+    {
+      "key": "momoSecretKey",
+      "value": "K951B6PE1waDMi640xX08PD3vg6EkVlz",
+      "type": "string"
+    },
+    {
+      "key": "momoRequestId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoOrderInfo",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoOrderType",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoTransId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoResultCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoMessage",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoPayType",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoResponseTime",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoExtraData",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momoSignature",
       "value": "",
       "type": "string"
     }

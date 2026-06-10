@@ -1,1 +1,2 @@
 export const REDIS_DEFAULT_KEY_TTL_SECONDS = 60;
+export const REDIS_AUTH_USER_CACHE_TTL_SECONDS = 5 * 60;

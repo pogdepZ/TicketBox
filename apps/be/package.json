@@ -18,13 +18,13 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
-    "@my-org/shared-types": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.0",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/schedule": "^6.1.3",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "bcrypt": "^6.0.0",
@@ -37,6 +37,7 @@
     "pg": "^8.21.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "vnpay": "^2.5.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
