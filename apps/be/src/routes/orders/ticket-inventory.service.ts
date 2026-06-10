@@ -31,7 +31,23 @@ export class TicketInventoryService {
     const sortedIds = [...ticketTypeIds].sort();
 
     const rows = await tx.$queryRawUnsafe<TicketType[]>(
-      `SELECT * FROM ticket_types WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE`,
+      `SELECT
+         id,
+         concert_id AS "concertId",
+         seat_zone_id AS "seatZoneId",
+         name,
+         price,
+         total_quantity AS "totalQuantity",
+         remaining,
+         max_per_user AS "maxPerUser",
+         sale_start_at AS "saleStartAt",
+         sale_end_at AS "saleEndAt",
+         status,
+         created_at AS "createdAt"
+       FROM ticket_types
+       WHERE id = ANY($1::uuid[])
+       ORDER BY id
+       FOR UPDATE`,
       sortedIds,
     );
 
@@ -128,7 +144,15 @@ export class TicketInventoryService {
 
     // Lock dòng cho update
     const rows = await tx.$queryRawUnsafe<UserTicketQuota[]>(
-      `SELECT * FROM user_ticket_quotas WHERE user_id = $1::uuid AND ticket_type_id = $2::uuid FOR UPDATE`,
+      `SELECT
+         user_id AS "userId",
+         ticket_type_id AS "ticketTypeId",
+         held_quantity AS "heldQuantity",
+         paid_quantity AS "paidQuantity",
+         updated_at AS "updatedAt"
+       FROM user_ticket_quotas
+       WHERE user_id = $1::uuid AND ticket_type_id = $2::uuid
+       FOR UPDATE`,
       userId,
       ticketTypeId,
     );

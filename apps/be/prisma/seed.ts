@@ -6,6 +6,8 @@ import {
   PrismaClient,
   Role,
   UserStatus,
+  ConcertStatus,
+  TicketTypeStatus,
 } from '../src/generated/prisma';
 
 const connectionString = process.env.DATABASE_URL;
@@ -271,6 +273,82 @@ async function upsertUserRole(params: {
   });
 }
 
+async function seedConcertsAndTicketTypes(): Promise<void> {
+  const concertName = 'TicketBox Live Seeded';
+
+  let concert = await prisma.concert.findFirst({
+    where: { name: concertName },
+  });
+
+  if (!concert) {
+    const eventDate = new Date();
+    eventDate.setDate(eventDate.getDate() + 30); // 30 days in future
+
+    concert = await prisma.concert.create({
+      data: {
+        name: concertName,
+        description: 'A sample seeded concert for Postman flow.',
+        artistName: 'The Seeded Band',
+        venueName: 'TicketBox Arena',
+        venueAddress: '123 Nguyen Hue, District 1, Ho Chi Minh City',
+        eventDate,
+        status: ConcertStatus.PUBLISHED,
+        seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+        posterUrl: 'https://example.com/posters/ticketbox-live.png',
+      },
+    });
+    console.log(`Created seeded concert: "${concertName}" with ID: ${concert.id}`);
+  } else {
+    console.log(`Seeded concert already exists with ID: ${concert.id}`);
+  }
+
+  const ticketTypesData = [
+    { name: 'SVIP', price: '1800000', totalQuantity: 50 },
+    { name: 'VIP', price: '1200000', totalQuantity: 100 },
+    { name: 'GA', price: '450000', totalQuantity: 200 },
+  ];
+
+  for (const tt of ticketTypesData) {
+    const existing = await prisma.ticketType.findUnique({
+      where: {
+        concertId_name: {
+          concertId: concert.id,
+          name: tt.name,
+        },
+      },
+    });
+
+    if (!existing) {
+      const created = await prisma.ticketType.create({
+        data: {
+          concertId: concert.id,
+          name: tt.name,
+          price: tt.price,
+          totalQuantity: tt.totalQuantity,
+          remaining: tt.totalQuantity,
+          status: TicketTypeStatus.ACTIVE,
+        },
+      });
+      console.log(`  Created TicketType: ${tt.name} (ID: ${created.id})`);
+    } else {
+      console.log(`  TicketType ${tt.name} already exists (ID: ${existing.id})`);
+    }
+  }
+
+  const vipTicketType = await prisma.ticketType.findFirst({
+    where: {
+      concertId: concert.id,
+      name: 'VIP',
+    },
+  });
+
+  console.log('\n==================================================================');
+  console.log('POSTMAN ENVIRONMENT VARIABLES FOR ORDERS + PAYMENTS FLOW:');
+  console.log(`concertId: ${concert.id}`);
+  console.log(`ticketTypeId: ${vipTicketType?.id || 'N/A'}`);
+  console.log('==================================================================\n');
+}
+
 async function main(): Promise<void> {
   const permissionByCode = await seedPermissions();
   const roleByName = await seedRoles();
@@ -278,6 +356,7 @@ async function main(): Promise<void> {
   await seedRolePermissions(roleByName, permissionByCode);
   await cleanupRolesAndPermissions(roleByName, permissionByCode);
   await seedAdminUser(roleByName);
+  await seedConcertsAndTicketTypes();
 
   console.log('RBAC seed completed.');
 }

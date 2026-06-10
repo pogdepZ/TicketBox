@@ -8,12 +8,14 @@ import { OrderTransactionHelper } from './order-transaction.helper';
 import { OrderExpirationJob } from './order-expiration.job';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { AuthModule } from '../auth/auth.module';
+import { TicketsModule } from '../tickets/tickets.module';
 import { RolesGuard } from '../auth/guard/roles.guard';
 
 @Module({
   imports: [
     PrismaModule,
     AuthModule,  // exports JwtAuthGuard, RolesGuard via Reflector
+    TicketsModule,
   ],
   controllers: [OrdersController],
   providers: [
@@ -25,6 +27,6 @@ import { RolesGuard } from '../auth/guard/roles.guard';
     RolesGuard,
     Reflector,
   ],
-  exports: [OrdersService],
+  exports: [OrdersService, OrderTransactionHelper],
 })
 export class OrdersModule {}

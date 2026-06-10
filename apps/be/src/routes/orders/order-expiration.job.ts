@@ -26,7 +26,7 @@ export class OrderExpirationJob {
 
     const expiredOrders = await this.prisma.order.findMany({
       where: {
-        status: OrderStatus.PENDING_PAYMENT,
+        status: { in: [OrderStatus.PENDING_PAYMENT, OrderStatus.PAYMENT_PROCESSING] },
         expiresAt: { lt: now },
       },
       select: { id: true },

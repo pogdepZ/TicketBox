@@ -21,6 +21,7 @@ import {
   decimalToString,
 } from './dto/order-response.dto';
 import { AuthUser } from '../auth/dto/user-response.dto';
+import { TicketsService } from '../tickets/tickets.service';
 import {
   IdempotencyStatus,
   Order,
@@ -48,6 +49,7 @@ export class OrdersService {
     private readonly idempotency: IdempotencyService,
     private readonly inventory: TicketInventoryService,
     private readonly txHelper: OrderTransactionHelper,
+    private readonly ticketsService: TicketsService,
   ) {}
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -279,9 +281,6 @@ export class OrdersService {
         items: {
           include: { ticketType: { select: { name: true } } },
         },
-        tickets: requestingUser.roles.some((r) => r.name === 'customer')
-          ? { where: { ownerUserId: requestingUser.id } }
-          : true,
       },
     });
 
@@ -291,6 +290,9 @@ export class OrdersService {
     if (!order || (!isAdmin && order.userId !== requestingUser.id)) {
       throw new NotFoundException('Order not found');
     }
+
+    // Query tickets via ticketsService to ensure we use the tickets module
+    await this.ticketsService.getTicketsForOrder(orderId, requestingUser);
 
     return this.buildDetailResponse(order as any);
   }

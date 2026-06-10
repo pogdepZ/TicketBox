@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { OrderStatus, PrismaClient, ReservationStatus } from '../../generated/prisma';
 
 type TransactionClient = Omit<
@@ -9,6 +9,8 @@ type TransactionClient = Omit<
 export interface ReleaseResult {
   orderId: string;
   releasedItems: { ticketTypeId: string; quantity: number }[];
+  skipped: boolean;
+  previousStatus?: OrderStatus;
 }
 
 @Injectable()
@@ -31,11 +33,47 @@ export class OrderTransactionHelper {
     orderStatus: OrderStatus,
     reservationStatus: ReservationStatus,
   ): Promise<ReleaseResult> {
-    // Lấy order và items
+    // Lock order first so cancel/expire/payment-fail cannot release the same
+    // inventory concurrently.
+    await tx.$executeRawUnsafe(
+      `SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`,
+      orderId,
+    );
+
     const order = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
       include: { items: true },
     });
+
+    const releasableStatuses: OrderStatus[] = [
+      OrderStatus.PENDING_PAYMENT,
+      OrderStatus.PAYMENT_PROCESSING,
+    ];
+
+    if (!releasableStatuses.includes(order.status)) {
+      const alreadyReleasedStatuses: OrderStatus[] = [
+        OrderStatus.PAYMENT_FAILED,
+        OrderStatus.EXPIRED,
+        OrderStatus.CANCELLED,
+      ];
+
+      if (alreadyReleasedStatuses.includes(order.status)) {
+        this.logger.warn(
+          `Skip releasing order ${orderId}; already ${order.status}`,
+        );
+        return {
+          orderId,
+          releasedItems: [],
+          skipped: true,
+          previousStatus: order.status,
+        };
+      }
+
+      throw new ConflictException({
+        message: `Cannot release order with status ${order.status}`,
+        currentStatus: order.status,
+      });
+    }
 
     // Cập nhật Order status
     await tx.order.update({
@@ -79,6 +117,6 @@ export class OrderTransactionHelper {
       `Released order ${orderId} → status=${orderStatus}, items=${JSON.stringify(releasedItems)}`,
     );
 
-    return { orderId, releasedItems };
+    return { orderId, releasedItems, skipped: false };
   }
 }

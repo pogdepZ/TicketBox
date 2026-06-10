@@ -14,6 +14,10 @@ const environmentSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().min(1),
   JWT_REFRESH_SECRET: z.string().min(1),
   JWT_REFRESH_EXPIRES_IN: z.string().min(1),
+  JWT_TICKET_SECRET: z.string().min(1).default('ticket-secret-change-in-prod'),
+  MOCK_VNPAY_SECRET: z.string().min(1).default('mock-vnpay-secret'),
+  MOCK_MOMO_SECRET: z.string().min(1).default('mock-momo-secret'),
+  MOCK_PAYMENT_BASE_URL: z.string().url().default('http://localhost:3000'),
 });
 
 export function validate(config: Record<string, unknown>) {

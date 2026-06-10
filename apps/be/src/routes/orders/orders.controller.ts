@@ -20,6 +20,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guard/jwt-auth.guard';
 import { RolesGuard } from '../auth/guard/roles.guard';
+import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard)
@@ -33,7 +34,7 @@ export class OrdersController {
    */
   @Post()
   @UseGuards(RolesGuard)
-  @Roles('customer')
+  @RequirePermissions('order:create')
   async create(
     @Body() dto: CreateOrderDto,
     @CurrentUser() user: AuthUser,
