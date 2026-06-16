@@ -54,3 +54,14 @@ Nếu notification với dedupe key này đã ở trạng thái `sent` hoặc `q
 - Email/push lỗi không làm rollback order.
 - Có thể thêm channel mới qua interface chung.
 - ReminderWorker không enqueue trùng reminder cho cùng user + concert + loại thông báo.
+
+## 8. Internal API / Service
+
+### `NotificationsService.sendNotification`
+- **Mô tả:** Gửi thông báo đến user thông qua các kênh khác nhau.
+- **Tham số:**
+  - `userId`: string
+  - `type`: string (template identifier)
+  - `channel`: 'EMAIL' | 'PUSH' | 'SMS' | 'ZALO'
+  - `payload`: Record<string, unknown>
+- **Trả về:** `{ notificationId: string, status: string }`

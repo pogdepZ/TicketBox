@@ -13,13 +13,13 @@ async function bootstrap() {
     : ['log', 'debug', 'error', 'warn', 'verbose'],
   });
   app.enableCors({
-    origin: process.env.CORS_ORIGIN,
+    origin: '*',
     credentials: true,
   });
   app.enableShutdownHooks();
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new TransformInterceptor());
-  await app.listen(process.env.PORT ? Number(process.env.PORT) : 3001);
+  await app.listen(process.env.PORT ? Number(process.env.PORT) : 3000, '0.0.0.0');
 }
 
 void bootstrap();

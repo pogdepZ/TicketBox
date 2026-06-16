@@ -17,8 +17,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
-import type { RootStackParamList, TicketInfo, ScanStatus } from '../types';
+import { apiService } from '../services/api';
+import { queueService } from '../services/queue';
+import type { RootStackParamList, TicketInfo, ScanStatus, OfflineQueueItem } from '../types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Scanner'>;
 
@@ -75,14 +78,79 @@ const SCAN_BUTTONS: { status: ScanStatus; label: string; color: string; tone: st
 
 export default function ScannerScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const [isOffline] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
-  const handleScan = (status: ScanStatus) => {
-    const ticket: TicketInfo = {
-      ...MOCK_TICKETS[status],
-      checkedInAt: new Date().toISOString(),
-    };
-    navigation.navigate('Result', { ticket, isOffline });
+  const handleScan = async (status: ScanStatus) => {
+    if (scanning) return;
+    setScanning(true);
+
+    const mockTicket = MOCK_TICKETS[status];
+    
+    // Attempt online scan
+    try {
+      const userStr = await AsyncStorage.getItem('auth_user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      const staffId = user?.id || 'staff-001';
+      const deviceId = 'device-A'; // Should come from settings in real app
+
+      const payload = {
+        qrCodeData: mockTicket.ticketCode,
+        staffId,
+        concertId: MOCK_CONCERT.id,
+        deviceId,
+        clientEventId: `scan-${Date.now()}`,
+      };
+
+      const response = await apiService.post<TicketInfo>('/checkin/scan', payload);
+
+      if (response.success && response.data) {
+        setIsOffline(false);
+        navigation.navigate('Result', { ticket: response.data, isOffline: false });
+      } else {
+        // If API fails with error or timeout, treat as offline
+        const isNetworkError = !response.data || response.message?.toLowerCase().includes('fetch') || response.message?.toLowerCase().includes('timeout');
+        
+        if (isNetworkError) {
+          setIsOffline(true);
+          const checkedAt = new Date().toISOString();
+          
+          const offlineItem: OfflineQueueItem = {
+            id: `q-${Date.now()}`,
+            ticketId: mockTicket.ticketId,
+            ticketCode: mockTicket.ticketCode,
+            qrCodeData: mockTicket.ticketCode,
+            concertId: MOCK_CONCERT.id,
+            staffId,
+            sourceDeviceId: deviceId,
+            checkedAt,
+            syncStatus: 'PENDING',
+            syncAttempts: 0,
+            lastSyncError: null,
+            serverCheckinId: null,
+            createdAt: checkedAt,
+          };
+
+          await queueService.enqueue(offlineItem);
+
+          // Construct a display ticket for offline
+          const displayTicket: TicketInfo = {
+            ...mockTicket, // Use mock info for display since we can't fetch it
+            checkedInAt: checkedAt,
+            status: 'SUCCESS', // Always allow in offline mode
+          };
+
+          navigation.navigate('Result', { ticket: displayTicket, isOffline: true });
+        } else {
+          // It's a server error or rejection, don't queue
+          Alert.alert('Lỗi quét vé', response.message || 'Lỗi không xác định');
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setScanning(false);
+    }
   };
 
   return (
@@ -94,9 +162,11 @@ export default function ScannerScreen() {
           <Text style={styles.concertLabel}>Cổng đang hoạt động</Text>
           <Text style={styles.concertName}>{MOCK_CONCERT.name}</Text>
         </View>
-        <View style={styles.livePill}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveText}>Online</Text>
+        <View style={[styles.livePill, isOffline && { backgroundColor: COLORS.error + '14', borderColor: COLORS.error + '55' }]}>
+          <View style={[styles.liveDot, isOffline && { backgroundColor: COLORS.error }]} />
+          <Text style={[styles.liveText, isOffline && { color: COLORS.errorLight }]}>
+            {isOffline ? 'Offline' : 'Online'}
+          </Text>
         </View>
       </View>
 
@@ -248,7 +318,7 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderWidth: 2,
     borderColor: COLORS.borderLight,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.lg,
     backgroundColor: COLORS.backgroundSecondary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -282,28 +352,28 @@ const styles = StyleSheet.create({
     left: 14,
     borderTopWidth: 3,
     borderLeftWidth: 3,
-    borderTopLeftRadius: BORDER_RADIUS.md,
+    borderTopLeftRadius: BORDER_RADIUS.lg,
   },
   cornerTR: {
     top: 14,
     right: 14,
     borderTopWidth: 3,
     borderRightWidth: 3,
-    borderTopRightRadius: BORDER_RADIUS.md,
+    borderTopRightRadius: BORDER_RADIUS.lg,
   },
   cornerBL: {
     bottom: 14,
     left: 14,
     borderBottomWidth: 3,
     borderLeftWidth: 3,
-    borderBottomLeftRadius: BORDER_RADIUS.md,
+    borderBottomLeftRadius: BORDER_RADIUS.lg,
   },
   cornerBR: {
     bottom: 14,
     right: 14,
     borderBottomWidth: 3,
     borderRightWidth: 3,
-    borderBottomRightRadius: BORDER_RADIUS.md,
+    borderBottomRightRadius: BORDER_RADIUS.lg,
   },
   scanLine: {
     position: 'absolute',
@@ -361,13 +431,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface + 'CC',
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
   },
   scanTone: {
     width: 32,
     height: 32,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.md,
@@ -393,7 +463,7 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.border,
     borderColor: COLORS.border,
     backgroundColor: COLORS.backgroundSecondary,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.lg,
   },
   navButton: {
     alignItems: 'center',
@@ -408,7 +478,7 @@ const styles = StyleSheet.create({
     height: 28,
     lineHeight: 28,
     textAlign: 'center',
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.md,
     backgroundColor: COLORS.surfaceRaised,
     overflow: 'hidden',
   },

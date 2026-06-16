@@ -1,0 +1,21 @@
+src/routes/checkin/checkin.service.ts:72:11 - error TS2322: Type '"REJECTED" | "DUPLICATE" | "ACCEPTED"' is not assignable to type 'CheckinResult'.
+  Type '"DUPLICATE"' is not assignable to type 'CheckinResult'.
+
+72           result: checkinResult,
+             ~~~~~~
+
+  src/generated/prisma/index.d.ts:37517:5
+    37517     result: $Enums.CheckinResult
+              ~~~~~~
+    The expected type comes from property 'result' which is declared here on type '(Without<CheckinEventCreateInput, CheckinEventUncheckedCreateInput> & CheckinEventUncheckedCreateInput) | (Without<...> & CheckinEventCreateInput)'
+
+src/routes/notifications/notifications.service.ts:24:9 - error TS2322: Type 'Record<string, unknown>' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue | undefined'.
+  Type 'Record<string, unknown>' is missing the following properties from type 'readonly (InputJsonValue | null)[]': length, concat, join, slice, and 26 more.
+
+24         payload,
+           ~~~~~~~
+
+  src/generated/prisma/index.d.ts:38014:5
+    38014     payload?: NullableJsonNullValueInput | InputJsonValue
+              ~~~~~~~
+    The expected type comes from property 'payload' which is declared here on type '(Without<NotificationCreateInput, NotificationUncheckedCreateInput> & NotificationUncheckedCreateInput) | (Without<...> & NotificationCreateInput)'

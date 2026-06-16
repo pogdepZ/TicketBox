@@ -225,8 +225,6 @@ importers:
         specifier: 5.7.3
         version: 5.7.3
 
-  packages/share-types: {}
-
 packages:
 
   '@alloc/quick-lru@5.2.0':

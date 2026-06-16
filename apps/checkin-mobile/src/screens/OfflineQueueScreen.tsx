@@ -9,93 +9,18 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   FlatList,
-  ActivityIndicator,
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
-import type { OfflineQueueItem, SyncStatus } from '../types';
+import { Button } from '../components';
+import { queueService } from '../services/queue';
+import { apiService } from '../services/api';
+import type { OfflineQueueItem, SyncStatus, SyncResultItem } from '../types';
+import { useFocusEffect } from '@react-navigation/native';
 
-const MOCK_QUEUE: OfflineQueueItem[] = [
-  {
-    id: 'q-001',
-    ticketId: 'ticket-101',
-    ticketCode: 'TKB-2026-VIP-101',
-    qrCodeData: 'qr-data-101',
-    concertId: 'concert-001',
-    staffId: 'staff-001',
-    sourceDeviceId: 'device-A',
-    checkedAt: '2026-06-07T19:30:00.000Z',
-    syncStatus: 'PENDING',
-    syncAttempts: 0,
-    lastSyncError: null,
-    serverCheckinId: null,
-    createdAt: '2026-06-07T19:30:00.000Z',
-  },
-  {
-    id: 'q-002',
-    ticketId: 'ticket-102',
-    ticketCode: 'TKB-2026-SVIP-102',
-    qrCodeData: 'qr-data-102',
-    concertId: 'concert-001',
-    staffId: 'staff-001',
-    sourceDeviceId: 'device-A',
-    checkedAt: '2026-06-07T19:32:00.000Z',
-    syncStatus: 'SYNCED',
-    syncAttempts: 1,
-    lastSyncError: null,
-    serverCheckinId: 'server-checkin-201',
-    createdAt: '2026-06-07T19:32:00.000Z',
-  },
-  {
-    id: 'q-003',
-    ticketId: 'ticket-103',
-    ticketCode: 'TKB-2026-GA-103',
-    qrCodeData: 'qr-data-103',
-    concertId: 'concert-001',
-    staffId: 'staff-001',
-    sourceDeviceId: 'device-A',
-    checkedAt: '2026-06-07T19:35:00.000Z',
-    syncStatus: 'FAILED',
-    syncAttempts: 3,
-    lastSyncError: 'Network timeout',
-    serverCheckinId: null,
-    createdAt: '2026-06-07T19:35:00.000Z',
-  },
-  {
-    id: 'q-004',
-    ticketId: 'ticket-104',
-    ticketCode: 'TKB-2026-VIP-104',
-    qrCodeData: 'qr-data-104',
-    concertId: 'concert-001',
-    staffId: 'staff-001',
-    sourceDeviceId: 'device-A',
-    checkedAt: '2026-06-07T19:38:00.000Z',
-    syncStatus: 'PENDING',
-    syncAttempts: 0,
-    lastSyncError: null,
-    serverCheckinId: null,
-    createdAt: '2026-06-07T19:38:00.000Z',
-  },
-  {
-    id: 'q-005',
-    ticketId: 'ticket-105',
-    ticketCode: 'TKB-2026-SVIP-105',
-    qrCodeData: 'qr-data-105',
-    concertId: 'concert-001',
-    staffId: 'staff-001',
-    sourceDeviceId: 'device-A',
-    checkedAt: '2026-06-07T19:40:00.000Z',
-    syncStatus: 'PENDING',
-    syncAttempts: 1,
-    lastSyncError: 'Server error',
-    serverCheckinId: null,
-    createdAt: '2026-06-07T19:40:00.000Z',
-  },
-];
 
 const STATUS_ICON: Record<SyncStatus, { code: string; color: string; label: string }> = {
   PENDING: { code: 'WAIT', color: COLORS.warning, label: 'Chờ sync' },
@@ -104,30 +29,61 @@ const STATUS_ICON: Record<SyncStatus, { code: string; color: string; label: stri
 };
 
 export default function OfflineQueueScreen() {
-  const [queue, setQueue] = useState<OfflineQueueItem[]>(MOCK_QUEUE);
+  const [queue, setQueue] = useState<OfflineQueueItem[]>([]);
   const [syncing, setSyncing] = useState(false);
+
+  const loadQueue = async () => {
+    const data = await queueService.getQueue();
+    setQueue(data);
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadQueue();
+    }, [])
+  );
 
   const pendingCount = queue.filter((i) => i.syncStatus === 'PENDING').length;
   const failedCount = queue.filter((i) => i.syncStatus === 'FAILED').length;
 
   const handleSyncNow = async () => {
+    const toSync = queue.filter((i) => i.syncStatus === 'PENDING' || i.syncStatus === 'FAILED');
+    if (toSync.length === 0) return;
+
     setSyncing(true);
-    // Simulate sync delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setQueue((prev) =>
-      prev.map((item) =>
-        item.syncStatus === 'PENDING' || item.syncStatus === 'FAILED'
-          ? {
-              ...item,
-              syncStatus: 'SYNCED' as SyncStatus,
-              syncAttempts: item.syncAttempts + 1,
-              lastSyncError: null,
-              serverCheckinId: `server-${item.id}`,
-            }
-          : item,
-      ),
-    );
-    setSyncing(false);
+    try {
+      const response = await apiService.post<{ results: SyncResultItem[] }>('/checkin/sync', {
+        items: toSync.map(item => ({
+          ticketId: item.ticketId,
+          qrCodeData: item.qrCodeData,
+          concertId: item.concertId,
+          staffId: item.staffId,
+          sourceDeviceId: item.sourceDeviceId,
+          checkedAt: item.checkedAt,
+        }))
+      });
+
+      if (response.success && response.data) {
+        for (const res of response.data.results) {
+          const item = toSync.find((i) => i.ticketId === res.ticketId);
+          if (item) {
+            await queueService.updateItemStatus(item.id, res.status);
+          }
+        }
+      } else {
+        // Mark all as failed
+        for (const item of toSync) {
+          await queueService.updateItemStatus(item.id, 'FAILED', response.message || 'Lỗi không xác định');
+        }
+      }
+    } catch (e) {
+      for (const item of toSync) {
+        await queueService.updateItemStatus(item.id, 'FAILED', 'Network error');
+      }
+    } finally {
+      await loadQueue();
+      setSyncing(false);
+    }
   };
 
   const renderItem = ({ item }: { item: OfflineQueueItem }) => {
@@ -187,21 +143,12 @@ export default function OfflineQueueScreen() {
         </View>
       </View>
 
-      <TouchableOpacity
-        style={[styles.syncButton, syncing && styles.syncButtonDisabled]}
+      <Button
+        title={syncing ? "Đang sync..." : "Đồng bộ lại ngay"}
         onPress={handleSyncNow}
-        disabled={syncing}
-        activeOpacity={0.8}
-      >
-        {syncing ? (
-          <>
-            <ActivityIndicator color={COLORS.text} size="small" />
-            <Text style={styles.syncButtonText}> Đang sync...</Text>
-          </>
-        ) : (
-          <Text style={styles.syncButtonText}>Đồng bộ lại ngay</Text>
-        )}
-      </TouchableOpacity>
+        loading={syncing}
+        style={{ marginHorizontal: SPACING.xl, marginVertical: SPACING.lg }}
+      />
 
       <FlatList
         data={queue}
@@ -228,7 +175,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.backgroundSecondary,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.lg,
     borderBottomWidth: 1,
   },
   summaryItem: {
@@ -243,24 +190,6 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: FONT_SIZES.xs,
     marginTop: 2,
-  },
-  syncButton: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.primary,
-    marginHorizontal: SPACING.xl,
-    marginVertical: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    borderRadius: BORDER_RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  syncButtonDisabled: {
-    opacity: 0.7,
-  },
-  syncButtonText: {
-    color: COLORS.background,
-    fontSize: FONT_SIZES.md,
-    fontWeight: '700',
   },
   list: {
     paddingHorizontal: SPACING.xl,
@@ -282,7 +211,7 @@ const styles = StyleSheet.create({
   queueCode: {
     width: 54,
     height: 38,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
