@@ -2,7 +2,7 @@ import { ConcertHero } from '@/components/concert-hero';
 import { SeatMap } from '@/components/seat-map';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
-import { concerts, getSeatsByConcertId, getTicketZonesByConcertId } from '@/lib/mock-data';
+import { getConcertById, getTicketZonesAsync, getSeatsAsync } from '@/lib/api';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -15,14 +15,19 @@ interface ConcertDetailPageProps {
 
 export default async function ConcertDetailPage({ params }: ConcertDetailPageProps) {
   const { id } = await params;
-  const concert = concerts.find((c) => c.id === id);
+  let concert;
+  try {
+    concert = await getConcertById(id);
+  } catch {
+    notFound();
+  }
 
   if (!concert) {
     notFound();
   }
 
-  const concertZones = getTicketZonesByConcertId(concert.id);
-  const concertSeats = getSeatsByConcertId(concert.id);
+  const concertZones = await getTicketZonesAsync(concert.id);
+  const concertSeats = await getSeatsAsync(concert.id);
 
   return (
     <main className="min-h-screen bg-background">

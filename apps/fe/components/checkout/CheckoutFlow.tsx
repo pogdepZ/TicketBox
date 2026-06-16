@@ -6,13 +6,15 @@ import { useRouter } from 'next/navigation';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { CheckoutSummary } from '@/components/checkout-summary';
 import { checkoutMock, concerts, paymentMethods } from '@/lib/mock-data';
-import { createDraftReservation, createMockOrderFromDraft, DraftReservation, getDraftReservation } from '@/lib/mock-reservation';
+import { createDraftReservation, DraftReservation, getDraftReservation } from '@/lib/mock-reservation';
+import { createOrder } from '@/lib/api';
 
 interface CheckoutViewModel {
   concertId: string;
   concertTitle: string;
   concertDate: string;
   ticketType: string;
+  ticketTypeId: string;
   quantity: number;
   unitPrice: number;
   selectedSeats: string[];
@@ -28,6 +30,7 @@ function fallbackCheckout(): CheckoutViewModel {
     concertTitle: concert.title,
     concertDate: concert.date,
     ticketType: checkoutMock.ticketType,
+    ticketTypeId: checkoutMock.ticketTypeId,
     quantity: checkoutMock.quantity,
     unitPrice: checkoutMock.unitPrice,
     selectedSeats: checkoutMock.selectedSeats,
@@ -44,6 +47,7 @@ function fromDraftReservation(draft: DraftReservation): CheckoutViewModel {
     concertTitle: draft.concertTitle,
     concertDate: concert?.date ?? draft.createdAt,
     ticketType: draft.item.zoneName,
+    ticketTypeId: draft.item.ticketTypeId,
     quantity: draft.item.quantity,
     unitPrice: draft.item.unitPrice,
     selectedSeats: draft.item.seatLabels,
@@ -60,11 +64,9 @@ export function CheckoutFlow() {
   const router = useRouter();
   const [checkout, setCheckout] = useState<CheckoutViewModel>(() => fallbackCheckout());
   const [draftReservation, setDraftReservation] = useState<DraftReservation | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState('card');
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const [cvv, setCvv] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('momo');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const draft = getDraftReservation();
@@ -85,61 +87,28 @@ export function CheckoutFlow() {
     });
   }, [checkout.expiresAt]);
 
-  function validatePayment() {
-    if (paymentMethod !== 'card') {
-      return '';
-    }
-
-    if (onlyDigits(cardNumber).length < 12) {
-      return 'Vui lòng nhập số thẻ hợp lệ.';
-    }
-
-    if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiry.trim())) {
-      return 'Vui lòng nhập hạn thẻ theo định dạng MM/YY.';
-    }
-
-    if (!/^\d{3,4}$/.test(cvv.trim())) {
-      return 'Vui lòng nhập CVV gồm 3 hoặc 4 chữ số.';
-    }
-
-    return '';
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const validationMessage = validatePayment();
-    if (validationMessage) {
-      setError(validationMessage);
-      return;
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      const orderResponse = await createOrder({
+        concertId: checkout.concertId,
+        items: [
+          {
+            ticketTypeId: checkout.ticketTypeId,
+            quantity: checkout.quantity,
+          }
+        ]
+      });
+
+      router.push(`/success?orderId=${encodeURIComponent(orderResponse.orderId)}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Đã có lỗi xảy ra.');
+      setIsSubmitting(false);
     }
-
-    const draft = draftReservation ?? createDraftReservation({
-      concertId: checkout.concertId,
-      concertTitle: checkout.concertTitle,
-      selectedZone: {
-        id: checkout.ticketType.toLowerCase(),
-        name: checkout.ticketType,
-        label: 'Khu đã chọn',
-        price: checkout.unitPrice,
-        remaining: 0,
-        total: checkout.quantity,
-        color: '#e5484d',
-        description: 'Reservation fallback từ checkout mock.',
-        status: 'available',
-      },
-      selectedSeats: checkout.selectedSeats.map((seatLabel, index) => ({
-        id: `checkout-seat-${index}`,
-        row: seatLabel.replace(/\d/g, ''),
-        number: Number(seatLabel.replace(/\D/g, '')) || index + 1,
-        label: seatLabel,
-        status: 'available',
-        zoneId: checkout.ticketType.toLowerCase(),
-      })),
-    });
-    const order = createMockOrderFromDraft({ draft, paymentMethod });
-
-    router.push(`/success?orderId=${encodeURIComponent(order.id)}`);
   }
 
   return (
@@ -225,45 +194,7 @@ export function CheckoutFlow() {
               </div>
             </div>
 
-            {paymentMethod === 'card' && (
-              <div className="mb-8 rounded-3xl border border-border bg-muted/55 p-6">
-                <h3 className="mb-4 font-black text-foreground">Chi tiết thẻ</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-foreground">Số thẻ</label>
-                    <input
-                      type="text"
-                      value={cardNumber}
-                      onChange={(event) => setCardNumber(event.target.value)}
-                      placeholder="4242 4242 4242 4242"
-                      className="h-11 w-full rounded-2xl border border-border bg-card px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-foreground">MM/YY</label>
-                      <input
-                        type="text"
-                        value={expiry}
-                        onChange={(event) => setExpiry(event.target.value)}
-                        placeholder="08/28"
-                        className="h-11 w-full rounded-2xl border border-border bg-card px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-foreground">CVV</label>
-                      <input
-                        type="text"
-                        value={cvv}
-                        onChange={(event) => setCvv(event.target.value)}
-                        placeholder="123"
-                        className="h-11 w-full rounded-2xl border border-border bg-card px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+
 
             {error && (
               <p className="mb-4 rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-semibold text-foreground">
@@ -273,9 +204,10 @@ export function CheckoutFlow() {
 
             <button
               type="submit"
-              className="mb-4 w-full rounded-full bg-primary py-3 font-bold text-primary-foreground transition hover:bg-primary/90 active:translate-y-px"
+              disabled={isSubmitting}
+              className="mb-4 w-full rounded-full bg-primary py-3 font-bold text-primary-foreground transition hover:bg-primary/90 active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Xác nhận thanh toán
+              {isSubmitting ? 'Đang xử lý...' : 'Xác nhận thanh toán'}
             </button>
             <p className="text-center text-xs text-muted-foreground">
               Bằng cách nhấn vào nút này, bạn đồng ý với Điều khoản và Chính sách của TicketBox.

@@ -95,9 +95,21 @@ export class ConcertService {
   }
 
   async findOne(id: string): Promise<ConcertResponseDto> {
-    const concert = await this.findConcertOrThrow(id);
+    const concert = await this.prismaService.concert.findUnique({
+      where: { id },
+      include: {
+        seatZones: {
+          include: {
+            ticketTypes: true
+          }
+        }
+      }
+    });
 
-    // TODO: include ticketTypes or related data only through owning modules when needed.
+    if (!concert) {
+      throw new NotFoundException('Concert not found');
+    }
+
     return this.toResponse(concert);
   }
 

@@ -4,7 +4,7 @@ import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LogIn, UserPlus } from 'lucide-react';
-import { loginMock, registerMock } from '@/lib/mock-auth';
+import { login, register } from '@/lib/api';
 
 type AuthMode = 'login' | 'register';
 
@@ -39,7 +39,7 @@ export function AuthForm({ mode }: AuthFormProps) {
     return '';
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const validationMessage = validate();
@@ -53,9 +53,11 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     try {
       if (isLogin) {
-        loginMock(email, password);
+        await login({ email, password });
       } else {
-        registerMock({ email, password, fullName, phone });
+        await register({ email, password, fullName, phone });
+        // Auto-login after register
+        await login({ email, password });
       }
 
       router.push('/');
@@ -77,8 +79,8 @@ export function AuthForm({ mode }: AuthFormProps) {
         </h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           {isLogin
-            ? 'Dùng tài khoản mock để tiếp tục đặt vé. Tài khoản mẫu: minhanh@example.com / password123.'
-            : 'Tài khoản được lưu cục bộ trong trình duyệt để mô phỏng API đăng ký.'}
+            ? 'Đăng nhập để đặt vé và trải nghiệm các tính năng của hệ thống.'
+            : 'Tạo tài khoản mới để bắt đầu.'}
         </p>
       </div>
 

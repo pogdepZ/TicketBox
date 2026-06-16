@@ -633,25 +633,18 @@ export const mockTickets: MockTicket[] = [
 
 export const paymentMethods = [
   {
-    id: 'card',
-    gateway: 'CARD' as PaymentMethod,
-    name: 'Thẻ tín dụng / ghi nợ',
-    description: 'Visa, Mastercard, JCB',
-    icon: 'CreditCard',
-  },
-  {
-    id: 'bank',
-    gateway: 'BANK_TRANSFER' as PaymentMethod,
-    name: 'Chuyển khoản ngân hàng',
-    description: 'QR ngân hàng, xác nhận tự động',
-    icon: 'Building2',
-  },
-  {
-    id: 'wallet',
+    id: 'momo',
     gateway: 'WALLET' as PaymentMethod,
-    name: 'Ví điện tử',
-    description: 'MoMo, ZaloPay, VNPay',
+    name: 'Ví MoMo',
+    description: 'Thanh toán nhanh qua ứng dụng MoMo',
     icon: 'Wallet',
+  },
+  {
+    id: 'vnpay',
+    gateway: 'WALLET' as PaymentMethod,
+    name: 'VNPAY',
+    description: 'Quét mã QR qua ứng dụng ngân hàng',
+    icon: 'Building2',
   },
 ];
 

@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { ThemeToggle } from './theme-toggle';
-import { getCurrentMockSession, logoutMock, MockAuthSession } from '@/lib/mock-auth';
+import { getProfile, logout } from '@/lib/api';
 
 export function Header() {
   const router = useRouter();
   const [keyword, setKeyword] = useState('');
-  const [session, setSession] = useState<MockAuthSession | null>(null);
+  const [session, setSession] = useState<any>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
 
@@ -25,19 +25,30 @@ export function Header() {
   }, []);
 
   useEffect(() => {
-    function syncSession() {
-      setSession(getCurrentMockSession());
+    async function syncSession() {
+      try {
+        const token = window.localStorage.getItem('access_token');
+        if (token) {
+          const profile = await getProfile();
+          setSession({ user: profile });
+        } else {
+          setSession(null);
+        }
+      } catch {
+        setSession(null);
+      }
     }
 
     syncSession();
-    window.addEventListener('ticketbox-auth-change', syncSession);
-    window.addEventListener('storage', syncSession);
+    // A rudimentary way to sync session after login in another component
+    const interval = setInterval(() => {
+      const token = window.localStorage.getItem('access_token');
+      if (token && !session) syncSession();
+      if (!token && session) setSession(null);
+    }, 1000);
 
-    return () => {
-      window.removeEventListener('ticketbox-auth-change', syncSession);
-      window.removeEventListener('storage', syncSession);
-    };
-  }, []);
+    return () => clearInterval(interval);
+  }, [session]);
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,10 +58,14 @@ export function Header() {
     router.push(query ? `/?q=${encodeURIComponent(query)}#events` : '/#events');
   }
 
-  function handleLogout() {
-    logoutMock();
-    setShowAccount(false);
-    router.push('/');
+  async function handleLogout() {
+    try {
+      await logout();
+    } finally {
+      setSession(null);
+      setShowAccount(false);
+      router.push('/');
+    }
   }
 
   return (
@@ -124,8 +139,12 @@ export function Header() {
                 <div className="absolute right-0 top-12 z-50 w-72 rounded-3xl border border-border bg-card p-4 shadow-xl shadow-foreground/10">
                   <p className="font-black text-foreground">{session.user.fullName}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{session.user.email}</p>
-                  <div className="mt-3 rounded-2xl bg-muted/70 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                    {session.user.roles.map((role) => role.name).join(', ')}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {session.user.roles?.map((role: any) => (
+                      <span key={role.name || role} className="rounded-2xl bg-muted/70 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                        {role.name || role}
+                      </span>
+                    ))}
                   </div>
                   <button
                     type="button"

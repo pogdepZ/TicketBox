@@ -1,61 +1,82 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { randomUUID } from 'crypto';
-
-type MockOrderItem = {
-  ticketTypeId: string;
-  name: string;
-  quantity: number;
-  unitPrice: number;
-  lineTotal: number;
-};
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class OrdersService {
-  createMockOrder(dto: CreateOrderDto, idempotencyKey?: string) {
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
+  constructor(private prisma: PrismaService) {}
 
-    const items: MockOrderItem[] = dto.items.map((item, index) => {
-      const unitPrice = this.getMockUnitPrice(index);
+  async createMockOrder(dto: CreateOrderDto, idempotencyKey?: string) {
+    // 1. Create a dummy user if not exists
+    let user = await this.prisma.user.findFirst({ where: { email: 'dummy@ticketbox.com' } });
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          email: 'dummy@ticketbox.com',
+          fullName: 'Khách hàng Demo',
+          phone: '0123456789'
+        }
+      });
+    }
 
-      return {
-        ticketTypeId: item.ticketTypeId,
-        name: this.getMockTicketName(index),
-        quantity: item.quantity,
-        unitPrice,
-        lineTotal: unitPrice * item.quantity,
-      };
+    // 2. Validate ticket types exist
+    const ticketTypeId = dto.items[0].ticketTypeId;
+    const ticketType = await this.prisma.ticketType.findUnique({
+      where: { id: ticketTypeId }
+    });
+    
+    if (!ticketType) {
+      throw new BadRequestException('Ticket Type không tồn tại trong DB');
+    }
+
+    const totalAmount = ticketType.price.toNumber() * dto.items[0].quantity;
+
+    // 3. Create a dummy reservation
+    const reservation = await this.prisma.reservation.create({
+      data: {
+        userId: user.id,
+        concertId: dto.concertId,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+        status: 'CONFIRMED',
+        items: {
+          create: {
+            ticketTypeId: ticketTypeId,
+            quantity: dto.items[0].quantity,
+            unitPrice: ticketType.price
+          }
+        }
+      }
     });
 
-    const totalAmount = items.reduce((sum, item) => sum + item.lineTotal, 0);
+    // 4. Create the Order
+    const order = await this.prisma.order.create({
+      data: {
+        userId: user.id,
+        concertId: dto.concertId,
+        reservationId: reservation.id,
+        idempotencyKey: idempotencyKey ?? randomUUID(),
+        status: 'PENDING_PAYMENT',
+        totalAmount: totalAmount,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+        items: {
+          create: {
+            ticketTypeId: ticketTypeId,
+            quantity: dto.items[0].quantity,
+            unitPrice: ticketType.price
+          }
+        }
+      }
+    });
 
     return {
       success: true,
       data: {
-        orderId: randomUUID(),
-        concertId: dto.concertId,
-        status: 'PENDING_PAYMENT',
-        totalAmount,
-        currency: 'VND',
-        expiresAt: expiresAt.toISOString(),
-        idempotencyKey: idempotencyKey ?? null,
-        mockUserId: 'mock-audience-user',
-        items,
+        orderId: order.id,
+        status: order.status,
+        totalAmount: totalAmount
       },
-      message: 'Mock order created',
+      message: 'Order created successfully in DB',
     };
-  }
-
-  private getMockUnitPrice(index: number): number {
-    const prices = [1800000, 1200000, 900000, 650000, 450000];
-
-    return prices[index] ?? 500000;
-  }
-
-  private getMockTicketName(index: number): string {
-    const names = ['SVIP', 'VIP', 'CAT1', 'CAT2', 'GA'];
-
-    return names[index] ?? `TICKET_${index + 1}`;
   }
 }

@@ -24,6 +24,7 @@ import { TicketsModule } from './routes/tickets/tickets.module';
     OrdersModule,
     PaymentsModule,
     TicketsModule,
+    ConcertModule
   ],
   controllers: [AppController],
   providers: [AppService],

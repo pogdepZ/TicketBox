@@ -44,6 +44,8 @@ export const metadata: Metadata = {
   },
 }
 
+import Script from 'next/script'
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -52,7 +54,6 @@ export default function RootLayout({
   return (
     <html lang="vi" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="font-sans antialiased bg-background text-foreground">
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
