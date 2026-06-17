@@ -7,21 +7,21 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-} from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { RedisService } from '../../common/redis/redis.service';
-import { IdempotencyService } from './idempotency.service';
-import { TicketInventoryService } from './ticket-inventory.service';
-import { OrderTransactionHelper } from './order-transaction.helper';
-import { CreateOrderDto } from './dto/create-order.dto';
+} from "@nestjs/common";
+import { PrismaService } from "../../common/prisma/prisma.service";
+import { RedisService } from "../../common/redis/redis.service";
+import { IdempotencyService } from "./idempotency.service";
+import { TicketInventoryService } from "./ticket-inventory.service";
+import { OrderTransactionHelper } from "./order-transaction.helper";
+import { CreateOrderDto } from "./dto/create-order.dto";
 import {
   OrderDetailResponseDto,
   OrderItemResponseDto,
   OrderResponseDto,
   decimalToString,
-} from './dto/order-response.dto';
-import { AuthUser } from '../auth/dto/user-response.dto';
-import { TicketsService } from '../tickets/tickets.service';
+} from "./dto/order-response.dto";
+import { AuthUser } from "../auth/dto/user-response.dto";
+import { TicketsService } from "../tickets/tickets.service";
 import {
   IdempotencyStatus,
   Order,
@@ -29,7 +29,7 @@ import {
   OrderStatus,
   ReservationStatus,
   TicketType,
-} from '../../generated/prisma';
+} from "../../generated/prisma";
 
 /** Thời gian giữ vé tạm: 10 phút */
 const RESERVATION_TTL_MINUTES = 10;
@@ -62,8 +62,8 @@ export class OrdersService {
     idempotencyKey: string | undefined,
   ): Promise<{ status: number; body: OrderResponseDto }> {
     // Bước 1: bắt buộc Idempotency-Key
-    if (!idempotencyKey || idempotencyKey.trim() === '') {
-      throw new BadRequestException('Idempotency-Key is required');
+    if (!idempotencyKey || idempotencyKey.trim() === "") {
+      throw new BadRequestException("Idempotency-Key is required");
     }
 
     const requestHash = this.idempotency.computeRequestHash(user.id, dto);
@@ -91,17 +91,25 @@ export class OrdersService {
 
     // Bước 4: Đánh dấu PROCESSING (chặn concurrent duplicate với cùng key)
     try {
-      await this.idempotency.markProcessing(idempotencyKey, requestHash, user.id);
+      await this.idempotency.markProcessing(
+        idempotencyKey,
+        requestHash,
+        user.id,
+      );
     } catch {
       // Unique constraint violation: request đang được xử lý
       throw new ConflictException({
-        message: 'Request is already being processed',
+        message: "Request is already being processed",
         key: idempotencyKey,
       });
     }
 
     try {
-      const responseBody = await this.runCreateOrderTransaction(user, dto, idempotencyKey);
+      const responseBody = await this.runCreateOrderTransaction(
+        user,
+        dto,
+        idempotencyKey,
+      );
 
       // Lưu vào idempotency store (COMPLETED)
       await this.idempotency.store(
@@ -131,7 +139,10 @@ export class OrdersService {
 
     return this.prisma.$transaction(async (tx) => {
       // ── Bước 5: Lock TicketType rows FOR UPDATE ──
-      const ticketTypes = await this.inventory.lockTicketTypes(tx as any, ticketTypeIds);
+      const ticketTypes = await this.inventory.lockTicketTypes(
+        tx as any,
+        ticketTypeIds,
+      );
 
       // ── Bước 6: Validate concert PUBLISHED ──
       const concert = await tx.concert.findUnique({
@@ -139,11 +150,11 @@ export class OrdersService {
         select: { id: true, status: true },
       });
 
-      if (!concert || concert.status !== 'PUBLISHED') {
+      if (!concert || concert.status !== "PUBLISHED") {
         throw new ConflictException({
-          message: 'Concert is not available',
+          message: "Concert is not available",
           concertId: dto.concertId,
-          status: concert?.status ?? 'NOT_FOUND',
+          status: concert?.status ?? "NOT_FOUND",
         });
       }
 
@@ -167,7 +178,7 @@ export class OrdersService {
           user.id,
           item.ticketTypeId,
         );
-        //this.inventory.checkQuota(quota, tt.maxPerUser, item.quantity);
+        this.inventory.checkQuota(quota, tt.maxPerUser, item.quantity);
 
         enrichedItems.push({ ticketType: tt, quantity: item.quantity });
       }
@@ -250,9 +261,7 @@ export class OrdersService {
         name: e.ticketType.name,
         quantity: e.quantity,
         unitPrice: decimalToString(e.ticketType.price),
-        lineTotal: decimalToString(
-          Number(e.ticketType.price) * e.quantity,
-        ),
+        lineTotal: decimalToString(Number(e.ticketType.price) * e.quantity),
       }));
 
       return {
@@ -260,7 +269,7 @@ export class OrdersService {
         concertId: order.concertId,
         status: order.status,
         totalAmount: decimalToString(totalAmount),
-        currency: 'VND',
+        currency: "VND",
         expiresAt: expiresAt.toISOString(),
         items,
       };
@@ -284,11 +293,11 @@ export class OrdersService {
       },
     });
 
-    const isAdmin = requestingUser.roles.some((r) => r.name === 'admin');
+    const isAdmin = requestingUser.roles.some((r) => r.name === "admin");
 
     // Trả 404 để tránh leak existence (nếu không phải owner và không phải admin)
     if (!order || (!isAdmin && order.userId !== requestingUser.id)) {
-      throw new NotFoundException('Order not found');
+      throw new NotFoundException("Order not found");
     }
 
     // Query tickets via ticketsService to ensure we use the tickets module
@@ -311,7 +320,7 @@ export class OrdersService {
     });
 
     if (!order || order.userId !== userId) {
-      throw new NotFoundException('Order not found');
+      throw new NotFoundException("Order not found");
     }
 
     if (order.status !== OrderStatus.PENDING_PAYMENT) {
@@ -332,7 +341,9 @@ export class OrdersService {
 
     const updated = await this.prisma.order.findUniqueOrThrow({
       where: { id: orderId },
-      include: { items: { include: { ticketType: { select: { name: true } } } } },
+      include: {
+        items: { include: { ticketType: { select: { name: true } } } },
+      },
     });
 
     return this.buildDetailResponse(updated as any);
@@ -352,9 +363,7 @@ export class OrdersService {
       name: item.ticketType.name,
       quantity: item.quantity,
       unitPrice: decimalToString(item.unitPrice),
-      lineTotal: decimalToString(
-        Number(item.unitPrice) * item.quantity,
-      ),
+      lineTotal: decimalToString(Number(item.unitPrice) * item.quantity),
     }));
 
     return {
@@ -364,7 +373,7 @@ export class OrdersService {
       reservationId: order.reservationId,
       status: order.status,
       totalAmount: decimalToString(order.totalAmount),
-      currency: 'VND',
+      currency: "VND",
       expiresAt: order.expiresAt.toISOString(),
       createdAt: order.createdAt.toISOString(),
       paymentMethod: order.paymentMethod,

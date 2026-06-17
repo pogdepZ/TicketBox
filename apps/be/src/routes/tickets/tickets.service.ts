@@ -1,14 +1,20 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { PrismaClient, TicketStatus } from '../../generated/prisma';
-import { randomBytes } from 'crypto';
-import { sign } from 'jsonwebtoken';
-import { AuthUser } from '../auth/dto/user-response.dto';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../common/prisma/prisma.service";
+import { PrismaClient, Prisma, TicketStatus } from "../../generated/prisma";
+import { randomBytes, randomUUID } from "crypto";
+import { sign, verify } from "jsonwebtoken";
+import { AuthUser } from "../auth/dto/user-response.dto";
 
 export type TransactionClient = Omit<
   PrismaClient,
-  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
 >;
 
 export interface OrderItemWithType {
@@ -23,6 +29,42 @@ export interface IssuedTicket {
   ticketTypeName: string;
   qrPayload: string;
 }
+
+const TICKET_CODE_RETRY_LIMIT = 5;
+
+export interface TicketViewDto {
+  ticketId: string;
+  ticketCode: string;
+  qrPayload: string;
+  ticketTypeId: string;
+  ticketTypeName: string;
+  ownerUserId: string;
+  orderId: string;
+  concertId: string;
+  status: TicketStatus;
+  seatNumber: string | null;
+  scannedAt: string | null;
+}
+
+export interface TicketVerificationResultDto {
+  valid: boolean;
+  ticket: TicketViewDto | null;
+  reason?: string;
+}
+
+type TicketRow = {
+  id: string;
+  orderId: string;
+  ticketTypeId: string;
+  ownerUserId: string;
+  ticketCode: string;
+  qrPayload: string;
+  seatNumber: string | null;
+  status: TicketStatus;
+  scannedAt: Date | null;
+  ticketType: { name: string };
+  order?: { id: string; userId: string; concertId: string };
+};
 
 @Injectable()
 export class TicketsService {
@@ -52,56 +94,33 @@ export class TicketsService {
   ): Promise<IssuedTicket[]> {
     const issued: IssuedTicket[] = [];
     const ticketSecret = this.config.get<string>(
-      'JWT_TICKET_SECRET',
-      'ticket-secret',
+      "JWT_TICKET_SECRET",
+      "ticket-secret",
     );
 
-    for (const item of items) {
-      for (let i = 0; i < item.quantity; i++) {
-        const ticketCode = this.generateTicketCode();
+    const concert = await this.prisma.concert.findUnique({
+      where: { id: order.concertId },
+      select: { id: true, eventDate: true },
+    });
 
-        // Tạo ticket record trước để có ID
-        const ticket = await tx.ticket.create({
-          data: {
-            orderId: order.id,
-            ticketTypeId: item.ticketTypeId,
-            ownerUserId: order.userId,
-            ticketCode,
-            qrPayload: '', // placeholder, cập nhật sau khi có ticketId
-            status: TicketStatus.ACTIVE,
-          },
-        });
-
-        // Sign JWT với ticketId đã có
-        const qrPayload = sign(
-          {
-            ticket_id: ticket.id,
-            ticket_code: ticketCode,
-            concert_id: order.concertId,
-            ticket_type_id: item.ticketTypeId,
-          },
-          ticketSecret,
-          { expiresIn: '7d' },
-        );
-
-        // Cập nhật qrPayload
-        await tx.ticket.update({
-          where: { id: ticket.id },
-          data: { qrPayload },
-        });
-
-        issued.push({
-          ticketId: ticket.id,
-          ticketCode,
-          ticketTypeName: item.ticketType.name,
-          qrPayload,
-        });
-      }
+    if (!concert) {
+      throw new NotFoundException("Concert not found");
     }
 
-    this.logger.log(
-      `Issued ${issued.length} tickets for order ${order.id}`,
-    );
+    const qrExpiresAt = this.getTicketQrExpiresAt(concert.eventDate);
+
+    // Mỗi item phải sinh đúng số ticket thực tế theo quantity.
+    for (const item of items) {
+      const createdTickets = await Promise.all(
+        Array.from({ length: item.quantity }, () =>
+          this.createIssuedTicket(tx, order, item, ticketSecret, qrExpiresAt),
+        ),
+      );
+
+      issued.push(...createdTickets);
+    }
+
+    this.logger.log(`Issued ${issued.length} tickets for order ${order.id}`);
 
     return issued;
   }
@@ -114,9 +133,72 @@ export class TicketsService {
   private generateTicketCode(): string {
     const alpha = Array.from({ length: 6 }, () =>
       String.fromCharCode(65 + Math.floor(Math.random() * 26)),
-    ).join('');
-    const hex = randomBytes(3).toString('hex').toUpperCase();
+    ).join("");
+    const hex = randomBytes(3).toString("hex").toUpperCase();
     return `TB-${alpha}-${hex}`;
+  }
+
+  private async createIssuedTicket(
+    tx: TransactionClient,
+    order: {
+      id: string;
+      userId: string;
+      concertId: string;
+    },
+    item: OrderItemWithType,
+    ticketSecret: string,
+    qrExpiresAt: Date,
+  ): Promise<IssuedTicket> {
+    for (let attempt = 1; attempt <= TICKET_CODE_RETRY_LIMIT; attempt++) {
+      const ticketId = randomUUID();
+      const ticketCode = this.generateTicketCode();
+
+      const qrPayload = sign(
+        {
+          ticket_id: ticketId,
+          ticket_code: ticketCode,
+          concert_id: order.concertId,
+          ticket_type_id: item.ticketTypeId,
+        },
+        ticketSecret,
+        {
+          expiresIn: Math.max(
+            1,
+            Math.floor((qrExpiresAt.getTime() - Date.now()) / 1000),
+          ),
+        },
+      );
+
+      try {
+        await tx.ticket.create({
+          data: {
+            id: ticketId,
+            orderId: order.id,
+            ticketTypeId: item.ticketTypeId,
+            ownerUserId: order.userId,
+            ticketCode,
+            qrPayload,
+            status: TicketStatus.ACTIVE,
+          },
+        });
+
+        return {
+          ticketId,
+          ticketCode,
+          ticketTypeName: item.ticketType.name,
+          qrPayload,
+        };
+      } catch (error) {
+        if (
+          !this.isUniqueViolation(error) ||
+          attempt === TICKET_CODE_RETRY_LIMIT
+        ) {
+          throw error;
+        }
+      }
+    }
+
+    throw new Error("Unable to generate unique ticket code");
   }
 
   /**
@@ -131,13 +213,25 @@ export class TicketsService {
     });
   }
 
-  /**
-   * Lấy danh sách ticket cho một order dựa theo phân quyền người yêu cầu.
-   * Customer chỉ xem được ticket của chính mình.
-   * Admin xem được tất cả ticket.
-   */
+  async getTicketsByOrderIdForUser(orderId: string, requestingUser: AuthUser) {
+    // Ownership check diễn ra theo order để tránh lộ vé của người khác.
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, userId: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException("Order not found");
+    }
+
+    this.assertCanAccessOwnedResource(order.userId, requestingUser);
+
+    return this.getTicketsByOrderId(orderId);
+  }
+
   async getTicketsForOrder(orderId: string, requestingUser: AuthUser) {
-    const isAdmin = requestingUser.roles.some((r) => r.name === 'admin');
+    const isAdmin = this.isAdmin(requestingUser);
+
     return this.prisma.ticket.findMany({
       where: {
         orderId,
@@ -146,18 +240,177 @@ export class TicketsService {
       include: {
         ticketType: { select: { name: true } },
       },
+      orderBy: [{ createdAt: "desc" }],
     });
   }
 
-  buildMockTicketPreview(orderId: string) {
-    return {
-      success: true,
-      data: {
-        orderId,
-        status: 'MOCK_ONLY',
-        note: 'Tickets will be generated after payment success in week 2.',
+  async getTicketsForUser(requestingUser: AuthUser) {
+    // Admin xem được toàn bộ ticket, customer chỉ thấy ticket của chính mình.
+    return this.prisma.ticket.findMany({
+      where: this.buildOwnershipFilter(requestingUser),
+      include: {
+        ticketType: { select: { name: true } },
+        order: {
+          select: {
+            id: true,
+            userId: true,
+            concertId: true,
+          },
+        },
       },
-      message: 'Mock ticket preview created',
+      orderBy: [{ createdAt: "desc" }],
+    });
+  }
+
+  async getTicketById(ticketId: string, requestingUser: AuthUser) {
+    // Trả 404 nếu ticket không tồn tại, và chặn nếu không phải chủ vé.
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: {
+        ticketType: { select: { name: true } },
+        order: {
+          select: {
+            id: true,
+            userId: true,
+            concertId: true,
+          },
+        },
+      },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException("Ticket not found");
+    }
+
+    this.assertCanAccessOwnedResource(ticket.ownerUserId, requestingUser);
+
+    return this.toTicketView(ticket as TicketRow);
+  }
+
+  async verifyTicketQr(
+    qrPayload: string,
+  ): Promise<TicketVerificationResultDto> {
+    if (!qrPayload?.trim()) {
+      throw new BadRequestException("qrPayload is required");
+    }
+
+    // Checker chỉ cần chuỗi QR, service tự verify chữ ký và đối chiếu DB.
+    const ticketSecret = this.config.get<string>(
+      "JWT_TICKET_SECRET",
+      "ticket-secret",
+    );
+
+    let payload: Record<string, unknown>;
+
+    try {
+      payload = verify(qrPayload, ticketSecret) as Record<string, unknown>;
+    } catch {
+      return { valid: false, ticket: null, reason: "Invalid signature" };
+    }
+
+    const ticketId =
+      typeof payload.ticket_id === "string" ? payload.ticket_id : null;
+    const ticketCode =
+      typeof payload.ticket_code === "string" ? payload.ticket_code : null;
+    const concertId =
+      typeof payload.concert_id === "string" ? payload.concert_id : null;
+    const ticketTypeId =
+      typeof payload.ticket_type_id === "string"
+        ? payload.ticket_type_id
+        : null;
+
+    if (!ticketId || !ticketCode || !concertId || !ticketTypeId) {
+      return { valid: false, ticket: null, reason: "Malformed QR payload" };
+    }
+
+    // Đối chiếu lại ticket thật trong DB để tránh QR giả hoặc QR đã bị sửa.
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: {
+        ticketType: { select: { name: true } },
+        order: {
+          select: {
+            id: true,
+            userId: true,
+            concertId: true,
+          },
+        },
+      },
+    });
+
+    if (
+      !ticket ||
+      ticket.ticketCode !== ticketCode ||
+      ticket.ticketTypeId !== ticketTypeId ||
+      ticket.order?.concertId !== concertId
+    ) {
+      return { valid: false, ticket: null, reason: "Ticket not found" };
+    }
+
+    const view = this.toTicketView(ticket as TicketRow);
+
+    if (ticket.status !== TicketStatus.ACTIVE) {
+      return {
+        valid: false,
+        ticket: view,
+        reason: `Ticket is ${ticket.status}`,
+      };
+    }
+
+    return {
+      valid: true,
+      ticket: view,
     };
+  }
+
+  private toTicketView(ticket: TicketRow): TicketViewDto {
+    return {
+      ticketId: ticket.id,
+      ticketCode: ticket.ticketCode,
+      qrPayload: ticket.qrPayload,
+      ticketTypeId: ticket.ticketTypeId,
+      ticketTypeName: ticket.ticketType.name,
+      ownerUserId: ticket.ownerUserId,
+      orderId: ticket.orderId,
+      concertId: ticket.order?.concertId ?? "",
+      status: ticket.status,
+      seatNumber: ticket.seatNumber,
+      scannedAt: ticket.scannedAt?.toISOString() ?? null,
+    };
+  }
+
+  private buildOwnershipFilter(requestingUser: AuthUser) {
+    return this.isAdmin(requestingUser)
+      ? {}
+      : { ownerUserId: requestingUser.id };
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    );
+  }
+
+  private getTicketQrExpiresAt(eventDate: Date): Date {
+    const graceMinutes = 60;
+    const expiresAt = new Date(eventDate.getTime() + graceMinutes * 60 * 1000);
+
+    // Đảm bảo QR không hết hạn trước giờ check-in, nhưng vẫn có đệm ngắn sau sự kiện.
+    return expiresAt;
+  }
+
+  private assertCanAccessOwnedResource(
+    ownerUserId: string,
+    requestingUser: AuthUser,
+  ) {
+    // Không cho customer truy cập ticket/order của người khác.
+    if (ownerUserId !== requestingUser.id && !this.isAdmin(requestingUser)) {
+      throw new ForbiddenException("You do not have permission");
+    }
+  }
+
+  private isAdmin(requestingUser: AuthUser): boolean {
+    return requestingUser.roles.some((role) => role.name === "admin");
   }
 }

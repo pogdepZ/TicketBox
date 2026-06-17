@@ -2,12 +2,16 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-} from '@nestjs/common';
-import { PrismaClient, TicketType, UserTicketQuota } from '../../generated/prisma';
+} from "@nestjs/common";
+import {
+  PrismaClient,
+  TicketType,
+  UserTicketQuota,
+} from "../../generated/prisma";
 
 type TransactionClient = Omit<
   PrismaClient,
-  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
 >;
 
 interface OrderItemInput {
@@ -72,21 +76,21 @@ export class TicketInventoryService {
 
       if (!tt) {
         throw new BadRequestException({
-          message: 'Invalid ticket type',
+          message: "Invalid ticket type",
           ticketTypeId: item.ticketTypeId,
         });
       }
 
       if (tt.concertId !== concertId) {
         throw new BadRequestException({
-          message: 'Invalid ticket type',
+          message: "Invalid ticket type",
           ticketTypeId: item.ticketTypeId,
         });
       }
 
-      if (tt.status !== 'ACTIVE') {
+      if (tt.status !== "ACTIVE") {
         throw new ConflictException({
-          message: 'Ticket type is not available',
+          message: "Ticket type is not available",
           ticketTypeId: item.ticketTypeId,
           status: tt.status,
         });
@@ -94,7 +98,7 @@ export class TicketInventoryService {
 
       if (tt.saleStartAt && now < tt.saleStartAt) {
         throw new ConflictException({
-          message: 'Ticket sale has not started yet',
+          message: "Ticket sale has not started yet",
           ticketTypeId: item.ticketTypeId,
           saleStartAt: tt.saleStartAt,
         });
@@ -102,7 +106,7 @@ export class TicketInventoryService {
 
       if (tt.saleEndAt && now > tt.saleEndAt) {
         throw new ConflictException({
-          message: 'Ticket sale has ended',
+          message: "Ticket sale has ended",
           ticketTypeId: item.ticketTypeId,
           saleEndAt: tt.saleEndAt,
         });
@@ -116,7 +120,7 @@ export class TicketInventoryService {
   checkInventory(ticketType: TicketType, quantity: number): void {
     if (ticketType.remaining < quantity) {
       throw new ConflictException({
-        message: 'Not enough tickets available',
+        message: "Not enough tickets available",
         ticketTypeId: ticketType.id,
         availableQuantity: ticketType.remaining,
         requested: quantity,
@@ -172,11 +176,11 @@ export class TicketInventoryService {
 
     if (total > maxPerUser) {
       throw new ConflictException({
-        message: 'Ticket limit exceeded',
+        message: "Ticket limit exceeded",
         maxPerUser,
-        held: quota.heldQuantity,
-        paid: quota.paidQuantity,
-        requested,
+        currentHeldQuantity: quota.heldQuantity,
+        currentPaidQuantity: quota.paidQuantity,
+        requestedQuantity: requested,
       });
     }
   }
