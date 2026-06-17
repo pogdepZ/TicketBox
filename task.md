@@ -1,14 +1,6 @@
-### Người D - Mobile Check-in + Integrations
-
-| ID | Nhóm việc | Task cụ thể tuần 2 | Kết quả bàn giao | Tiêu chí xong |
-| --- | --- | --- | --- | --- |
-| D1 | Checker auth mobile | Login checker, lưu accessToken an toàn, gọi profile. | Mobile auth. | Checker login được trên Expo app. |
-| D2 | Check-in scan online | POST /checkin/scan với ticketCode/QR. | CheckinModule thật. | ACCEPTED/DUPLICATE/INVALID hiển thị đúng. |
-| D3 | Check-in DB constraints | Đảm bảo ticket chỉ check-in success một lần; tạo CheckinLog. | Check-in logic. | Scan lần 2 bị duplicate. |
-| D4 | Offline queue | SQLite hoặc mock local queue: lưu pending scans khi offline. | Offline queue UI. | Tắt mạng/mock offline vẫn lưu scan. |
-| D5 | Sync API | POST /checkin/sync gửi batch pending scans. | Sync endpoint + mobile sync. | Online lại sync được, duplicate bị reject. |
-| D6 | Notification skeleton | NotificationModule: record notification, mock email/in-app. | Notification skeleton. | Payment success có thể tạo notification mock. |
-| D7 | AI Artist Bio upload | Upload file/text, set processing, mock worker set done/failed. | AiBio flow skeleton. | Admin upload, concert có artistBio mock. |
-| D8 | Guest List CSV | Import CSV, validate rows, duplicate handling, summary result. | GuestList flow. | CSV lỗi dòng nào báo dòng đó, không crash toàn bộ. |
-| D9 | Integration specs | Update specs/checkin.md, notification.md, ai-artist-bio.md, guest-list.md. | Specs cập nhật. | Có flow lỗi mất mạng, duplicate, file sai, AI fail. |
-| D10 | Mobile demo script | Chuẩn bị demo scan QR hợp lệ/trùng/sai + sync offline. | demo-mobile.md. | Demo 3 case scan rõ ràng. |
+| Week | Owner | App/Module | Task ID | Priority | Status | Nhóm việc | Task cụ thể | Kết quả sau task | Tiêu chí nghiệm thu | Dependencies | Ghi chú kỹ thuật | Demo/Proof | Update Type |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Tuần 1 | Người D | apps/checkin-mobile | D-W1-01 | P0 | Done | Khởi tạo Expo mobile app | Khởi tạo dự án Expo trong apps/checkin-mobile, cấu hình TypeScript, env API URL, scripts pnpm/turbo. | Mobile app chạy được trên emulator/device. | `pnpm dev mobile` hoặc `expo start` mở được app hello screen. | Monorepo scripts | Không để thư mục mobile trống sau tuần 1. | Screenshot app chạy. | NEW/CRITICAL |
+| Tuần 1 | Người D | apps/checkin-mobile - SQLite | D-W1-02 | P0 | Done | SQLite local schema | Cài `expo-sqlite` và tạo bảng local: `concert_cache`, `ticket_snapshot`, `guest_snapshot`, `checkin_log`, `sync_log`. | Mobile có storage offline thật để chuẩn bị scan khi mất mạng. | Mở app lần đầu tạo DB; log debug thấy bảng tồn tại. | Expo app init | Cần version schema/migration đơn giản để tránh lỗi khi đổi cấu trúc. | SQLite inspector/log. | NEW |
+| Tuần 1 | Người D | apps/checkin-mobile - Camera | D-W1-03 | P0 | Done | Scanner UI bằng camera | Cài `expo-camera`/`expo-barcode-scanner`, tạo màn hình quét QR và màn hình kết quả xanh/đỏ. | Staff có giao diện quét QR ban đầu. | Quét QR mẫu → app đọc được payload và hiện kết quả parse. | Expo app init | Tuần 1 có thể verify chữ ký sau; trước mắt đọc payload đúng. | Video scan QR mẫu. | NEW |
+| Tuần 1 | Người D | apps/checkin-mobile - Snapshot UI | D-W1-04 | P1 | Done | Màn hình tải snapshot offline | Tạo màn hình chọn concert và tải dữ liệu snapshot vào SQLite; tuần 1 có thể dùng API mock/seed để hoàn thiện UI. | Có luồng chuẩn bị dữ liệu trước sự kiện. | Bấm Download Snapshot → SQLite có số lượng ticket/guest cache. | SQLite schema, backend snapshot tuần 2 | Snapshot cần lưu `publicKey`/`version`/`downloadedAt`. | Ảnh UI snapshot + DB row count. | NEW |

@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
 import { apiService } from '../services/api';
 import { queueService } from '../services/queue';
@@ -26,47 +27,15 @@ import type { RootStackParamList, TicketInfo, ScanStatus, OfflineQueueItem } fro
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Scanner'>;
 
 const MOCK_CONCERT = {
-  id: 'concert-001',
+  id: 'a35ba9c7-89e4-425c-9d00-8016ac4afc3d',
   name: 'Sơn Tùng M-TP - Sky Tour 2026',
 };
 
-const MOCK_TICKETS: Record<ScanStatus, TicketInfo> = {
-  SUCCESS: {
-    ticketId: 'ticket-001',
-    guestName: 'Nguyễn Văn An',
-    ticketType: 'VIP',
-    ticketCode: 'TKB-2026-VIP-001',
-    concertName: MOCK_CONCERT.name,
-    checkedInAt: new Date().toISOString(),
-    status: 'SUCCESS',
-  },
-  DUPLICATE: {
-    ticketId: 'ticket-002',
-    guestName: 'Trần Thị Bình',
-    ticketType: 'SVIP',
-    ticketCode: 'TKB-2026-SVIP-002',
-    concertName: MOCK_CONCERT.name,
-    checkedInAt: new Date().toISOString(),
-    status: 'DUPLICATE',
-  },
-  NOT_FOUND: {
-    ticketId: 'ticket-unknown',
-    guestName: 'Không xác định',
-    ticketType: 'N/A',
-    ticketCode: 'INVALID-CODE',
-    concertName: MOCK_CONCERT.name,
-    checkedInAt: new Date().toISOString(),
-    status: 'NOT_FOUND',
-  },
-  WRONG_EVENT: {
-    ticketId: 'ticket-003',
-    guestName: 'Lê Hoàng Cường',
-    ticketType: 'GA',
-    ticketCode: 'TKB-2026-GA-003',
-    concertName: 'Concert khác - Không phải sự kiện hiện tại',
-    checkedInAt: new Date().toISOString(),
-    status: 'WRONG_EVENT',
-  },
+const MOCK_TICKETS: Record<ScanStatus, { ticketCode: string }> = {
+  SUCCESS: { ticketCode: 'TKB-2026-VIP-001' },
+  DUPLICATE: { ticketCode: 'TKB-2026-SVIP-002' },
+  NOT_FOUND: { ticketCode: 'INVALID-CODE' },
+  WRONG_EVENT: { ticketCode: 'TKB-2026-GA-003' },
 };
 
 const SCAN_BUTTONS: { status: ScanStatus; label: string; color: string; tone: string }[] = [
@@ -80,29 +49,39 @@ export default function ScannerScreen() {
   const navigation = useNavigation<NavigationProp>();
   const [isOffline, setIsOffline] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
 
-  const handleScan = async (status: ScanStatus) => {
+  const handleScan = async (qrData: string) => {
     if (scanning) return;
     setScanning(true);
 
-    const mockTicket = MOCK_TICKETS[status];
-    
+    // Xử lý quét qua QR text thay vì mock status
+    const mockTicket = MOCK_TICKETS.SUCCESS; // Dự phòng
+    const qrCodeDataToScan = qrData || mockTicket.ticketCode;
+
     // Attempt online scan
     try {
       const userStr = await AsyncStorage.getItem('auth_user');
       const user = userStr ? JSON.parse(userStr) : null;
-      const staffId = user?.id || 'staff-001';
-      const deviceId = 'device-A'; // Should come from settings in real app
+      // Provide valid UUIDs as fallbacks to prevent Prisma crash on backend
+      const staffId = user?.id || '00000000-0000-0000-0000-000000000001';
+      const deviceId = '00000000-0000-0000-0000-000000000002';
 
       const payload = {
-        qrCodeData: mockTicket.ticketCode,
+        qrCodeData: qrCodeDataToScan,
         staffId,
         concertId: MOCK_CONCERT.id,
         deviceId,
         clientEventId: `scan-${Date.now()}`,
       };
 
+      // In payload ra màn hình Console để debug
+      console.log("\n🚀 [DEBUG] PAYLOAD GỬI LÊN SERVER:");
+      console.log(JSON.stringify(payload, null, 2));
+
       const response = await apiService.post<TicketInfo>('/checkin/scan', payload);
+
+      console.log("response ticket>>>>>>:", response)
 
       if (response.success && response.data) {
         setIsOffline(false);
@@ -110,16 +89,16 @@ export default function ScannerScreen() {
       } else {
         // If API fails with error or timeout, treat as offline
         const isNetworkError = !response.data || response.message?.toLowerCase().includes('fetch') || response.message?.toLowerCase().includes('timeout');
-        
+
         if (isNetworkError) {
           setIsOffline(true);
           const checkedAt = new Date().toISOString();
-          
+
           const offlineItem: OfflineQueueItem = {
             id: `q-${Date.now()}`,
-            ticketId: mockTicket.ticketId,
-            ticketCode: mockTicket.ticketCode,
-            qrCodeData: mockTicket.ticketCode,
+            ticketId: 'offline-ticket', // Can't know actual ID offline
+            ticketCode: qrCodeDataToScan,
+            qrCodeData: qrCodeDataToScan,
             concertId: MOCK_CONCERT.id,
             staffId,
             sourceDeviceId: deviceId,
@@ -135,7 +114,11 @@ export default function ScannerScreen() {
 
           // Construct a display ticket for offline
           const displayTicket: TicketInfo = {
-            ...mockTicket, // Use mock info for display since we can't fetch it
+            ticketId: 'offline-ticket',
+            ticketCode: qrCodeDataToScan,
+            guestName: 'Đang tải (Offline)',
+            ticketType: '---',
+            concertName: MOCK_CONCERT.name,
             checkedInAt: checkedAt,
             status: 'SUCCESS', // Always allow in offline mode
           };
@@ -149,9 +132,31 @@ export default function ScannerScreen() {
     } catch (e) {
       console.error(e);
     } finally {
-      setScanning(false);
+      // Đợi 2s trước khi cho phép quét tiếp
+      setTimeout(() => setScanning(false), 2000);
     }
   };
+
+  // Helper cho các nút mock (Developer Tools)
+  const handleMockScan = (status: ScanStatus) => {
+    const mockTicket = MOCK_TICKETS[status];
+    handleScan(mockTicket.ticketCode);
+  };
+
+  if (!permission) {
+    return <View />; // Lần render đầu
+  }
+
+  if (!permission.granted) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: 'white', marginBottom: 20 }}>Chúng tôi cần quyền sử dụng Camera để quét vé.</Text>
+        <TouchableOpacity style={styles.scanButton} onPress={requestPermission}>
+          <Text style={styles.scanButtonText}>Cấp quyền Camera</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -175,34 +180,35 @@ export default function ScannerScreen() {
           <Text style={styles.cameraSectionLabel}>Khung quét</Text>
           <Text style={styles.scanCounter}>128 vào cổng</Text>
         </View>
-        <View style={styles.cameraFrame}>
-          <View style={styles.cameraGridLineV} />
-          <View style={styles.cameraGridLineH} />
-          <View style={[styles.corner, styles.cornerTL]} />
-          <View style={[styles.corner, styles.cornerTR]} />
-          <View style={[styles.corner, styles.cornerBL]} />
-          <View style={[styles.corner, styles.cornerBR]} />
+        <CameraView
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          barcodeScannerSettings={{
+            barcodeTypes: ["qr"],
+          }}
+          onBarcodeScanned={({ data }) => handleScan(data)}
+        />
+        <View style={styles.cameraGridLineV} />
+        <View style={styles.cameraGridLineH} />
+        <View style={[styles.corner, styles.cornerTL]} />
+        <View style={[styles.corner, styles.cornerTR]} />
+        <View style={[styles.corner, styles.cornerBL]} />
+        <View style={[styles.corner, styles.cornerBR]} />
 
-          <View style={styles.scanLine} />
-          <Text style={styles.cameraText}>Sẵn sàng</Text>
-          <Text style={styles.cameraHint}>Đưa QR vào vùng sáng</Text>
-          <Text style={styles.cameraSubHint}>
-            Mã hợp lệ sẽ chuyển sang màn hình kết quả ngay lập tức
-          </Text>
-        </View>
+        <View style={[styles.scanLine, scanning && { backgroundColor: COLORS.success }]} />
       </View>
 
       <View style={styles.buttonsContainer}>
         <View style={styles.buttonsHeader}>
-          <Text style={styles.buttonsTitle}>Mô phỏng quét</Text>
-          <Text style={styles.buttonsHint}>Chọn trạng thái để test luồng</Text>
+          <Text style={styles.buttonsTitle}>Developer Tools: Mô phỏng quét</Text>
+          <Text style={styles.buttonsHint}>Hỗ trợ test nhanh trên máy ảo</Text>
         </View>
         <View style={styles.buttonGrid}>
           {SCAN_BUTTONS.map((btn) => (
             <TouchableOpacity
               key={btn.status}
               style={[styles.scanButton, { borderColor: btn.color + '66' }]}
-              onPress={() => handleScan(btn.status)}
+              onPress={() => handleMockScan(btn.status)}
               activeOpacity={0.82}
             >
               <View style={[styles.scanTone, { backgroundColor: btn.color + '20' }]}>

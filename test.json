@@ -1,0 +1,80 @@
+{
+  "info": {
+    "name": "TicketBox Sprint D - Mobile Check-in & Integration Skeletons",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "D2. Quét vé (Online)",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "url": {
+          "raw": "http://localhost:3000/checkin/scan",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["checkin", "scan"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"qrCodeData\": \"TKB-2026-VIP-001\",\n  \"staffId\": \"00000000-0000-0000-0000-000000000001\",\n  \"concertId\": \"a35ba9c7-89e4-425c-9d00-8016ac4afc3d\",\n  \"deviceId\": \"00000000-0000-0000-0000-000000000002\",\n  \"clientEventId\": \"scan-123456789\"\n}"
+        }
+      }
+    },
+    {
+      "name": "D5. Đồng bộ vé Offline (Sync)",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "url": {
+          "raw": "http://localhost:3000/checkin/sync",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["checkin", "sync"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    {\n      \"ticketId\": \"f478c73e-0a3e-4629-9997-196085466e0b\",\n      \"qrCodeData\": \"TKB-2026-VIP-001\",\n      \"concertId\": \"a35ba9c7-89e4-425c-9d00-8016ac4afc3d\",\n      \"staffId\": \"00000000-0000-0000-0000-000000000001\",\n      \"sourceDeviceId\": \"00000000-0000-0000-0000-000000000002\",\n      \"checkedAt\": \"2026-06-16T12:00:00Z\"\n    }\n  ]\n}"
+        }
+      }
+    },
+    {
+      "name": "D7. Upload file AI Artist Bio",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:3000/admin/concerts/a35ba9c7-89e4-425c-9d00-8016ac4afc3d/artist-bio/upload",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["admin", "concerts", "a35ba9c7-89e4-425c-9d00-8016ac4afc3d", "artist-bio", "upload"]
+        },
+        "body": {
+          "mode": "formdata",
+          "formdata": [ { "key": "file", "type": "file", "src": [] } ]
+        }
+      }
+    },
+    {
+      "name": "D8. Import file CSV Guest List",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:3000/admin/concerts/a35ba9c7-89e4-425c-9d00-8016ac4afc3d/guest-list/import",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["admin", "concerts", "a35ba9c7-89e4-425c-9d00-8016ac4afc3d", "guest-list", "import"]
+        },
+        "body": {
+          "mode": "formdata",
+          "formdata": [ { "key": "file", "type": "file", "src": [] } ]
+        }
+      }
+    }
+  ]
+}

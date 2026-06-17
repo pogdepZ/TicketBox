@@ -59,6 +59,8 @@ export default function ResultScreen() {
   const route = useRoute<ResultRouteProp>();
   const { ticket, isOffline } = route.params;
 
+  console.log("ticket", ticket)
+
   const config = STATUS_CONFIG[ticket.status as ScanStatus] || {
     label: `Lỗi: Status là "${ticket.status}"`,
     code: 'ERR',

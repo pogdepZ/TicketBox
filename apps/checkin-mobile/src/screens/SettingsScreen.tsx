@@ -89,6 +89,12 @@ export default function SettingsScreen() {
 
         <View style={{ marginTop: SPACING.xxxl }}>
           <Button
+            title="📥 Tải dữ liệu Offline (Snapshot)"
+            onPress={() => navigation.navigate('Snapshot')}
+            variant="primary"
+            style={{ marginBottom: SPACING.md }}
+          />
+          <Button
             title="🔍 In dữ liệu lưu trữ (Console)"
             onPress={debugStorage}
             variant="secondary"

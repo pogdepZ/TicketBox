@@ -15,6 +15,7 @@ import ResultScreen from '../screens/ResultScreen';
 import OfflineQueueScreen from '../screens/OfflineQueueScreen';
 import SyncHistoryScreen from '../screens/SyncHistoryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import SnapshotScreen from '../screens/SnapshotScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -89,6 +90,11 @@ export default function AppNavigator() {
           name="Settings"
           component={SettingsScreen}
           options={{ title: 'Cài đặt' }}
+        />
+        <Stack.Screen
+          name="Snapshot"
+          component={SnapshotScreen}
+          options={{ title: 'Tải dữ liệu Offline' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
