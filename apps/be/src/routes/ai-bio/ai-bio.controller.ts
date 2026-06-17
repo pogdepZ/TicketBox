@@ -13,12 +13,6 @@ export class AiBioController {
     @Param('id') concertId: string,
     @UploadedFile() file: UploadedFileDto,
   ) {
-    const data = await this.aiBioService.generateBioFromPdf(concertId, file);
-
-    return {
-      success: true,
-      data,
-      message: 'Artist bio generated successfully from PDF',
-    };
+    return this.aiBioService.generateBioFromPdf(concertId, file);
   }
 }

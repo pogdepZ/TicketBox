@@ -9,23 +9,11 @@ export class CheckinController {
 
   @Post('scan')
   async scan(@Body() dto: ScanCheckinDto) {
-    const data = await this.checkinService.scan(dto);
-
-    return {
-      success: true,
-      data,
-      message: 'Check-in processed successfully',
-    };
+    return this.checkinService.scan(dto);
   }
 
   @Post('sync')
   async sync(@Body() dto: SyncCheckinDto) {
-    const data = await this.checkinService.sync(dto);
-
-    return {
-      success: true,
-      data,
-      message: `Synced ${dto.items.length} check-in records`,
-    };
+    return this.checkinService.sync(dto);
   }
 }

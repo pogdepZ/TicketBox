@@ -21,6 +21,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guard/jwt-auth.guard';
 import { RolesGuard } from '../auth/guard/roles.guard';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
+import { PermissionGuard } from '../auth/guard/permission.guard';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard)
@@ -33,13 +34,12 @@ export class OrdersController {
    * Bắt buộc header Idempotency-Key.
    */
   @Post()
-  @UseGuards(RolesGuard)
+  @UseGuards(PermissionGuard)
   @RequirePermissions('order:create')
   async create(
     @Body() dto: CreateOrderDto,
     @CurrentUser() user: AuthUser,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Res() res: Response,
   ) {
     if (!idempotencyKey) {
       throw new BadRequestException('Idempotency-Key is required');
@@ -47,10 +47,7 @@ export class OrdersController {
 
     const result = await this.ordersService.createOrder(user, dto, idempotencyKey);
 
-    return res.status(result.status).json({
-      success: true,
-      data: result.body,
-    });
+    return result;
   }
 
   /**
@@ -62,11 +59,7 @@ export class OrdersController {
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
   ) {
-    const order = await this.ordersService.getOrder(id, user);
-    return {
-      success: true,
-      data: order,
-    };
+    return this.ordersService.getOrder(id, user);
   }
 
   /**
@@ -79,11 +72,6 @@ export class OrdersController {
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
   ) {
-    const order = await this.ordersService.cancelOrder(id, user.id);
-    return {
-      success: true,
-      data: order,
-      message: 'Order cancelled successfully',
-    };
+    return this.ordersService.cancelOrder(id, user.id);
   }
 }

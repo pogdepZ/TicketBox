@@ -60,7 +60,7 @@ export class OrdersService {
     user: AuthUser,
     dto: CreateOrderDto,
     idempotencyKey: string | undefined,
-  ): Promise<{ status: number; body: OrderResponseDto }> {
+  ): Promise<OrderResponseDto> {
     // Bước 1: bắt buộc Idempotency-Key
     if (!idempotencyKey || idempotencyKey.trim() === "") {
       throw new BadRequestException("Idempotency-Key is required");
@@ -71,7 +71,7 @@ export class OrdersService {
     // Bước 2: Kiểm tra idempotency (Redis → DB)
     const cached = await this.idempotency.check(idempotencyKey, requestHash);
     if (cached) {
-      return { status: cached.status, body: cached.body as OrderResponseDto };
+      return cached.body as OrderResponseDto;
     }
 
     // Bước 3: Rate limit theo userId
@@ -120,7 +120,7 @@ export class OrdersService {
         IdempotencyStatus.COMPLETED,
       );
 
-      return { status: 201, body: responseBody };
+      return responseBody;
     } catch (error) {
       await this.idempotency.markFailed(idempotencyKey);
       throw error;

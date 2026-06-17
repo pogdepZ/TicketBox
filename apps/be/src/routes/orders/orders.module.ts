@@ -15,7 +15,7 @@ import { RolesGuard } from '../auth/guard/roles.guard';
   imports: [
     PrismaModule,
     AuthModule,  // exports JwtAuthGuard, RolesGuard via Reflector
-    TicketsModule,
+    TicketsModule,  
   ],
   controllers: [OrdersController],
   providers: [

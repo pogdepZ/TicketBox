@@ -13,12 +13,6 @@ export class GuestListController {
     @Param('id') concertId: string,
     @UploadedFile() file: UploadedFileDto,
   ) {
-    const data = await this.guestListService.importFromCsv(concertId, file);
-
-    return {
-      success: true,
-      data,
-      message: `Imported ${data.imported} guests, ${data.duplicates} duplicates skipped`,
-    };
+    return this.guestListService.importFromCsv(concertId, file);
   }
 }
