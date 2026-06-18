@@ -103,6 +103,18 @@ export class OrdersService {
     try {
       const responseBody = await this.runCreateOrderTransaction(user, dto, idempotencyKey);
 
+      // Sau khi DB transaction thành công, set thêm Redis key cho từng ghế
+      const redisTTL = RESERVATION_TTL_MINUTES * 60; // 10 * 60 = 600s
+      const normalizedSeats = dto.seatNumbers.map((s) => s.trim().toUpperCase());
+      for (const seatNumber of normalizedSeats) {
+        const key = `hold:seat:${dto.concertId}:${seatNumber}`;
+        try {
+          await this.redis.setJson(key, responseBody.reservationId || responseBody.orderId, redisTTL);
+        } catch (err) {
+          this.logger.warn(`Failed to set Redis lock for seat ${seatNumber}: ${(err as any).message}`);
+        }
+      }
+
       // Lưu vào idempotency store (COMPLETED)
       await this.idempotency.store(
         idempotencyKey,
@@ -127,7 +139,9 @@ export class OrdersService {
     dto: CreateOrderDto,
     idempotencyKey: string,
   ): Promise<OrderResponseDto> {
-    const ticketTypeIds = dto.items.map((i) => i.ticketTypeId);
+    const normalizedSeats = dto.seatNumbers.map((s) => s.trim().toUpperCase());
+    const quantity = normalizedSeats.length;
+    const ticketTypeIds = [dto.ticketTypeId];
 
     return this.prisma.$transaction(async (tx) => {
       // ── Bước 5: Lock TicketType rows FOR UPDATE ──
@@ -148,28 +162,61 @@ export class OrdersService {
       }
 
       // ── Bước 7: Validate ticket types (status, concertId, sale window) ──
-      this.inventory.validateTicketTypes(ticketTypes, dto.concertId, dto.items);
+      this.inventory.validateTicketTypes(ticketTypes, dto.concertId, [
+        { ticketTypeId: dto.ticketTypeId, quantity },
+      ]);
 
       // ── Bước 8+9+10: Check tồn kho và quota per item ──
-      const enrichedItems: Array<{
-        ticketType: TicketType;
-        quantity: number;
-      }> = [];
+      const tt = ticketTypes.find((t) => t.id === dto.ticketTypeId);
+      if (!tt) {
+        throw new BadRequestException({
+          message: 'Invalid ticket type',
+          ticketTypeId: dto.ticketTypeId,
+        });
+      }
 
-      for (const item of dto.items) {
-        const tt = ticketTypes.find((t) => t.id === item.ticketTypeId)!;
+      this.inventory.checkInventory(tt, quantity);
 
-        this.inventory.checkInventory(tt, item.quantity);
+      // Lock/upsert quota và check
+      const quota = await this.inventory.lockOrUpsertQuota(
+        tx as any,
+        user.id,
+        dto.ticketTypeId,
+      );
+      //this.inventory.checkQuota(quota, tt.maxPerUser, quantity);
 
-        // Lock/upsert quota và check
-        const quota = await this.inventory.lockOrUpsertQuota(
-          tx as any,
-          user.id,
-          item.ticketTypeId,
-        );
-        //this.inventory.checkQuota(quota, tt.maxPerUser, item.quantity);
+      // ── Kiểm tra ghế đã bán hoặc đang giữ ──
+      const now = new Date();
 
-        enrichedItems.push({ ticketType: tt, quantity: item.quantity });
+      // Check if seats are sold (using tickets table)
+      const soldTickets = await tx.ticket.findMany({
+        where: {
+          concertId: dto.concertId,
+          seatNumber: { in: normalizedSeats },
+          status: { in: ['ACTIVE', 'USED'] },
+        },
+        select: { seatNumber: true },
+      });
+      const soldSeats = soldTickets.map((t) => t.seatNumber).filter(Boolean) as string[];
+
+      // Check if seats are held (using reservation_seats table)
+      const heldSeats = await tx.reservationSeat.findMany({
+        where: {
+          concertId: dto.concertId,
+          seatNumber: { in: normalizedSeats },
+          status: 'HELD',
+          expiresAt: { gt: now },
+        },
+        select: { seatNumber: true },
+      });
+      const heldSeatNumbers = heldSeats.map((s) => s.seatNumber).filter(Boolean) as string[];
+
+      const conflictSeats = Array.from(new Set([...soldSeats, ...heldSeatNumbers]));
+      if (conflictSeats.length > 0) {
+        throw new ConflictException({
+          message: 'Some seats are already sold or held',
+          conflictSeats,
+        });
       }
 
       // ── Bước 11: Tạo Reservation ──
@@ -187,20 +234,29 @@ export class OrdersService {
       });
 
       // ── Bước 12: Tạo ReservationItem ──
-      await tx.reservationItem.createMany({
-        data: enrichedItems.map((e) => ({
+      await tx.reservationItem.create({
+        data: {
           reservationId: reservation.id,
-          ticketTypeId: e.ticketType.id,
-          quantity: e.quantity,
-          unitPrice: e.ticketType.price,
+          ticketTypeId: dto.ticketTypeId,
+          quantity,
+          unitPrice: tt.price,
+        },
+      });
+
+      // ── Bước 12.5: Tạo ReservationSeat ──
+      await tx.reservationSeat.createMany({
+        data: normalizedSeats.map((seatNumber) => ({
+          reservationId: reservation.id,
+          concertId: dto.concertId,
+          ticketTypeId: dto.ticketTypeId,
+          seatNumber,
+          status: 'HELD',
+          expiresAt,
         })),
       });
 
       // ── Bước 13: Tính totalAmount và tạo Order ──
-      const totalAmount = enrichedItems.reduce(
-        (sum, e) => sum + Number(e.ticketType.price) * e.quantity,
-        0,
-      );
+      const totalAmount = Number(tt.price) * quantity;
 
       const order = await tx.order.create({
         data: {
@@ -215,49 +271,39 @@ export class OrdersService {
       });
 
       // ── Bước 14: Tạo OrderItem ──
-      await tx.orderItem.createMany({
-        data: enrichedItems.map((e) => ({
+      await tx.orderItem.create({
+        data: {
           orderId: order.id,
-          ticketTypeId: e.ticketType.id,
-          quantity: e.quantity,
-          unitPrice: e.ticketType.price,
-        })),
+          ticketTypeId: dto.ticketTypeId,
+          quantity,
+          unitPrice: tt.price,
+        },
       });
 
       // ── Bước 15: Cập nhật tồn kho và quota atomically ──
-      for (const e of enrichedItems) {
-        // Giảm remaining
-        await tx.$executeRawUnsafe(
-          `UPDATE ticket_types SET remaining = remaining - $1 WHERE id = $2::uuid`,
-          e.quantity,
-          e.ticketType.id,
-        );
+      // Giảm remaining
+      await tx.$executeRaw`UPDATE ticket_types SET remaining = remaining - ${quantity} WHERE id = ${dto.ticketTypeId}::uuid`;
 
-        // Tăng heldQuantity
-        await tx.$executeRawUnsafe(
-          `UPDATE user_ticket_quotas
-           SET held_quantity = held_quantity + $1, updated_at = NOW()
-           WHERE user_id = $2::uuid AND ticket_type_id = $3::uuid`,
-          e.quantity,
-          user.id,
-          e.ticketType.id,
-        );
-      }
+      // Tăng heldQuantity
+      await tx.$executeRaw`UPDATE user_ticket_quotas
+         SET held_quantity = held_quantity + ${quantity}, updated_at = NOW()
+         WHERE user_id = ${user.id}::uuid AND ticket_type_id = ${dto.ticketTypeId}::uuid`;
 
       // ── Bước 16: Build response ──
-      const items: OrderItemResponseDto[] = enrichedItems.map((e) => ({
-        ticketTypeId: e.ticketType.id,
-        name: e.ticketType.name,
-        quantity: e.quantity,
-        unitPrice: decimalToString(e.ticketType.price),
-        lineTotal: decimalToString(
-          Number(e.ticketType.price) * e.quantity,
-        ),
-      }));
+      const items: OrderItemResponseDto[] = [
+        {
+          ticketTypeId: dto.ticketTypeId,
+          name: tt.name,
+          quantity,
+          unitPrice: decimalToString(tt.price),
+          lineTotal: decimalToString(totalAmount),
+        },
+      ];
 
       return {
         orderId: order.id,
         concertId: order.concertId,
+        reservationId: reservation.id,
         status: order.status,
         totalAmount: decimalToString(totalAmount),
         currency: 'VND',
@@ -321,14 +367,26 @@ export class OrdersService {
       });
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await this.txHelper.releaseOrder(
+    const result = await this.prisma.$transaction(async (tx) => {
+      return this.txHelper.releaseOrder(
         tx as any,
         orderId,
         OrderStatus.CANCELLED,
         ReservationStatus.CANCELLED,
       );
     });
+
+    // Clean up Redis keys for released seats
+    if (result && result.releasedSeats) {
+      for (const seat of result.releasedSeats) {
+        const key = `hold:seat:${seat.concertId}:${seat.seatNumber}`;
+        try {
+          await this.redis.del(key);
+        } catch (err) {
+          this.logger.warn(`Failed to delete Redis key on order cancellation: ${(err as any).message}`);
+        }
+      }
+    }
 
     const updated = await this.prisma.order.findUniqueOrThrow({
       where: { id: orderId },

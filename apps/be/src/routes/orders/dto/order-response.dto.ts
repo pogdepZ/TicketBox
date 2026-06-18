@@ -11,6 +11,7 @@ export interface OrderItemResponseDto {
 export interface OrderResponseDto {
   orderId: string;
   concertId: string;
+  reservationId?: string;
   status: string;
   totalAmount: string;
   currency: 'VND';

@@ -310,7 +310,6 @@ export class PaymentGatewayService {
         extraData,
         signature,
         // Tham số quy định thời gian hết hạn của link MoMo
-        resultCode: 0,
         expireTime: expireTimeMinutes,
       }),
     });

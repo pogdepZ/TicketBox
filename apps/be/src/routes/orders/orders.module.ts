@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { IdempotencyService } from './idempotency.service';
@@ -25,7 +24,6 @@ import { RolesGuard } from '../auth/guard/roles.guard';
     OrderTransactionHelper,
     OrderExpirationJob,
     RolesGuard,
-    Reflector,
   ],
   exports: [OrdersService, OrderTransactionHelper],
 })

@@ -102,10 +102,7 @@ export class PaymentsService {
     await this.circuitBreaker.assertAvailable(dto.provider as Provider);
 
     const paymentRequest = await this.prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe(
-        `SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`,
-        dto.orderId,
-      );
+      await tx.$executeRaw`SELECT id FROM orders WHERE id = ${dto.orderId}::uuid FOR UPDATE`;
 
       const order = await tx.order.findUnique({
         where: { id: dto.orderId },
@@ -175,18 +172,25 @@ export class PaymentsService {
       };
     });
 
-    const paymentUrl = await this.gateway.buildPaymentUrl(
-      paymentRequest.provider as Provider,
-      paymentRequest.paymentRef,
-      paymentRequest.amount,
-      new Date(paymentRequest.expiresAt),
-      dto.returnUrl,
-    );
+    try {
+      const paymentUrl = await this.gateway.buildPaymentUrl(
+        paymentRequest.provider as Provider,
+        paymentRequest.paymentRef,
+        paymentRequest.amount,
+        new Date(paymentRequest.expiresAt),
+        dto.returnUrl,
+      );
 
-    return {
-      ...paymentRequest,
-      paymentUrl,
-    };
+      await this.circuitBreaker.recordSuccess(paymentRequest.provider as Provider);
+
+      return {
+        ...paymentRequest,
+        paymentUrl,
+      };
+    } catch (error) {
+      await this.circuitBreaker.recordFailure(paymentRequest.provider as Provider);
+      throw error;
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -235,6 +239,16 @@ export class PaymentsService {
         orderStatus: order.status,
         paymentStatus: this.toPaymentStatus(order.status as OrderStatus),
         retryAction: this.toRetryAction(order.status as OrderStatus),
+      };
+    }
+
+    if (!isNew && status === 'PROCESSING') {
+      // Đang có tiến trình khác xử lý → không xử lý song song
+      return {
+        processed: false,
+        orderStatus: order.status,
+        paymentStatus: this.toPaymentStatus(order.status as OrderStatus),
+        retryAction: 'WAIT_AND_RETRY',
       };
     }
 
@@ -341,10 +355,7 @@ export class PaymentsService {
   ): Promise<string> {
     const result = await this.prisma.$transaction(async (tx) => {
       // Lock order FOR UPDATE
-      await tx.$executeRawUnsafe(
-        `SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`,
-        orderId,
-      );
+      await tx.$executeRaw`SELECT id FROM orders WHERE id = ${orderId}::uuid FOR UPDATE`;
 
       const order = await tx.order.findUniqueOrThrow({
         where: { id: orderId },
@@ -418,17 +429,14 @@ export class PaymentsService {
 
       // Chuyển heldQuantity → paidQuantity per item
       for (const item of order.items) {
-        await tx.$executeRawUnsafe(
-          `UPDATE user_ticket_quotas
+        await tx.$executeRaw`
+          UPDATE user_ticket_quotas
            SET
-             held_quantity = GREATEST(0, held_quantity - $1),
-             paid_quantity = paid_quantity + $1,
+             held_quantity = GREATEST(0, held_quantity - ${item.quantity}),
+             paid_quantity = paid_quantity + ${item.quantity},
              updated_at = NOW()
-           WHERE user_id = $2::uuid AND ticket_type_id = $3::uuid`,
-          item.quantity,
-          order.userId,
-          item.ticketTypeId,
-        );
+           WHERE user_id = ${order.userId}::uuid AND ticket_type_id = ${item.ticketTypeId}::uuid
+        `;
       }
 
       // Sinh tickets
@@ -460,10 +468,7 @@ export class PaymentsService {
 
   private async handleFailed(orderId: string): Promise<string> {
     return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe(
-        `SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`,
-        orderId,
-      );
+      await tx.$executeRaw`SELECT id FROM orders WHERE id = ${orderId}::uuid FOR UPDATE`;
 
       const order = await tx.order.findUniqueOrThrow({
         where: { id: orderId },

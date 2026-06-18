@@ -2,8 +2,8 @@ import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
 export const isoDateStringSchema = z.union([
-  z.iso.datetime({ offset: true }),
-  z.iso.date(),
+  z.string().datetime({ offset: true }),
+  z.string().date(),
 ]);
 
 export const createConcertSchema = z

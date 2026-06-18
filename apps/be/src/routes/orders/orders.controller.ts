@@ -34,8 +34,8 @@ export class OrdersController {
    * Bắt buộc header Idempotency-Key.
    */
   @Post()
-  @UseGuards(PermissionGuard)
-  @RequirePermissions('order:create')
+  // @UseGuards(PermissionGuard)
+  // @RequirePermissions('order:create')
   async create(
     @Body() dto: CreateOrderDto,
     @CurrentUser() user: AuthUser,

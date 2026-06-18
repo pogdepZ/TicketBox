@@ -266,6 +266,8 @@ model Concert {
   artistAssets        ArtistAsset[]
   checkinDevices      CheckinDevice[]
   waitingRoomSessions WaitingRoomSession[]
+  tickets             Ticket[]
+  reservationSeats    ReservationSeat[]
 
   @@index([status, eventDate])
   @@map("concerts")
@@ -321,6 +323,7 @@ model TicketType {
   orderItems       OrderItem[]
   tickets          Ticket[]
   quotas           UserTicketQuota[]
+  reservationSeats ReservationSeat[]
 
   @@unique([concertId, name])
   @@index([concertId])
@@ -346,8 +349,9 @@ model Reservation {
   user    User    @relation(fields: [userId], references: [id])
   concert Concert @relation(fields: [concertId], references: [id])
 
-  items ReservationItem[]
-  order Order?
+  items            ReservationItem[]
+  order            Order?
+  reservationSeats ReservationSeat[]
 
   @@index([userId])
   @@index([status, expiresAt])
@@ -368,6 +372,28 @@ model ReservationItem {
   @@unique([reservationId, ticketTypeId])
   @@index([ticketTypeId])
   @@map("reservation_items")
+}
+
+model ReservationSeat {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reservationId String   @map("reservation_id") @db.Uuid
+  concertId     String   @map("concert_id") @db.Uuid
+  ticketTypeId  String   @map("ticket_type_id") @db.Uuid
+  seatNumber    String   @map("seat_number") @db.VarChar(30)
+  status        String   // HELD, CONFIRMED, RELEASED, EXPIRED
+  expiresAt     DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  ticketType  TicketType  @relation(fields: [ticketTypeId], references: [id])
+  concert     Concert     @relation(fields: [concertId], references: [id])
+
+  @@index([concertId, seatNumber])
+  @@index([reservationId])
+  @@index([ticketTypeId])
+  @@index([status, expiresAt])
+  @@map("reservation_seats")
 }
 
 model UserTicketQuota {
@@ -480,6 +506,7 @@ model Ticket {
   orderId      String @map("order_id") @db.Uuid
   ticketTypeId String @map("ticket_type_id") @db.Uuid
   ownerUserId  String @map("owner_user_id") @db.Uuid
+  concertId    String @map("concert_id") @db.Uuid
 
   ticketCode String @unique @map("ticket_code") @db.VarChar(50)
 
@@ -510,6 +537,7 @@ model Ticket {
   ticketType TicketType @relation(fields: [ticketTypeId], references: [id])
   owner      User       @relation("TicketOwner", fields: [ownerUserId], references: [id])
   scannedBy  User?      @relation("TicketScannedBy", fields: [scannedById], references: [id])
+  concert    Concert    @relation(fields: [concertId], references: [id])
 
   checkinEvents CheckinEvent[]
 
@@ -518,6 +546,7 @@ model Ticket {
   @@index([status])
   @@index([ticketTypeId])
   @@index([ticketCode, status])
+  @@unique([concertId, seatNumber])
   @@map("tickets")
 }
 

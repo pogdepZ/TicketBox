@@ -143,38 +143,38 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     ttlSeconds: number,
   ): Promise<TokenBucketResult> {
     const script = `
-local key = KEYS[1]
-local capacity = tonumber(ARGV[1])
-local refillRate = tonumber(ARGV[2])
-local ttlSeconds = tonumber(ARGV[3])
-local now = tonumber(ARGV[4])
+      local key = KEYS[1]
+      local capacity = tonumber(ARGV[1])
+      local refillRate = tonumber(ARGV[2])
+      local ttlSeconds = tonumber(ARGV[3])
+      local now = tonumber(ARGV[4])
 
-local bucket = redis.call('HMGET', key, 'tokens', 'updatedAt')
-local tokens = tonumber(bucket[1])
-local updatedAt = tonumber(bucket[2])
+      local bucket = redis.call('HMGET', key, 'tokens', 'updatedAt')
+      local tokens = tonumber(bucket[1])
+      local updatedAt = tonumber(bucket[2])
 
-if tokens == nil then
-  tokens = capacity
-end
+      if tokens == nil then
+        tokens = capacity
+      end
 
-if updatedAt == nil then
-  updatedAt = now
-end
+      if updatedAt == nil then
+        updatedAt = now
+      end
 
-local elapsedSeconds = math.max(0, (now - updatedAt) / 1000)
-local refilledTokens = math.min(capacity, tokens + (elapsedSeconds * refillRate))
+      local elapsedSeconds = math.max(0, (now - updatedAt) / 1000)
+      local refilledTokens = math.min(capacity, tokens + (elapsedSeconds * refillRate))
 
-if refilledTokens < 1 then
-  local retryAfterSeconds = math.ceil((1 - refilledTokens) / refillRate)
-  redis.call('HMSET', key, 'tokens', refilledTokens, 'updatedAt', now)
-  redis.call('EXPIRE', key, ttlSeconds)
-  return {0, retryAfterSeconds, refilledTokens}
-end
+      if refilledTokens < 1 then
+        local retryAfterSeconds = math.ceil((1 - refilledTokens) / refillRate)
+        redis.call('HMSET', key, 'tokens', refilledTokens, 'updatedAt', now)
+        redis.call('EXPIRE', key, ttlSeconds)
+        return {0, retryAfterSeconds, refilledTokens}
+      end
 
-local remainingTokens = refilledTokens - 1
-redis.call('HMSET', key, 'tokens', remainingTokens, 'updatedAt', now)
-redis.call('EXPIRE', key, ttlSeconds)
-return {1, 0, remainingTokens}
+      local remainingTokens = refilledTokens - 1
+      redis.call('HMSET', key, 'tokens', remainingTokens, 'updatedAt', now)
+      redis.call('EXPIRE', key, ttlSeconds)
+      return {1, 0, remainingTokens}
 `;
 
     const [allowed, retryAfterSeconds, remainingTokens] = (await this.client.eval(

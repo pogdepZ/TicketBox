@@ -990,9 +990,8 @@
                   "  throw new Error('Missing ticketTypeId. Set it from DB/seed ticket_types for the selected concert.');",
                   "}",
                   "pm.collectionVariables.set('orderIdempotencyKey', pm.variables.replaceIn('{{$guid}}'));",
-                  "if (!pm.collectionVariables.get('orderQuantity')) {",
-                  "  pm.collectionVariables.set('orderQuantity', '1');",
-                  "}"
+                  "const timestamp = Date.now();",
+                  "pm.collectionVariables.set('testSeats', JSON.stringify([`S-${timestamp}-1`, `S-${timestamp}-2`]));"
                 ]
               }
             },
@@ -1038,7 +1037,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"concertId\": \"{{concertId}}\",\n  \"items\": [\n    {\n      \"ticketTypeId\": \"{{ticketTypeId}}\",\n      \"quantity\": {{orderQuantity}}\n    }\n  ]\n}"
+              "raw": "{\n  \"concertId\": \"{{concertId}}\",\n  \"ticketTypeId\": \"{{ticketTypeId}}\",\n  \"seatNumbers\": {{testSeats}}\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/orders",
@@ -1188,6 +1187,88 @@
               ]
             },
             "description": "Creates or returns the active payment request for orderId. Saves paymentRef and paymentAmount."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /orders - Create real order for MOMO",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Run Auth > Register/Login first.');",
+                  "}",
+                  "pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${accessToken}` });",
+                  "if (!pm.collectionVariables.get('concertId')) {",
+                  "  throw new Error('Missing concertId. Set it from a published concert.');",
+                  "}",
+                  "if (!pm.collectionVariables.get('ticketTypeId')) {",
+                  "  throw new Error('Missing ticketTypeId. Set it from DB/seed ticket_types for the selected concert.');",
+                  "}",
+                  "pm.collectionVariables.set('orderIdempotencyKey', pm.variables.replaceIn('{{$guid}}'));",
+                  "const timestamp = Date.now();",
+                  "pm.collectionVariables.set('testSeats', JSON.stringify([`S-${timestamp}-1`, `S-${timestamp}-2`]));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "function unwrapResponse(json) {",
+                  "  return json && json.data && json.data.data ? json.data.data : (json && json.data ? json.data : json);",
+                  "}",
+                  "const json = pm.response.json();",
+                  "const data = unwrapResponse(json);",
+                  "",
+                  "pm.test('order is created and pending payment', function () {",
+                  "  pm.expect(data).to.have.property('orderId');",
+                  "  pm.expect(data).to.have.property('status', 'PENDING_PAYMENT');",
+                  "  pm.expect(data).to.have.property('expiresAt');",
+                  "  pm.expect(data.items).to.be.an('array').that.is.not.empty;",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('orderId', data.orderId);",
+                  "pm.collectionVariables.set('paymentAmount', data.totalAmount);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{orderIdempotencyKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"concertId\": \"{{concertId}}\",\n  \"ticketTypeId\": \"{{ticketTypeId}}\",\n  \"seatNumbers\": {{testSeats}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "description": "Creates a real order with Reservation=HELD and Order=PENDING_PAYMENT. Saves orderId and paymentAmount."
           },
           "response": []
         },
@@ -1889,7 +1970,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"concertId\": \"not-a-uuid\",\n  \"items\": []\n}"
+              "raw": "{\n  \"concertId\": \"not-a-uuid\",\n  \"ticketTypeId\": \"not-a-uuid\",\n  \"seatNumbers\": []\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/orders",
@@ -2369,7 +2450,7 @@
     },
     {
       "key": "concertId",
-      "value": "0e491afa-772b-43c0-9009-e6847aacf517",
+      "value": "202dedd0-18dc-4d48-a652-d0ee8aa1f441",
       "type": "string"
     },
     {
@@ -2464,7 +2545,7 @@
     },
     {
       "key": "ticketTypeId",
-      "value": "71d2f154-74b4-40af-a9b3-802209884d58",
+      "value": "f7c6c7ab-f989-40c8-b81b-8338fc30730e",
       "type": "string"
     },
     {

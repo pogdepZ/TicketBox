@@ -11,22 +11,12 @@ export interface ReleaseResult {
   releasedItems: { ticketTypeId: string; quantity: number }[];
   skipped: boolean;
   previousStatus?: OrderStatus;
+  releasedSeats?: { concertId: string; seatNumber: string }[];
 }
 
 @Injectable()
 export class OrderTransactionHelper {
   private readonly logger = new Logger(OrderTransactionHelper.name);
-
-  /**
-   * Trả vé và hoàn quota khi order bị cancel, expire, hoặc payment fail.
-   * Phải được gọi trong một Prisma $transaction.
-   *
-   * Thực hiện atomically:
-   * 1. Cập nhật Order.status
-   * 2. Cập nhật Reservation.status
-   * 3. Tăng TicketType.remaining theo từng item
-   * 4. Giảm UserTicketQuota.heldQuantity theo từng item
-   */
   async releaseOrder(
     tx: TransactionClient,
     orderId: string,
@@ -35,10 +25,7 @@ export class OrderTransactionHelper {
   ): Promise<ReleaseResult> {
     // Lock order first so cancel/expire/payment-fail cannot release the same
     // inventory concurrently.
-    await tx.$executeRawUnsafe(
-      `SELECT id FROM orders WHERE id = $1::uuid FOR UPDATE`,
-      orderId,
-    );
+    await tx.$executeRaw`SELECT id FROM orders WHERE id = ${orderId}::uuid FOR UPDATE`;
 
     const order = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
@@ -87,25 +74,29 @@ export class OrderTransactionHelper {
       data: { status: reservationStatus },
     });
 
+    // Cập nhật ReservationSeat status
+    const seats = await tx.reservationSeat.findMany({
+      where: { reservationId: order.reservationId },
+      select: { concertId: true, seatNumber: true },
+    });
+
+    await tx.reservationSeat.updateMany({
+      where: { reservationId: order.reservationId },
+      data: {
+        status: reservationStatus === ReservationStatus.EXPIRED ? 'EXPIRED' : 'RELEASED',
+      },
+    });
+
     const releasedItems: { ticketTypeId: string; quantity: number }[] = [];
 
     for (const item of order.items) {
       // Trả lại tồn kho
-      await tx.$executeRawUnsafe(
-        `UPDATE ticket_types SET remaining = remaining + $1 WHERE id = $2::uuid`,
-        item.quantity,
-        item.ticketTypeId,
-      );
+      await tx.$executeRaw`UPDATE ticket_types SET remaining = remaining + ${item.quantity} WHERE id = ${item.ticketTypeId}::uuid`;
 
       // Giảm heldQuantity (không xuống dưới 0)
-      await tx.$executeRawUnsafe(
-        `UPDATE user_ticket_quotas
-         SET held_quantity = GREATEST(0, held_quantity - $1), updated_at = NOW()
-         WHERE user_id = $2::uuid AND ticket_type_id = $3::uuid`,
-        item.quantity,
-        order.userId,
-        item.ticketTypeId,
-      );
+      await tx.$executeRaw`UPDATE user_ticket_quotas
+         SET held_quantity = GREATEST(0, held_quantity - ${item.quantity}), updated_at = NOW()
+         WHERE user_id = ${order.userId}::uuid AND ticket_type_id = ${item.ticketTypeId}::uuid`;
 
       releasedItems.push({
         ticketTypeId: item.ticketTypeId,
@@ -114,9 +105,9 @@ export class OrderTransactionHelper {
     }
 
     this.logger.log(
-      `Released order ${orderId} → status=${orderStatus}, items=${JSON.stringify(releasedItems)}`,
+      `Released order ${orderId} → status=${orderStatus}, items=${JSON.stringify(releasedItems)}, seats=${JSON.stringify(seats)}`,
     );
 
-    return { orderId, releasedItems, skipped: false };
+    return { orderId, releasedItems, skipped: false, releasedSeats: seats };
   }
 }

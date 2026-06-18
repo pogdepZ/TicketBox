@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PrismaClient, TicketStatus } from '../../generated/prisma';
@@ -50,41 +50,81 @@ export class TicketsService {
     },
     items: OrderItemWithType[],
   ): Promise<IssuedTicket[]> {
+    // Check if tickets already exist for this order to ensure idempotency
+    const existingTickets = await tx.ticket.findMany({
+      where: { orderId: order.id },
+      include: { ticketType: { select: { name: true } } },
+    });
+
+    if (existingTickets.length > 0) {
+      this.logger.warn(`Tickets already issued for order ${order.id}. Returning existing tickets.`);
+      return existingTickets.map((t) => ({
+        ticketId: t.id,
+        ticketCode: t.ticketCode,
+        ticketTypeName: t.ticketType.name,
+        qrPayload: t.qrPayload,
+      }));
+    }
+
+    // Read the reservationId from Order
+    const orderRecord = await tx.order.findUniqueOrThrow({
+      where: { id: order.id },
+      select: { reservationId: true },
+    });
+
+    // Query reservation seats
+    const reservationSeats = await tx.reservationSeat.findMany({
+      where: { reservationId: orderRecord.reservationId },
+      include: { ticketType: { select: { name: true } } },
+    });
+
     const issued: IssuedTicket[] = [];
     const ticketSecret = this.config.get<string>(
       'JWT_TICKET_SECRET',
       'ticket-secret',
     );
 
-    for (const item of items) {
-      for (let i = 0; i < item.quantity; i++) {
+    // If reservationSeats exists, use seat-based flow
+    if (reservationSeats.length > 0) {
+      for (const seat of reservationSeats) {
         const ticketCode = this.generateTicketCode();
 
-        // Tạo ticket record trước để có ID
-        const ticket = await tx.ticket.create({
-          data: {
-            orderId: order.id,
-            ticketTypeId: item.ticketTypeId,
-            ownerUserId: order.userId,
-            ticketCode,
-            qrPayload: '', // placeholder, cập nhật sau khi có ticketId
-            status: TicketStatus.ACTIVE,
-          },
-        });
+        let ticket;
+        try {
+          ticket = await tx.ticket.create({
+            data: {
+              orderId: order.id,
+              ticketTypeId: seat.ticketTypeId,
+              ownerUserId: order.userId,
+              concertId: order.concertId,
+              ticketCode,
+              qrPayload: '', // placeholder, will update
+              status: TicketStatus.ACTIVE,
+              seatNumber: seat.seatNumber,
+            },
+          });
+        } catch (err) {
+          // Check for Prisma unique constraint violation (P2002)
+          if ((err as any).code === 'P2002') {
+            throw new ConflictException({
+              message: `Seat ${seat.seatNumber} has already been sold for this concert`,
+              seatNumber: seat.seatNumber,
+            });
+          }
+          throw err;
+        }
 
-        // Sign JWT với ticketId đã có
         const qrPayload = sign(
           {
             ticket_id: ticket.id,
             ticket_code: ticketCode,
             concert_id: order.concertId,
-            ticket_type_id: item.ticketTypeId,
+            ticket_type_id: seat.ticketTypeId,
           },
           ticketSecret,
           { expiresIn: '7d' },
         );
 
-        // Cập nhật qrPayload
         await tx.ticket.update({
           where: { id: ticket.id },
           data: { qrPayload },
@@ -93,9 +133,59 @@ export class TicketsService {
         issued.push({
           ticketId: ticket.id,
           ticketCode,
-          ticketTypeName: item.ticketType.name,
+          ticketTypeName: seat.ticketType.name,
           qrPayload,
         });
+      }
+
+      // Update reservation seats to CONFIRMED
+      await tx.reservationSeat.updateMany({
+        where: { reservationId: orderRecord.reservationId },
+        data: { status: 'CONFIRMED' },
+      });
+    } else {
+      // Fallback old flow (no seat selection)
+      this.logger.log(`No reservation seats found for order ${order.id}. Falling back to default ticket issuance.`);
+      for (const item of items) {
+        for (let i = 0; i < item.quantity; i++) {
+          const ticketCode = this.generateTicketCode();
+
+          const ticket = await tx.ticket.create({
+            data: {
+              orderId: order.id,
+              ticketTypeId: item.ticketTypeId,
+              ownerUserId: order.userId,
+              concertId: order.concertId,
+              ticketCode,
+              qrPayload: '',
+              status: TicketStatus.ACTIVE,
+              seatNumber: null,
+            },
+          });
+
+          const qrPayload = sign(
+            {
+              ticket_id: ticket.id,
+              ticket_code: ticketCode,
+              concert_id: order.concertId,
+              ticket_type_id: item.ticketTypeId,
+            },
+            ticketSecret,
+            { expiresIn: '7d' },
+          );
+
+          await tx.ticket.update({
+            where: { id: ticket.id },
+            data: { qrPayload },
+          });
+
+          issued.push({
+            ticketId: ticket.id,
+            ticketCode,
+            ticketTypeName: item.ticketType.name,
+            qrPayload,
+          });
+        }
       }
     }
 

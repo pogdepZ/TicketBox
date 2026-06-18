@@ -30,8 +30,7 @@ export class TicketInventoryService {
     // Sort để đảm bảo thứ tự lock nhất quán → tránh deadlock
     const sortedIds = [...ticketTypeIds].sort();
 
-    const rows = await tx.$queryRawUnsafe<TicketType[]>(
-      `SELECT
+    const rows = await tx.$queryRaw<TicketType[]>`SELECT
          id,
          concert_id AS "concertId",
          seat_zone_id AS "seatZoneId",
@@ -45,11 +44,9 @@ export class TicketInventoryService {
          status,
          created_at AS "createdAt"
        FROM ticket_types
-       WHERE id = ANY($1::uuid[])
+       WHERE id = ANY(${sortedIds}::uuid[])
        ORDER BY id
-       FOR UPDATE`,
-      sortedIds,
-    );
+       FOR UPDATE`;
 
     return rows;
   }
@@ -134,28 +131,20 @@ export class TicketInventoryService {
     ticketTypeId: string,
   ): Promise<UserTicketQuota> {
     // Thử insert trước nếu chưa tồn tại
-    await tx.$executeRawUnsafe(
-      `INSERT INTO user_ticket_quotas (user_id, ticket_type_id, held_quantity, paid_quantity, updated_at)
-       VALUES ($1::uuid, $2::uuid, 0, 0, NOW())
-       ON CONFLICT (user_id, ticket_type_id) DO NOTHING`,
-      userId,
-      ticketTypeId,
-    );
+    await tx.$executeRaw`INSERT INTO user_ticket_quotas (user_id, ticket_type_id, held_quantity, paid_quantity, updated_at)
+       VALUES (${userId}::uuid, ${ticketTypeId}::uuid, 0, 0, NOW())
+       ON CONFLICT (user_id, ticket_type_id) DO NOTHING`;
 
     // Lock dòng cho update
-    const rows = await tx.$queryRawUnsafe<UserTicketQuota[]>(
-      `SELECT
+    const rows = await tx.$queryRaw<UserTicketQuota[]>`SELECT
          user_id AS "userId",
          ticket_type_id AS "ticketTypeId",
          held_quantity AS "heldQuantity",
          paid_quantity AS "paidQuantity",
          updated_at AS "updatedAt"
        FROM user_ticket_quotas
-       WHERE user_id = $1::uuid AND ticket_type_id = $2::uuid
-       FOR UPDATE`,
-      userId,
-      ticketTypeId,
-    );
+       WHERE user_id = ${userId}::uuid AND ticket_type_id = ${ticketTypeId}::uuid
+       FOR UPDATE`;
 
     return rows[0];
   }

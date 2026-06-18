@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { PaymentGatewayService } from './payment-gateway.service';
@@ -27,7 +26,6 @@ import { RolesGuard } from '../auth/guard/roles.guard';
     PaymentCircuitBreakerService,
     IdempotencyService,   // instance riêng cho payments
     RolesGuard,
-    Reflector,
   ],
   exports: [PaymentsService],
 })

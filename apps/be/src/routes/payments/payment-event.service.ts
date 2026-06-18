@@ -29,20 +29,14 @@ export class PaymentEventService {
     signatureValid: boolean;
   }): Promise<InsertEventResult> {
     // Dùng raw SQL với ON CONFLICT DO NOTHING để đảm bảo idempotency
-    const result = await this.prisma.$queryRawUnsafe<{ id: string }[]>(
-      `INSERT INTO payment_events
+    const result = await this.prisma.$queryRaw<{ id: string }[]>`
+      INSERT INTO payment_events
          (id, order_id, gateway, gateway_transaction_id, event_type, raw_payload, signature_valid, status, created_at)
        VALUES
-         (gen_random_uuid(), $1::uuid, $2::text::"PaymentGateway", $3, $4, $5::jsonb, $6, 'PROCESSING', NOW())
+         (gen_random_uuid(), ${data.orderId}::uuid, ${data.gateway}::text::"PaymentGateway", ${data.gatewayTransactionId}, ${data.eventType}, ${JSON.stringify(data.rawPayload)}::jsonb, ${data.signatureValid}, 'PROCESSING', NOW())
        ON CONFLICT (gateway, gateway_transaction_id, event_type) DO NOTHING
-       RETURNING id`,
-      data.orderId,
-      data.gateway,
-      data.gatewayTransactionId,
-      data.eventType,
-      JSON.stringify(data.rawPayload),
-      data.signatureValid,
-    );
+       RETURNING id
+    `;
 
     if (result.length === 0) {
       // Conflict → event đã tồn tại
@@ -74,32 +68,29 @@ export class PaymentEventService {
    * Đánh dấu event đã được xử lý xong.
    */
   async markProcessed(eventId: string): Promise<void> {
-    await this.prisma.$executeRawUnsafe(
-      `UPDATE payment_events
+    await this.prisma.$executeRaw`
+      UPDATE payment_events
        SET status = 'PROCESSED', processed_at = NOW()
-       WHERE id = $1::uuid`,
-      eventId,
-    ).catch((err) => {
+       WHERE id = ${eventId}::uuid
+    `.catch((err) => {
       this.logger.error(`Failed to mark event processed: ${eventId}`, err);
     });
   }
 
   async markProcessing(eventId: string): Promise<void> {
-    await this.prisma.$executeRawUnsafe(
-      `UPDATE payment_events
+    await this.prisma.$executeRaw`
+      UPDATE payment_events
        SET status = 'PROCESSING'
-       WHERE id = $1::uuid`,
-      eventId,
-    );
+       WHERE id = ${eventId}::uuid
+    `;
   }
 
   async markFailed(eventId: string): Promise<void> {
-    await this.prisma.$executeRawUnsafe(
-      `UPDATE payment_events
+    await this.prisma.$executeRaw`
+      UPDATE payment_events
        SET status = 'FAILED'
-       WHERE id = $1::uuid`,
-      eventId,
-    ).catch((err) => {
+       WHERE id = ${eventId}::uuid
+    `.catch((err) => {
       this.logger.error(`Failed to mark event failed: ${eventId}`, err);
     });
   }
@@ -109,10 +100,9 @@ export class PaymentEventService {
       return 'FAILED';
     }
 
-    const rows = await this.prisma.$queryRawUnsafe<{ status: string }[]>(
-      `SELECT status FROM payment_events WHERE id = $1::uuid`,
-      eventId,
-    );
+    const rows = await this.prisma.$queryRaw<{ status: string }[]>`
+      SELECT status FROM payment_events WHERE id = ${eventId}::uuid
+    `;
 
     const status = rows[0]?.status;
     if (status === 'PROCESSED' || status === 'FAILED') {

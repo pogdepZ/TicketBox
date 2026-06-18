@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthRole, AuthUser } from '../dto/user-response.dto';
@@ -11,6 +12,7 @@ import { REQUIRED_PERMISSIONS_KEY } from '../decorators/require-permissions.deco
 @Injectable()
 export class PermissionGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
+  private readonly logger = new Logger(PermissionGuard.name);
 
   canActivate(context: ExecutionContext): boolean {
     const requiredPermissions = this.reflector.getAllAndOverride<string[]>(
