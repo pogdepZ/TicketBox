@@ -1,7 +1,7 @@
 import { getStoredMockOrder, getStoredMockOrders } from './mock-reservation';
 import { adminStats, concerts as mockConcerts } from './mock-data';
 
-export const API_BASE_URL = 'http://127.0.0.1:4000';
+export const API_BASE_URL = 'http://127.0.0.1:3001';
 
 export class ApiError extends Error {
   statusCode?: number;
@@ -92,29 +92,85 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
 // ----------------------------------------------------
 
 export async function getConcerts(params?: { status?: string; keyword?: string; fromDate?: string; toDate?: string; page?: number; limit?: number }) {
-  const query = new URLSearchParams();
-  if (params) {
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined) {
-        query.append(key, String(value));
-      }
-    });
+  try {
+    const query = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          query.append(key, String(value));
+        }
+      });
+    }
+    
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    const data = await fetchApi(`/concerts${queryString}`, { next: { revalidate: 60 } } as any); // use ISR cache
+    
+    // data format: { items: [], meta: {} }
+    return {
+      items: data.items.map((concert: any) => mapConcertToDisplay(concert)),
+      meta: data.meta,
+    };
+  } catch (error) {
+    console.warn('Backend API /concerts failed, falling back to mock data:', error);
+    let items = mockConcerts.map(c => mapConcertToDisplay(mapLocalMockToBEConcert(c)));
+    
+    if (params?.keyword) {
+      const kw = params.keyword.toLowerCase();
+      items = items.filter(c => 
+        c.title.toLowerCase().includes(kw) || 
+        c.artist.toLowerCase().includes(kw) || 
+        c.venue.toLowerCase().includes(kw)
+      );
+    }
+    
+    return {
+      items,
+      meta: {
+        page: params?.page || 1,
+        limit: params?.limit || 10,
+        total: items.length,
+        totalPages: 1,
+      },
+    };
   }
-  
-  const queryString = query.toString() ? `?${query.toString()}` : '';
-  const data = await fetchApi(`/concerts${queryString}`, { next: { revalidate: 60 } } as any); // use ISR cache
-  
-  // data format: { items: [], meta: {} }
-  return {
-    items: data.items.map((concert: any) => mapConcertToDisplay(concert)),
-    meta: data.meta,
-  };
 }
 
 export async function getConcertById(id: string) {
-  const concert = await fetchApi(`/concerts/${id}`, { next: { revalidate: 60 } } as any);
-  return mapConcertToDisplay(concert);
+  try {
+    const concert = await fetchApi(`/concerts/${id}`, { next: { revalidate: 60 } } as any);
+    return mapConcertToDisplay(concert);
+  } catch (error) {
+    console.warn(`Backend API /concerts/${id} failed, falling back to mock data:`, error);
+    const mock = mockConcerts.find(c => c.id === id);
+    if (!mock) {
+      throw error;
+    }
+    return mapConcertToDisplay(mapLocalMockToBEConcert(mock));
+  }
 }
+
+function mapLocalMockToBEConcert(mock: any) {
+  return {
+    id: mock.id,
+    name: mock.title,
+    description: mock.description || 'Tiểu sử nghệ sĩ và chi tiết show diễn.',
+    artistName: mock.artist,
+    venueName: mock.venue,
+    venueAddress: mock.city,
+    eventDate: new Date(mock.date).toISOString(),
+    seatMapSvgUrl: null,
+    posterUrl: mock.image,
+    status: mock.status === 'sold-out' ? 'PUBLISHED' : 'PUBLISHED',
+    ticketsSold: mock.status === 'sold-out' ? (mock.capacity || 2000) : 0,
+    capacity: mock.capacity || 2000,
+    revenue: 0,
+    genre: mock.genre || 'Live Music',
+    language: mock.language || 'Tiếng Việt',
+    ageLimit: mock.ageLimit || 'Tất cả lứa tuổi',
+    seatZones: [],
+  };
+}
+
 
 function mapConcertToDisplay(concert: any) {
   // Mapping BE model to what FE components expect based on mock data
