@@ -47,3 +47,19 @@ Ban tổ chức có thể upload PDF hồ sơ nghệ sĩ hoặc press kit. Hệ 
 - File quá 10 MB hoặc không phải PDF bị reject ngay tại bước upload.
 - AI lỗi sau 3 lần retry → status chuyển `failed`, concert không bị ảnh hưởng.
 - Admin sửa bio thủ công thành công.
+
+## 7. API Endpoints
+
+### `POST /ai-bio/upload`
+- **Mô tả:** Upload PDF để trích xuất tiểu sử nghệ sĩ.
+- **Request:** `multipart/form-data`
+  - `concertId`: UUID
+  - `file`: PDF file
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": { "bio": "..." },
+    "message": "Processed successfully"
+  }
+  ```

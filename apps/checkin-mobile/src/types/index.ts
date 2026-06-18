@@ -104,4 +104,5 @@ export type RootStackParamList = {
   OfflineQueue: undefined;
   SyncHistory: undefined;
   Settings: undefined;
+  Snapshot: undefined;
 };

@@ -17,53 +17,25 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
-import type { RootStackParamList, TicketInfo, ScanStatus } from '../types';
+import { apiService } from '../services/api';
+import { queueService } from '../services/queue';
+import type { RootStackParamList, TicketInfo, ScanStatus, OfflineQueueItem } from '../types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Scanner'>;
 
 const MOCK_CONCERT = {
-  id: 'concert-001',
+  id: 'a35ba9c7-89e4-425c-9d00-8016ac4afc3d',
   name: 'Sơn Tùng M-TP - Sky Tour 2026',
 };
 
-const MOCK_TICKETS: Record<ScanStatus, TicketInfo> = {
-  SUCCESS: {
-    ticketId: 'ticket-001',
-    guestName: 'Nguyễn Văn An',
-    ticketType: 'VIP',
-    ticketCode: 'TKB-2026-VIP-001',
-    concertName: MOCK_CONCERT.name,
-    checkedInAt: new Date().toISOString(),
-    status: 'SUCCESS',
-  },
-  DUPLICATE: {
-    ticketId: 'ticket-002',
-    guestName: 'Trần Thị Bình',
-    ticketType: 'SVIP',
-    ticketCode: 'TKB-2026-SVIP-002',
-    concertName: MOCK_CONCERT.name,
-    checkedInAt: new Date().toISOString(),
-    status: 'DUPLICATE',
-  },
-  NOT_FOUND: {
-    ticketId: 'ticket-unknown',
-    guestName: 'Không xác định',
-    ticketType: 'N/A',
-    ticketCode: 'INVALID-CODE',
-    concertName: MOCK_CONCERT.name,
-    checkedInAt: new Date().toISOString(),
-    status: 'NOT_FOUND',
-  },
-  WRONG_EVENT: {
-    ticketId: 'ticket-003',
-    guestName: 'Lê Hoàng Cường',
-    ticketType: 'GA',
-    ticketCode: 'TKB-2026-GA-003',
-    concertName: 'Concert khác - Không phải sự kiện hiện tại',
-    checkedInAt: new Date().toISOString(),
-    status: 'WRONG_EVENT',
-  },
+const MOCK_TICKETS: Record<ScanStatus, { ticketCode: string }> = {
+  SUCCESS: { ticketCode: 'TKB-2026-VIP-001' },
+  DUPLICATE: { ticketCode: 'TKB-2026-SVIP-002' },
+  NOT_FOUND: { ticketCode: 'INVALID-CODE' },
+  WRONG_EVENT: { ticketCode: 'TKB-2026-GA-003' },
 };
 
 const SCAN_BUTTONS: { status: ScanStatus; label: string; color: string; tone: string }[] = [
@@ -75,15 +47,116 @@ const SCAN_BUTTONS: { status: ScanStatus; label: string; color: string; tone: st
 
 export default function ScannerScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const [isOffline] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
 
-  const handleScan = (status: ScanStatus) => {
-    const ticket: TicketInfo = {
-      ...MOCK_TICKETS[status],
-      checkedInAt: new Date().toISOString(),
-    };
-    navigation.navigate('Result', { ticket, isOffline });
+  const handleScan = async (qrData: string) => {
+    if (scanning) return;
+    setScanning(true);
+
+    // Xử lý quét qua QR text thay vì mock status
+    const mockTicket = MOCK_TICKETS.SUCCESS; // Dự phòng
+    const qrCodeDataToScan = qrData || mockTicket.ticketCode;
+
+    // Attempt online scan
+    try {
+      const userStr = await AsyncStorage.getItem('auth_user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      // Provide valid UUIDs as fallbacks to prevent Prisma crash on backend
+      const staffId = user?.id || '00000000-0000-0000-0000-000000000001';
+      const deviceId = '00000000-0000-0000-0000-000000000002';
+
+      const payload = {
+        qrCodeData: qrCodeDataToScan,
+        staffId,
+        concertId: MOCK_CONCERT.id,
+        deviceId,
+        clientEventId: `scan-${Date.now()}`,
+      };
+
+      // In payload ra màn hình Console để debug
+      console.log("\n🚀 [DEBUG] PAYLOAD GỬI LÊN SERVER:");
+      console.log(JSON.stringify(payload, null, 2));
+
+      const response = await apiService.post<TicketInfo>('/checkin/scan', payload);
+
+      console.log("response ticket>>>>>>:", response)
+
+      if (response.success && response.data) {
+        setIsOffline(false);
+        navigation.navigate('Result', { ticket: response.data, isOffline: false });
+      } else {
+        // If API fails with error or timeout, treat as offline
+        const isNetworkError = !response.data || response.message?.toLowerCase().includes('fetch') || response.message?.toLowerCase().includes('timeout');
+
+        if (isNetworkError) {
+          setIsOffline(true);
+          const checkedAt = new Date().toISOString();
+
+          const offlineItem: OfflineQueueItem = {
+            id: `q-${Date.now()}`,
+            ticketId: 'offline-ticket', // Can't know actual ID offline
+            ticketCode: qrCodeDataToScan,
+            qrCodeData: qrCodeDataToScan,
+            concertId: MOCK_CONCERT.id,
+            staffId,
+            sourceDeviceId: deviceId,
+            checkedAt,
+            syncStatus: 'PENDING',
+            syncAttempts: 0,
+            lastSyncError: null,
+            serverCheckinId: null,
+            createdAt: checkedAt,
+          };
+
+          await queueService.enqueue(offlineItem);
+
+          // Construct a display ticket for offline
+          const displayTicket: TicketInfo = {
+            ticketId: 'offline-ticket',
+            ticketCode: qrCodeDataToScan,
+            guestName: 'Đang tải (Offline)',
+            ticketType: '---',
+            concertName: MOCK_CONCERT.name,
+            checkedInAt: checkedAt,
+            status: 'SUCCESS', // Always allow in offline mode
+          };
+
+          navigation.navigate('Result', { ticket: displayTicket, isOffline: true });
+        } else {
+          // It's a server error or rejection, don't queue
+          Alert.alert('Lỗi quét vé', response.message || 'Lỗi không xác định');
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      // Đợi 2s trước khi cho phép quét tiếp
+      setTimeout(() => setScanning(false), 2000);
+    }
   };
+
+  // Helper cho các nút mock (Developer Tools)
+  const handleMockScan = (status: ScanStatus) => {
+    const mockTicket = MOCK_TICKETS[status];
+    handleScan(mockTicket.ticketCode);
+  };
+
+  if (!permission) {
+    return <View />; // Lần render đầu
+  }
+
+  if (!permission.granted) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: 'white', marginBottom: 20 }}>Chúng tôi cần quyền sử dụng Camera để quét vé.</Text>
+        <TouchableOpacity style={styles.scanButton} onPress={requestPermission}>
+          <Text style={styles.scanButtonText}>Cấp quyền Camera</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -94,9 +167,11 @@ export default function ScannerScreen() {
           <Text style={styles.concertLabel}>Cổng đang hoạt động</Text>
           <Text style={styles.concertName}>{MOCK_CONCERT.name}</Text>
         </View>
-        <View style={styles.livePill}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveText}>Online</Text>
+        <View style={[styles.livePill, isOffline && { backgroundColor: COLORS.error + '14', borderColor: COLORS.error + '55' }]}>
+          <View style={[styles.liveDot, isOffline && { backgroundColor: COLORS.error }]} />
+          <Text style={[styles.liveText, isOffline && { color: COLORS.errorLight }]}>
+            {isOffline ? 'Offline' : 'Online'}
+          </Text>
         </View>
       </View>
 
@@ -105,34 +180,35 @@ export default function ScannerScreen() {
           <Text style={styles.cameraSectionLabel}>Khung quét</Text>
           <Text style={styles.scanCounter}>128 vào cổng</Text>
         </View>
-        <View style={styles.cameraFrame}>
-          <View style={styles.cameraGridLineV} />
-          <View style={styles.cameraGridLineH} />
-          <View style={[styles.corner, styles.cornerTL]} />
-          <View style={[styles.corner, styles.cornerTR]} />
-          <View style={[styles.corner, styles.cornerBL]} />
-          <View style={[styles.corner, styles.cornerBR]} />
+        <CameraView
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          barcodeScannerSettings={{
+            barcodeTypes: ["qr"],
+          }}
+          onBarcodeScanned={({ data }) => handleScan(data)}
+        />
+        <View style={styles.cameraGridLineV} />
+        <View style={styles.cameraGridLineH} />
+        <View style={[styles.corner, styles.cornerTL]} />
+        <View style={[styles.corner, styles.cornerTR]} />
+        <View style={[styles.corner, styles.cornerBL]} />
+        <View style={[styles.corner, styles.cornerBR]} />
 
-          <View style={styles.scanLine} />
-          <Text style={styles.cameraText}>Sẵn sàng</Text>
-          <Text style={styles.cameraHint}>Đưa QR vào vùng sáng</Text>
-          <Text style={styles.cameraSubHint}>
-            Mã hợp lệ sẽ chuyển sang màn hình kết quả ngay lập tức
-          </Text>
-        </View>
+        <View style={[styles.scanLine, scanning && { backgroundColor: COLORS.success }]} />
       </View>
 
       <View style={styles.buttonsContainer}>
         <View style={styles.buttonsHeader}>
-          <Text style={styles.buttonsTitle}>Mô phỏng quét</Text>
-          <Text style={styles.buttonsHint}>Chọn trạng thái để test luồng</Text>
+          <Text style={styles.buttonsTitle}>Developer Tools: Mô phỏng quét</Text>
+          <Text style={styles.buttonsHint}>Hỗ trợ test nhanh trên máy ảo</Text>
         </View>
         <View style={styles.buttonGrid}>
           {SCAN_BUTTONS.map((btn) => (
             <TouchableOpacity
               key={btn.status}
               style={[styles.scanButton, { borderColor: btn.color + '66' }]}
-              onPress={() => handleScan(btn.status)}
+              onPress={() => handleMockScan(btn.status)}
               activeOpacity={0.82}
             >
               <View style={[styles.scanTone, { backgroundColor: btn.color + '20' }]}>
@@ -248,7 +324,7 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderWidth: 2,
     borderColor: COLORS.borderLight,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.lg,
     backgroundColor: COLORS.backgroundSecondary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -282,28 +358,28 @@ const styles = StyleSheet.create({
     left: 14,
     borderTopWidth: 3,
     borderLeftWidth: 3,
-    borderTopLeftRadius: BORDER_RADIUS.md,
+    borderTopLeftRadius: BORDER_RADIUS.lg,
   },
   cornerTR: {
     top: 14,
     right: 14,
     borderTopWidth: 3,
     borderRightWidth: 3,
-    borderTopRightRadius: BORDER_RADIUS.md,
+    borderTopRightRadius: BORDER_RADIUS.lg,
   },
   cornerBL: {
     bottom: 14,
     left: 14,
     borderBottomWidth: 3,
     borderLeftWidth: 3,
-    borderBottomLeftRadius: BORDER_RADIUS.md,
+    borderBottomLeftRadius: BORDER_RADIUS.lg,
   },
   cornerBR: {
     bottom: 14,
     right: 14,
     borderBottomWidth: 3,
     borderRightWidth: 3,
-    borderBottomRightRadius: BORDER_RADIUS.md,
+    borderBottomRightRadius: BORDER_RADIUS.lg,
   },
   scanLine: {
     position: 'absolute',
@@ -361,13 +437,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface + 'CC',
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
   },
   scanTone: {
     width: 32,
     height: 32,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.md,
@@ -393,7 +469,7 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.border,
     borderColor: COLORS.border,
     backgroundColor: COLORS.backgroundSecondary,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.lg,
   },
   navButton: {
     alignItems: 'center',
@@ -408,7 +484,7 @@ const styles = StyleSheet.create({
     height: 28,
     lineHeight: 28,
     textAlign: 'center',
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.md,
     backgroundColor: COLORS.surfaceRaised,
     overflow: 'hidden',
   },

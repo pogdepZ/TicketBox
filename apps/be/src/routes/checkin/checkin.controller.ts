@@ -5,7 +5,7 @@ import { SyncCheckinDto } from './dto/sync-checkin.dto';
 
 @Controller('checkin')
 export class CheckinController {
-  constructor(private readonly checkinService: CheckinService) {}
+  constructor(private readonly checkinService: CheckinService) { }
 
   @Post('scan')
   async scan(@Body() dto: ScanCheckinDto) {

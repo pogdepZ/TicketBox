@@ -9,7 +9,6 @@ import React from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   StatusBar,
   ScrollView,
@@ -19,6 +18,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
+import { Button, Card } from '../components';
 import type { RootStackParamList, ScanStatus } from '../types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Result'>;
@@ -59,7 +59,14 @@ export default function ResultScreen() {
   const route = useRoute<ResultRouteProp>();
   const { ticket, isOffline } = route.params;
 
-  const config = STATUS_CONFIG[ticket.status];
+  console.log("ticket", ticket)
+
+  const config = STATUS_CONFIG[ticket.status as ScanStatus] || {
+    label: `Lỗi: Status là "${ticket.status}"`,
+    code: 'ERR',
+    color: COLORS.error,
+    bgColor: '#CCCCCC30', 
+  };
   const checkinTime = new Date(ticket.checkedInAt).toLocaleString('vi-VN');
 
   return (
@@ -109,21 +116,17 @@ export default function ResultScreen() {
         </View>
 
         <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.scanAgainButton}
+          <Button
+            title="Quét vé tiếp theo"
             onPress={() => navigation.navigate('Scanner')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.scanAgainText}>Quét vé tiếp theo</Text>
-          </TouchableOpacity>
+            variant="primary"
+          />
 
-          <TouchableOpacity
-            style={styles.queueButton}
+          <Button
+            title="Xem hàng đợi offline"
             onPress={() => navigation.navigate('OfflineQueue')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.queueButtonText}>Xem hàng đợi offline</Text>
-          </TouchableOpacity>
+            variant="secondary"
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -190,7 +193,7 @@ const styles = StyleSheet.create({
   },
   statusBanner: {
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.lg,
     marginTop: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -202,7 +205,7 @@ const styles = StyleSheet.create({
   statusIcon: {
     width: 72,
     height: 72,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.lg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.lg,
@@ -284,29 +287,5 @@ const styles = StyleSheet.create({
   actions: {
     marginTop: SPACING.xxl,
     gap: SPACING.md,
-  },
-  scanAgainButton: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.lg,
-    borderRadius: BORDER_RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scanAgainText: {
-    color: COLORS.background,
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '800',
-  },
-  queueButton: {
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.sm,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  queueButtonText: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.md,
   },
 });

@@ -52,11 +52,12 @@ class ApiService {
 
       return {
         success: response.ok,
-        data: json,
+        data: json.data !== undefined ? json.data : json,
         message: response.ok ? undefined : 'Request failed',
       };
     } catch (error) {
       clearTimeout(timeoutId);
+      console.error(`[API Error] request to ${endpoint} failed:`, error);
 
       const message =
         error instanceof Error

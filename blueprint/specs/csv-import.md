@@ -46,3 +46,19 @@ Tran Thi B,b@example.com,0900000002,Sponsor,VIP002
 - File lỗi không làm gián đoạn hệ thống.
 - File có 100 dòng, 90 dòng hợp lệ, 10 dòng lỗi thì 90 dòng vẫn được import.
 - Import lại cùng file không tạo duplicate.
+
+## 7. API Endpoints
+
+### `POST /guest-list/import`
+- **Mô tả:** Import danh sách khách mời từ file CSV.
+- **Request:** `multipart/form-data`
+  - `concertId`: UUID
+  - `file`: CSV file
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": { "imported": 10, "duplicates": 0, "errors": 0 },
+    "message": "Imported successfully"
+  }
+  ```

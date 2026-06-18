@@ -14,6 +14,12 @@ Nhân sự soát vé (vai trò `checker`) dùng mobile app/PWA để quét QR e-
 6. Nếu ticket active, backend update ticket thành used.
 7. App hiển thị check-in thành công.
 
+## 2.1 Hiệu năng
+
+- Giao diện dễ nhìn ban đêm.
+- Mạng chậm 5s -> mobile tự rớt xuống offline.
+- Quét 10,000 vé trong 2 giờ -> server không quá tải DB connection (dùng redis/pgbouncer).
+
 ## 3. Luồng offline
 
 1. Trước sự kiện, app đồng bộ public key và tải danh sách vé (cấu hình concert/gate) để lưu offline.
@@ -56,3 +62,38 @@ Nhân sự soát vé (vai trò `checker`) dùng mobile app/PWA để quét QR e-
 - Dữ liệu offline không mất sau khi đóng app.
 - Sync lại không tạo duplicate check-in event.
 - Vé đã used không thể accepted lần hai trên server.
+
+## 7. API Endpoints
+
+### `POST /checkin/scan`
+- **Mô tả:** Gửi yêu cầu check-in online cho một vé.
+- **Request Payload:**
+  ```json
+  {
+    "qrCodeData": "TKB-VIP-001",
+    "staffId": "uuid",
+    "concertId": "uuid",
+    "deviceId": "device-uuid",
+    "clientEventId": "scan-12345"
+  }
+  ```
+- **Response:** Trả về TicketInfo cùng `status` (SUCCESS/DUPLICATE/NOT_FOUND).
+
+### `POST /checkin/sync`
+- **Mô tả:** Đồng bộ danh sách check-in offline lên server.
+- **Request Payload:**
+  ```json
+  {
+    "items": [
+      {
+        "ticketId": "uuid",
+        "qrCodeData": "TKB-VIP-001",
+        "concertId": "uuid",
+        "staffId": "uuid",
+        "sourceDeviceId": "device-uuid",
+        "checkedAt": "ISOString"
+      }
+    ]
+  }
+  ```
+- **Response:** Danh sách trạng thái đồng bộ cho từng vé (`SYNCED`/`FAILED`).

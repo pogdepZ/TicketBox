@@ -7,7 +7,6 @@ import React from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   Alert,
   StatusBar,
@@ -18,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
+import { Button } from '../components';
 import type { RootStackParamList } from '../types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
@@ -37,6 +37,21 @@ export default function SettingsScreen() {
         },
       },
     ]);
+  };
+
+  const debugStorage = async () => {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const result = await AsyncStorage.multiGet(keys);
+      console.log('--- ASYNC STORAGE DUMP ---');
+      result.forEach(([key, value]) => {
+        console.log(`${key}:`, value);
+      });
+      console.log('--------------------------');
+      Alert.alert('Log thành công', 'Mở Terminal/Console của Expo để xem chi tiết dữ liệu nhé!');
+    } catch (error) {
+      console.error('Error reading AsyncStorage:', error);
+    }
   };
 
   return (
@@ -72,13 +87,27 @@ export default function SettingsScreen() {
           <SettingRow label="Sync lần cuối" value="07/06/2026 20:00" />
         </View>
 
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={handleLogout}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.logoutText}>Đăng xuất</Text>
-        </TouchableOpacity>
+        <View style={{ marginTop: SPACING.xxxl }}>
+          <Button
+            title="📥 Tải dữ liệu Offline (Snapshot)"
+            onPress={() => navigation.navigate('Snapshot')}
+            variant="primary"
+            style={{ marginBottom: SPACING.md }}
+          />
+          <Button
+            title="🔍 In dữ liệu lưu trữ (Console)"
+            onPress={debugStorage}
+            variant="secondary"
+            style={{ marginBottom: SPACING.md }}
+          />
+          <Button
+            title="Đăng xuất"
+            onPress={handleLogout}
+            variant="ghost"
+            style={{ borderWidth: 1, borderColor: COLORS.error }}
+            textStyle={{ color: COLORS.error }}
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -110,7 +139,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.backgroundSecondary,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.lg,
   },
   avatar: {
     width: 64,
@@ -145,7 +174,7 @@ const styles = StyleSheet.create({
   profileBadge: {
     width: 42,
     height: 34,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.md,
     backgroundColor: COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -177,26 +206,5 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: FONT_SIZES.md,
     flex: 1,
-  },
-  settingValue: {
-    color: COLORS.text,
-    fontSize: FONT_SIZES.md,
-    fontWeight: '500',
-    flex: 1.2,
-    textAlign: 'right',
-  },
-  logoutButton: {
-    marginHorizontal: SPACING.xl,
-    marginTop: SPACING.xxxl,
-    paddingVertical: SPACING.lg,
-    borderRadius: BORDER_RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.error,
-    alignItems: 'center',
-  },
-  logoutText: {
-    color: COLORS.error,
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
   },
 });

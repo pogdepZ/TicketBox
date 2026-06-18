@@ -11,10 +11,8 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   StyleSheet,
   Alert,
-  ActivityIndicator,
   StatusBar,
   KeyboardAvoidingView,
   Platform,
@@ -24,6 +22,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
+import { Button } from '../components';
+import { apiService } from '../services/api';
 import type { RootStackParamList } from '../types';
 
 // Simulated network check
@@ -38,9 +38,6 @@ const useNetworkStatus = () => {
 };
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
-
-const MOCK_JWT =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzdGFmZi0wMDEiLCJyb2xlIjoiQ0hFQ0tJTl9TVEFGRiIsImlhdCI6MTcwMDAwMDAwMH0.mock-signature';
 
 export default function LoginScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -58,24 +55,32 @@ export default function LoginScreen() {
 
     setLoading(true);
 
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    // Save mock JWT token
-    await AsyncStorage.setItem('auth_token', MOCK_JWT);
-    await AsyncStorage.setItem(
-      'auth_user',
-      JSON.stringify({
-        id: 'staff-001',
+    try {
+      const response = await apiService.post<{ accessToken: string; user: any }>('/auth/login', {
         email: email.trim(),
-        fullName: 'Nhân viên soát vé',
-        role: 'CHECKIN_STAFF',
-        token: MOCK_JWT,
-      }),
-    );
+        password: password.trim(),
+      });
 
-    setLoading(false);
-    navigation.reset({ index: 0, routes: [{ name: 'Scanner' }] });
+      if (response.success && response.data) {
+        const { accessToken, user } = response.data;
+
+        // Save to AsyncStorage
+        await AsyncStorage.setItem('auth_token', accessToken);
+        await AsyncStorage.setItem('auth_user', JSON.stringify(user));
+        
+        // Set token for future API calls
+        apiService.setToken(accessToken);
+
+        navigation.reset({ index: 0, routes: [{ name: 'Scanner' }] });
+      } else {
+        Alert.alert('Đăng nhập thất bại', response.message || 'Email hoặc mật khẩu không đúng');
+      }
+    } catch (error) {
+      console.error('Login error detailed:', error);
+      Alert.alert('Lỗi', 'Không thể kết nối tới server');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -146,18 +151,12 @@ export default function LoginScreen() {
             />
           </View>
 
-          <TouchableOpacity
-            style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+          <Button
+            title="Bắt đầu ca trực"
             onPress={handleLogin}
-            disabled={loading}
-            activeOpacity={0.85}
-          >
-            {loading ? (
-              <ActivityIndicator color={COLORS.background} />
-            ) : (
-              <Text style={styles.loginButtonText}>Bắt đầu ca trực</Text>
-            )}
-          </TouchableOpacity>
+            loading={loading}
+            style={{ marginTop: SPACING.lg }}
+          />
         </View>
 
         <View style={styles.shiftPanel}>
@@ -303,21 +302,6 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     borderWidth: 1,
     borderColor: COLORS.border,
-  },
-  loginButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: BORDER_RADIUS.sm,
-    paddingVertical: SPACING.lg,
-    alignItems: 'center',
-    marginTop: SPACING.md,
-  },
-  loginButtonDisabled: {
-    opacity: 0.7,
-  },
-  loginButtonText: {
-    color: COLORS.background,
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '800',
   },
   shiftPanel: {
     flexDirection: 'row',

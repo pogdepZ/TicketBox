@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Injectable()
 export class NotificationsService {
+  constructor(private prisma: PrismaService) {}
+
   async sendNotification(
     userId: string,
     type: string,
@@ -13,9 +16,20 @@ export class NotificationsService {
       { type, payload },
     );
 
+    const notification = await this.prisma.notification.create({
+      data: {
+        userId,
+        channel: channel === 'EMAIL' || channel === 'PUSH' || channel === 'SMS' || channel === 'ZALO' ? channel : 'EMAIL',
+        template: type,
+        payload: payload as any,
+        status: 'SENT',
+        sentAt: new Date(),
+      },
+    });
+
     return {
-      notificationId: `notif-${Date.now()}`,
-      status: 'QUEUED',
+      notificationId: notification.id,
+      status: 'SENT',
     };
   }
 
