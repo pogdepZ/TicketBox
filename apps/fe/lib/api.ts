@@ -71,6 +71,14 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     const errorData = await response.json().catch(() => ({}));
     const message = errorData.message || 'API Request failed';
     const statusCode = errorData.metadata?.statusCode || response.status;
+    
+    if (statusCode === 401 && typeof window !== 'undefined') {
+      if (window.localStorage.getItem('access_token')) {
+        window.localStorage.removeItem('access_token');
+        window.dispatchEvent(new CustomEvent('ticketbox-auth-change'));
+      }
+    }
+
     throw new ApiError(message, statusCode);
   }
 

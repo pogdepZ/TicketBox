@@ -21,8 +21,10 @@ export function HomeBanner() {
         } else {
           setSession(null);
         }
-      } catch (err) {
-        console.error('Failed to sync session on HomeBanner', err);
+      } catch (err: any) {
+        if (err?.statusCode !== 401) {
+          console.error('Failed to sync session on HomeBanner', err);
+        }
         setSession(null);
       }
     }

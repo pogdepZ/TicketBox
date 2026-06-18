@@ -24,8 +24,10 @@ export default function MyTicketsPage() {
           const storedOrders = getStoredMockOrders();
           setOrders(storedOrders);
         }
-      } catch (err) {
-        console.error(err);
+      } catch (err: any) {
+        if (err?.statusCode !== 401) {
+          console.error(err);
+        }
       } finally {
         setLoading(false);
       }

@@ -32,8 +32,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         } else {
           router.push('/');
         }
-      } catch (err) {
-        console.error(err);
+      } catch (err: any) {
+        if (err?.statusCode !== 401) {
+          console.error(err);
+        }
         router.push('/login');
       } finally {
         setLoading(false);
