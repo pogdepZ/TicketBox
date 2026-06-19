@@ -78,6 +78,7 @@ export default function MyTicketsPage() {
     order.tickets.map(ticket => ({
       ...ticket,
       concertTitle: order.concertTitle,
+      concertVenue: order.concertVenue,
       orderNumber: order.orderNumber,
       paidAt: order.paidAt,
     }))
@@ -123,7 +124,7 @@ export default function MyTicketsPage() {
                 concertTitle={ticket.concertTitle}
                 date={ticket.createdAt}
                 time={new Date(ticket.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                venue="Nhà hát Hòa Bình, TP. Hồ Chí Minh"
+                venue={ticket.concertVenue || "Nhà hát Hòa Bình, TP. Hồ Chí Minh"}
                 seatZone={ticket.seatZone}
                 seatNumber={ticket.seatNumber}
                 price={ticket.price}

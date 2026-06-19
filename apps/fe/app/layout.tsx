@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { ToastContainer } from '@/components/toast-container'
+import { HistoryListener } from '@/components/history-listener'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({
@@ -54,9 +55,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable}`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="font-sans antialiased bg-background text-foreground">
         {children}
         <ToastContainer />
+        <HistoryListener />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

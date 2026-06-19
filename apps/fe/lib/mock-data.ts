@@ -294,7 +294,7 @@ const zoneTemplates = [
   },
   {
     code: 'premium',
-    name: 'Premium',
+    name: 'CAT1',
     label: 'Khu C',
     price: 650000,
     totalQuantity: 420,
@@ -304,7 +304,7 @@ const zoneTemplates = [
   },
   {
     code: 'standard',
-    name: 'Standard',
+    name: 'CAT2',
     label: 'Khu D',
     price: 420000,
     totalQuantity: 760,
@@ -314,13 +314,13 @@ const zoneTemplates = [
   },
   {
     code: 'economy',
-    name: 'Economy',
+    name: 'GA',
     label: 'Khu E',
     price: 250000,
     totalQuantity: 540,
-    remaining: 0,
+    remaining: 145,
     color: '#64748b',
-    description: 'Khu tiết kiệm phía xa sân khấu, hiện đã hết vé cho đợt mở bán này.',
+    description: 'Khu vực General Admission (GA) tự do sôi động, gần gũi với không khí lễ hội.',
   },
 ] as const;
 
@@ -483,10 +483,7 @@ export function getSeatsByConcertId(concertId: string): Seat[] {
     ...createZoneSeats(concertId, 'vip', ['G', 'H', 'I', 'J', 'K', 'L', 'M'], 18),
     ...createZoneSeats(concertId, 'premium', ['N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U'], 20),
     ...createZoneSeats(concertId, 'standard', ['V', 'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC'], 22),
-    ...createZoneSeats(concertId, 'economy', ['AD', 'AE', 'AF', 'AG', 'AH', 'AI'], 24).map((seat) => ({
-      ...seat,
-      status: 'sold' as const,
-    })),
+    ...createZoneSeats(concertId, 'economy', ['AD', 'AE', 'AF', 'AG', 'AH', 'AI'], 24),
   ];
 }
 
@@ -555,7 +552,7 @@ export const ticketTypes = ticketZones.map((zone) => ({
 
 export const seatZones = ticketZones.map((zone) => ({
   id: zone.seatZoneId ?? zone.id,
-  name: `${zone.name} / ${zone.label}`,
+  name: zone.name,
   rows: 8,
   seatsPerRow: 18,
   price: zone.price,
@@ -685,7 +682,7 @@ export const orderMock = {
     .filter((ticket) => ticket.orderId === demoOrder.id)
     .map((ticket) => ({
       ticketNumber: ticket.ticketCode,
-      seatZone: `${demoTicketType.name} / ${mockSeatZones.find((zone) => zone.id === demoTicketType.seatZoneId)?.label ?? ''}`,
+      seatZone: demoTicketType.name,
       seatNumber: ticket.seatNumber,
       qrPayload: ticket.qrPayload,
     })),
@@ -700,9 +697,9 @@ export const adminStats = {
   ticketDistribution: [
     { label: 'SVIP', value: 14, color: 'bg-primary' },
     { label: 'VIP', value: 24, color: 'bg-[#e0a82e]' },
-    { label: 'Premium', value: 29, color: 'bg-[#3d6f8f]' },
-    { label: 'Standard', value: 25, color: 'bg-accent' },
-    { label: 'Economy', value: 8, color: 'bg-slate-500' },
+    { label: 'CAT1', value: 29, color: 'bg-[#3d6f8f]' },
+    { label: 'CAT2', value: 25, color: 'bg-accent' },
+    { label: 'GA', value: 8, color: 'bg-slate-500' },
   ],
 };
 

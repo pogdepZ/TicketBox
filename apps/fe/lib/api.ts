@@ -240,9 +240,14 @@ export async function createOrder(payload: any, idempotencyKey?: string) {
 // PAYMENTS
 // ----------------------------------------------------
 
-export async function createPayment(payload: { orderId: string; provider: string; returnUrl?: string }) {
+export async function createPayment(payload: { orderId: string; provider: string; returnUrl?: string }, idempotencyKey?: string) {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers['idempotency-key'] = idempotencyKey;
+  }
   return await fetchApi('/payments/create', {
     method: 'POST',
+    headers,
     body: JSON.stringify(payload),
   });
 }
@@ -326,9 +331,7 @@ export async function getTicketZonesAsync(concertId: string, preFetchedSeatZones
       return getTicketZonesByConcertId(concertId); // fallback if no real zones
     }
 
-    const validMockCodes = ['svip', 'vip', 'premium', 'standard', 'economy'];
-
-    return seatZones.flatMap((zone: any, index: number) => {
+    return seatZones.flatMap((zone: any) => {
       const ticketType = zone.ticketTypes?.[0];
       if (!ticketType) return [];
 
@@ -336,7 +339,10 @@ export async function getTicketZonesAsync(concertId: string, preFetchedSeatZones
       if (ticketType.status === 'SOLD_OUT' || ticketType.remaining === 0) status = 'sold-out';
       else if (ticketType.remaining / ticketType.totalQuantity <= 0.15) status = 'limited';
 
-      const mockCode = validMockCodes[index % validMockCodes.length];
+      let mockCode = (zone.code || 'economy').toLowerCase();
+      if (!['svip', 'vip', 'premium', 'standard', 'economy'].includes(mockCode)) {
+        mockCode = 'economy';
+      }
 
       return [{
         id: mockCode,
@@ -372,10 +378,12 @@ export async function getSeatsAsync(concertId: string, preFetchedSeatZones?: any
     }
 
     const seats: any[] = [];
-    const validMockCodes = ['svip', 'vip', 'premium', 'standard', 'economy'];
     
-    seatZones.forEach((zone: any, index: number) => {
-      const mockCode = validMockCodes[index % validMockCodes.length];
+    seatZones.forEach((zone: any) => {
+      let mockCode = (zone.code || 'economy').toLowerCase();
+      if (!['svip', 'vip', 'premium', 'standard', 'economy'].includes(mockCode)) {
+        mockCode = 'economy';
+      }
       const rowNames = ['A', 'B', 'C', 'D'];
       const seatsPerRow = 12;
       

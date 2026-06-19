@@ -7,7 +7,7 @@ import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { CheckoutSummary } from '@/components/checkout-summary';
 import { checkoutMock, concerts, paymentMethods } from '@/lib/mock-data';
 import { createDraftReservation, DraftReservation, getDraftReservation } from '@/lib/mock-reservation';
-import { createOrder, createPayment, getFriendlyErrorMessage } from '@/lib/api';
+import { createOrder, createPayment, getFriendlyErrorMessage, getProfile } from '@/lib/api';
 
 interface CheckoutViewModel {
   concertId: string;
@@ -62,23 +62,45 @@ function onlyDigits(value: string) {
 
 export function CheckoutFlow() {
   const router = useRouter();
-  const [checkout, setCheckout] = useState<CheckoutViewModel>(() => fallbackCheckout());
-  const [draftReservation, setDraftReservation] = useState<DraftReservation | null>(null);
+  const [checkout, setCheckout] = useState<CheckoutViewModel>(() => {
+    if (typeof window !== 'undefined') {
+      const draft = getDraftReservation();
+      if (draft) {
+        return fromDraftReservation(draft);
+      }
+    }
+    return fallbackCheckout();
+  });
+  const [draftReservation, setDraftReservation] = useState<DraftReservation | null>(() => {
+    if (typeof window !== 'undefined') {
+      return getDraftReservation();
+    }
+    return null;
+  });
   const [paymentMethod, setPaymentMethod] = useState('momo');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const draft = getDraftReservation();
-    if (draft) {
-      setDraftReservation(draft);
-      setCheckout(fromDraftReservation(draft));
+    async function loadUserProfile() {
+      try {
+        const profile = await getProfile();
+        if (profile && (profile.fullName || profile.name)) {
+          setCheckout((prev) => ({
+            ...prev,
+            customerName: profile.fullName || profile.name,
+          }));
+        }
+      } catch (err) {
+        console.warn('Failed to load user profile in checkout:', err);
+      }
     }
+    loadUserProfile();
   }, []);
 
   const expiresAtText = useMemo(() => {
     if (!checkout.expiresAt) {
-      return '15 phút';
+      return '5 phút';
     }
 
     return new Date(checkout.expiresAt).toLocaleTimeString('vi-VN', {
@@ -111,14 +133,18 @@ export function CheckoutFlow() {
 
       const returnUrl = `${window.location.origin}/success?orderId=${encodeURIComponent(orderId)}`;
 
+      const paymentIdempotencyKey = typeof window !== 'undefined' && window.crypto?.randomUUID 
+        ? window.crypto.randomUUID() 
+        : `idempotency-pay-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
       const paymentResponse = await createPayment({
         orderId,
         provider: paymentMethod.toUpperCase(),
         returnUrl,
-      });
+      }, paymentIdempotencyKey);
 
       if (paymentResponse.paymentUrl) {
-        router.push(paymentResponse.paymentUrl);
+        window.location.href = paymentResponse.paymentUrl;
       } else {
         router.push(`/success?orderId=${encodeURIComponent(orderId)}`);
       }

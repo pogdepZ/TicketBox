@@ -27,7 +27,7 @@ export function ZoneSeatMap({ zone, seats, selectedSeatIds, onToggleSeat, onBack
             Đổi hạng vé
           </button>
           <p className="text-sm font-bold text-primary">Bước 2</p>
-          <h2 className="text-2xl font-black tracking-tight text-foreground">Chọn ghế {zone.name} / {zone.label}</h2>
+          <h2 className="text-2xl font-black tracking-tight text-foreground">Chọn ghế {zone.name}</h2>
           <p className="mt-2 max-w-2xl text-muted-foreground">
             Chỉ hiển thị ghế thuộc khu đã chọn. Ghế được bo cong nhẹ theo khoảng cách với sân khấu.
           </p>
@@ -90,7 +90,7 @@ export function ZoneSeatMap({ zone, seats, selectedSeatIds, onToggleSeat, onBack
       <div className="rounded-3xl border border-border bg-muted/45 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="font-black text-foreground">{zone.name} / {zone.label}</p>
+            <p className="font-black text-foreground">{zone.name}</p>
             <p className="text-sm text-muted-foreground">{zone.description}</p>
           </div>
           <p className="text-lg font-black text-primary">{zone.price.toLocaleString('vi-VN')}đ / vé</p>

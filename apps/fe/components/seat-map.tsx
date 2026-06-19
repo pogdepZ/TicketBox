@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Seat, TicketZone } from '@/lib/mock-data';
+import type { Seat, TicketZone, TicketZoneStatus } from '@/lib/mock-data';
 import { OrderSummary } from '@/components/checkout/OrderSummary';
 import { VenueMapOverview } from '@/components/seat-map/VenueMapOverview';
 import { ZoneSeatMap } from '@/components/seat-map/ZoneSeatMap';
@@ -22,10 +22,60 @@ export function SeatMap({ concertId, concertTitle, zones, seats }: SeatMapProps)
   const [step, setStep] = useState<FlowStep>('overview');
   const [selectedZone, setSelectedZone] = useState<TicketZone | undefined>();
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
+  const [currentZones, setCurrentZones] = useState<TicketZone[]>(zones);
+
+  useEffect(() => {
+    setCurrentZones(zones);
+  }, [zones]);
+
+  // Real-time simulated updates for ticket availability
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentZones((prevZones) => {
+        // Find zones that still have tickets
+        const availableZones = prevZones.filter((z) => z.remaining > 0);
+        if (availableZones.length === 0) return prevZones;
+
+        // Choose 1 or 2 random zones to decrease their remaining tickets
+        const numZonesToUpdate = Math.min(availableZones.length, Math.random() > 0.5 ? 2 : 1);
+        const shuffled = [...availableZones].sort(() => 0.5 - Math.random());
+        const targetZones = shuffled.slice(0, numZonesToUpdate);
+
+        return prevZones.map((zone) => {
+          const target = targetZones.find((tz) => tz.id === zone.id);
+          if (target) {
+            // Decrease by 1 or 2 tickets
+            const decrement = Math.random() > 0.7 ? 2 : 1;
+            const newRemaining = Math.max(0, zone.remaining - decrement);
+            
+            let status = zone.status;
+            if (newRemaining === 0) {
+              status = 'sold-out';
+            } else if (newRemaining / zone.total <= 0.15) {
+              status = 'limited';
+            }
+
+            return {
+              ...zone,
+              remaining: newRemaining,
+              status: status as TicketZoneStatus,
+            };
+          }
+          return zone;
+        });
+      });
+    }, 4000); // update every 4 seconds
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const activeSelectedZone = useMemo(() => {
+    return selectedZone ? currentZones.find((z) => z.id === selectedZone.id) : undefined;
+  }, [selectedZone, currentZones]);
 
   const zoneSeats = useMemo(
-    () => seats.filter((seat) => seat.zoneId === selectedZone?.id),
-    [seats, selectedZone?.id],
+    () => seats.filter((seat) => seat.zoneId === activeSelectedZone?.id),
+    [seats, activeSelectedZone?.id],
   );
 
   const selectedSeats = useMemo(
@@ -34,16 +84,17 @@ export function SeatMap({ concertId, concertTitle, zones, seats }: SeatMapProps)
   );
 
   function handleSelectZone(zone: TicketZone) {
-    if (zone.status === 'sold-out') {
+    const currentZoneState = currentZones.find((z) => z.id === zone.id);
+    if (!currentZoneState || currentZoneState.status === 'sold-out') {
       return;
     }
 
-    setSelectedZone(zone);
+    setSelectedZone(currentZoneState);
     setSelectedSeatIds([]);
   }
 
   function handleContinueToSeats() {
-    if (!selectedZone || selectedZone.status === 'sold-out') {
+    if (!activeSelectedZone || activeSelectedZone.status === 'sold-out') {
       return;
     }
 
@@ -68,16 +119,16 @@ export function SeatMap({ concertId, concertTitle, zones, seats }: SeatMapProps)
   }
 
   const primaryLabel = step === 'overview' ? 'Tiếp tục chọn ghế' : 'Tiếp tục thanh toán';
-  const primaryDisabled = step === 'overview' ? !selectedZone : selectedSeats.length === 0;
+  const primaryDisabled = step === 'overview' ? !activeSelectedZone : selectedSeats.length === 0;
   const primaryAction = step === 'overview' ? handleContinueToSeats : () => {
-    if (!selectedZone || selectedSeats.length === 0) {
+    if (!activeSelectedZone || selectedSeats.length === 0) {
       return;
     }
 
     createDraftReservation({
       concertId,
       concertTitle,
-      selectedZone,
+      selectedZone: activeSelectedZone,
       selectedSeats,
     });
     router.push('/checkout');
@@ -86,12 +137,12 @@ export function SeatMap({ concertId, concertTitle, zones, seats }: SeatMapProps)
   const summary = (
     <OrderSummary
       concertTitle={concertTitle}
-      selectedZone={selectedZone}
+      selectedZone={activeSelectedZone}
       selectedSeats={selectedSeats}
       primaryLabel={primaryLabel}
       primaryDisabled={primaryDisabled}
       onPrimaryAction={primaryAction}
-      onChangeZone={selectedZone ? handleBackToOverview : undefined}
+      onChangeZone={activeSelectedZone ? handleBackToOverview : undefined}
     />
   );
 
@@ -100,13 +151,13 @@ export function SeatMap({ concertId, concertTitle, zones, seats }: SeatMapProps)
       <div className="lg:col-span-2">
         {step === 'overview' ? (
           <VenueMapOverview
-            zones={zones}
-            selectedZone={selectedZone}
+            zones={currentZones}
+            selectedZone={activeSelectedZone}
             onSelectZone={handleSelectZone}
           />
-        ) : selectedZone ? (
+        ) : activeSelectedZone ? (
           <ZoneSeatMap
-            zone={selectedZone}
+            zone={activeSelectedZone}
             seats={zoneSeats}
             selectedSeatIds={selectedSeatIds}
             onToggleSeat={handleToggleSeat}
@@ -120,12 +171,12 @@ export function SeatMap({ concertId, concertTitle, zones, seats }: SeatMapProps)
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 backdrop-blur lg:hidden">
         <OrderSummary
           concertTitle={concertTitle}
-          selectedZone={selectedZone}
+          selectedZone={activeSelectedZone}
           selectedSeats={selectedSeats}
           primaryLabel={primaryLabel}
           primaryDisabled={primaryDisabled}
           onPrimaryAction={primaryAction}
-          onChangeZone={selectedZone ? handleBackToOverview : undefined}
+          onChangeZone={activeSelectedZone ? handleBackToOverview : undefined}
           compact
         />
       </div>

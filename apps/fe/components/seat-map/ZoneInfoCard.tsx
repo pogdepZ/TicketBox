@@ -24,7 +24,7 @@ export function ZoneInfoCard({ zone, isSelected, onSelect }: ZoneInfoCardProps) 
         <div>
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-full" style={{ backgroundColor: zone.color }} />
-            <p className="font-black text-foreground">{zone.name} / {zone.label}</p>
+            <p className="font-black text-foreground">{zone.name}</p>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{zone.description}</p>
         </div>
