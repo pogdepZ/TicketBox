@@ -3,7 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './common/prisma/prisma.module';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigType } from '@nestjs/config';
 import { APP_PIPE } from '@nestjs/core';
 import { validate } from './config/env.validation';
 import { AuthModule } from './routes/auth/auth.module';
@@ -20,6 +20,7 @@ import { CheckinModule } from './routes/checkin/checkin.module';
 import { NotificationsModule } from './routes/notifications/notifications.module';
 import { AiBioModule } from './routes/ai-bio/ai-bio.module';
 import { GuestListModule } from './routes/guest-list/guest-list.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -27,6 +28,18 @@ import { GuestListModule } from './routes/guest-list/guest-list.module';
       isGlobal: true,
       validate,
       load: [databaseConfig, jwtConfig, redisConfig],
+    }),
+    BullModule.forRootAsync({
+      inject: [redisConfig.KEY],
+      useFactory: (redis: ConfigType<typeof redisConfig>) => ({
+        connection: {
+          host: redis.host,
+          port: redis.port,
+          password: redis.password,
+          db: redis.db,
+          maxRetriesPerRequest: null,
+        },
+      }),
     }),
     ScheduleModule.forRoot(),
     PrismaModule,

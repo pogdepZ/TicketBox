@@ -9,7 +9,6 @@ async function bootstrap() {
     where: { email: 'staff-001@ticketbox.vn' },
     data: { password: '$2b$10$E/AQNm1R5sATpi.zaF4HROc00Tttx9zJFrf50QG7RgsprdDuq9Ndy' }
   });
-  console.log('Password updated');
   await app.close();
 }
 bootstrap();

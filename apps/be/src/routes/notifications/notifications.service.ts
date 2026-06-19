@@ -1,9 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @InjectQueue('notification') private readonly notificationQueue: Queue,
+  ) {}
 
   async sendNotification(
     userId: string,
@@ -22,9 +27,12 @@ export class NotificationsService {
         channel: channel === 'EMAIL' || channel === 'PUSH' || channel === 'SMS' || channel === 'ZALO' ? channel : 'EMAIL',
         template: type,
         payload: payload as any,
-        status: 'SENT',
-        sentAt: new Date(),
+        status: 'PENDING',
       },
+    });
+
+    await this.notificationQueue.add('send-single', {
+      notificationId: notification.id,
     });
 
     return {
@@ -37,6 +45,10 @@ export class NotificationsService {
     concertId: string,
   ): Promise<{ totalSent: number; status: string }> {
     console.log(`[NotificationsService] sendBulkReminder for concert ${concertId}`);
+
+    await this.notificationQueue.add('send-bulk', {
+      concertId,
+    });
 
     return {
       totalSent: 0,

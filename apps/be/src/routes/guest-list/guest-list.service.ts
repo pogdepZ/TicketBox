@@ -1,10 +1,34 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { UploadedFileDto } from './dto/uploaded-file.dto';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue, QueueEvents } from 'bullmq';
+import redisConfig from '../../config/redis.config';
+import { ConfigType } from '@nestjs/config';
 
 @Injectable()
-export class GuestListService {
-  constructor(private prisma: PrismaService) {}
+export class GuestListService implements OnModuleDestroy {
+  private queueEvents: QueueEvents;
+
+  constructor(
+    private prisma: PrismaService,
+    @InjectQueue('csv') private readonly csvQueue: Queue,
+    @Inject(redisConfig.KEY)
+    private readonly redis: ConfigType<typeof redisConfig>,
+  ) {
+    this.queueEvents = new QueueEvents('csv', {
+      connection: {
+        host: redis.host,
+        port: redis.port,
+        password: redis.password,
+        db: redis.db,
+      },
+    });
+  }
+
+  async onModuleDestroy() {
+    await this.queueEvents.close();
+  }
 
   async importFromCsv(
     concertId: string,
@@ -18,64 +42,17 @@ export class GuestListService {
       data: {
         concertId,
         fileUrl: file?.originalname || 'local_path.csv',
-        status: 'PROCESSING',
+        status: 'PENDING',
       },
     });
 
-    // Mock CSV parsing
-    const mockRows = [
-      { fullName: 'Nguyễn Văn A', email: 'a@example.com', guestCode: 'GUEST-001' },
-      { fullName: 'Trần Thị B', email: 'b@example.com', guestCode: 'GUEST-002' },
-    ];
-
-    let imported = 0;
-    let errors = 0;
-
-    for (let i = 0; i < mockRows.length; i++) {
-      const row = mockRows[i];
-      try {
-        await this.prisma.guestImportRow.create({
-          data: {
-            batchId: batch.id,
-            rowNumber: i + 1,
-            fullName: row.fullName,
-            email: row.email,
-            guestCode: row.guestCode,
-            validationStatus: 'VALID',
-          },
-        });
-
-        await this.prisma.guestList.create({
-          data: {
-            concertId,
-            fullName: row.fullName,
-            email: row.email,
-            guestCode: row.guestCode,
-            status: 'ACTIVE',
-            csvBatchId: batch.id,
-          },
-        });
-        imported++;
-      } catch (e) {
-        errors++;
-      }
-    }
-
-    await this.prisma.guestImportBatch.update({
-      where: { id: batch.id },
-      data: {
-        status: 'COMPLETED',
-        totalRows: mockRows.length,
-        validRows: imported,
-        invalidRows: errors,
-        completedAt: new Date(),
-      },
+    const job = await this.csvQueue.add('import', {
+      concertId,
+      batchId: batch.id,
     });
 
-    return {
-      imported,
-      duplicates: 0,
-      errors,
-    };
+    const result = await job.waitUntilFinished(this.queueEvents);
+
+    return result as { imported: number; duplicates: number; errors: number };
   }
 }
