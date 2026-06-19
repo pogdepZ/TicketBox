@@ -23,70 +23,114 @@ export default function SuccessPage() {
       if (orderId) {
         try {
           const fetchedOrder = await getOrderById(orderId);
-          if (fetchedOrder && !fetchedOrder.tickets) {
-            // DB order is real but tickets/concert relations might not be fully seeded/joined
-            const subtotal = fetchedOrder.totalAmount ? Number(fetchedOrder.totalAmount) : 0;
-            const mappedOrder: StoredMockOrder = {
-              id: fetchedOrder.id,
-              orderNumber: fetchedOrder.id.substring(0, 8).toUpperCase(),
-              userId: fetchedOrder.userId,
-              concertId: fetchedOrder.concertId,
-              concertTitle: fetchedOrder.concert?.name || fetchedOrder.concert?.title || 'Sự kiện âm nhạc',
-              reservationId: fetchedOrder.reservationId,
-              status: 'PAID', // Treat success page loading as paid
-              totalAmount: subtotal,
-              paymentMethod: fetchedOrder.paymentMethod || 'MOMO',
-              paidAt: fetchedOrder.paidAt || fetchedOrder.createdAt || new Date().toISOString(),
-              createdAt: fetchedOrder.createdAt || new Date().toISOString(),
-              expiresAt: fetchedOrder.expiresAt || new Date().toISOString(),
-              items: fetchedOrder.items?.map((item: any) => ({
-                id: item.id,
-                ticketTypeId: item.ticketTypeId,
-                quantity: item.quantity,
-                unitPrice: Number(item.unitPrice),
-                seatLabels: item.seatLabels || ['Tự do'],
-              })) || [],
-              tickets: Array.from({ length: fetchedOrder.items?.[0]?.quantity || 1 }).map((_, idx) => {
-                const ticketCode = `TBX-${new Date(fetchedOrder.createdAt || Date.now()).getFullYear()}-${fetchedOrder.id.substring(0, 6).toUpperCase()}-${idx + 1}`;
-                return {
-                  id: `ticket-${fetchedOrder.id}-${idx + 1}`,
-                  orderId: fetchedOrder.id,
-                  ticketTypeId: fetchedOrder.items?.[0]?.ticketTypeId,
-                  ticketCode,
-                  qrPayload: `mock-qr:${ticketCode}:${fetchedOrder.concertId}:${fetchedOrder.items?.[0]?.ticketTypeId}`,
-                  seatZone: fetchedOrder.items?.[0]?.ticketType?.name || 'Standard',
-                  seatNumber: 'Tự do',
-                  price: Number(fetchedOrder.items?.[0]?.unitPrice || subtotal),
-                  status: 'ACTIVE' as const,
-                  createdAt: fetchedOrder.createdAt || new Date().toISOString(),
-                };
-              })
-            };
-            setOrder(mappedOrder);
-            
-            const sessionKey = `notified-order-${orderId}`;
-            const alreadyNotified = typeof window !== 'undefined' && window.sessionStorage.getItem(sessionKey);
-            if (!alreadyNotified) {
-              addLocalNotification(
-                'Đặt vé thành công!',
-                `Đơn hàng #${mappedOrder.orderNumber} cho sự kiện "${mappedOrder.concertTitle}" đã được đặt thành công.`
-              );
-              if (typeof window !== 'undefined') {
-                window.sessionStorage.setItem(sessionKey, 'true');
+          if (fetchedOrder) {
+            let concertTitle = fetchedOrder.concert?.name || fetchedOrder.concert?.title || 'Sự kiện âm nhạc';
+            let concertVenue = 'Nhà hát Hòa Bình, TP. Hồ Chí Minh';
+            let concertDate = fetchedOrder.createdAt;
+
+            try {
+              const { getConcertById } = await import('@/lib/api');
+              const concertData = await getConcertById(fetchedOrder.concertId);
+              if (concertData) {
+                concertTitle = concertData.title;
+                concertVenue = concertData.venue || concertData.venueAddress || 'TicketBox Arena';
+                concertDate = concertData.date || fetchedOrder.createdAt;
+              }
+            } catch (err) {
+              console.warn('Failed to load concert details for success page:', err);
+            }
+
+            const draft = typeof window !== 'undefined' ? window.localStorage.getItem('ticketbox-draft-reservation') : null;
+            let draftSeats: string[] = [];
+            if (draft) {
+              try {
+                const parsedDraft = JSON.parse(draft);
+                if (parsedDraft && parsedDraft.concertId === fetchedOrder.concertId) {
+                  draftSeats = parsedDraft.item?.seatLabels || [];
+                }
+              } catch (e) {
+                console.warn('Failed to parse draft for success seat mapping:', e);
               }
             }
-          } else if (fetchedOrder) {
-            setOrder(fetchedOrder);
-            
-            const sessionKey = `notified-order-${orderId}`;
-            const alreadyNotified = typeof window !== 'undefined' && window.sessionStorage.getItem(sessionKey);
-            if (!alreadyNotified) {
-              addLocalNotification(
-                'Đặt vé thành công!',
-                `Đơn hàng #${fetchedOrder.orderNumber} cho sự kiện "${fetchedOrder.concertTitle}" đã được đặt thành công.`
-              );
-              if (typeof window !== 'undefined') {
-                window.sessionStorage.setItem(sessionKey, 'true');
+
+            const actualOrderId = fetchedOrder.orderId || fetchedOrder.id || '';
+            const actualOrderNumber = fetchedOrder.orderNumber || (actualOrderId ? actualOrderId.substring(0, 8).toUpperCase() : 'UNKNOWN');
+
+            if (!fetchedOrder.tickets) {
+              // DB order is real but tickets/concert relations might not be fully seeded/joined
+              const subtotal = fetchedOrder.totalAmount ? Number(fetchedOrder.totalAmount) : 0;
+              const mappedOrder: StoredMockOrder = {
+                id: actualOrderId,
+                orderNumber: actualOrderNumber,
+                userId: fetchedOrder.userId,
+                concertId: fetchedOrder.concertId,
+                concertTitle,
+                concertVenue,
+                reservationId: fetchedOrder.reservationId,
+                status: 'PAID', // Treat success page loading as paid
+                totalAmount: subtotal,
+                paymentMethod: fetchedOrder.paymentMethod || 'MOMO',
+                paidAt: fetchedOrder.paidAt || fetchedOrder.createdAt || new Date().toISOString(),
+                createdAt: concertDate || fetchedOrder.createdAt || new Date().toISOString(),
+                expiresAt: fetchedOrder.expiresAt || new Date().toISOString(),
+                items: fetchedOrder.items?.map((item: any) => ({
+                  id: item.id,
+                  ticketTypeId: item.ticketTypeId,
+                  quantity: item.quantity,
+                  unitPrice: Number(item.unitPrice),
+                  seatLabels: item.seatLabels || ['Tự do'],
+                })) || [],
+                tickets: Array.from({ length: fetchedOrder.items?.[0]?.quantity || 1 }).map((_, idx) => {
+                  const ticketCode = `TBX-${new Date(fetchedOrder.createdAt || Date.now()).getFullYear()}-${actualOrderId.substring(0, 6).toUpperCase()}-${idx + 1}`;
+                  const seatNumber = draftSeats[idx] || 'Tự do';
+                  return {
+                    id: `ticket-${actualOrderId}-${idx + 1}`,
+                    orderId: actualOrderId,
+                    ticketTypeId: fetchedOrder.items?.[0]?.ticketTypeId,
+                    ticketCode,
+                    qrPayload: `mock-qr:${ticketCode}:${fetchedOrder.concertId}:${fetchedOrder.items?.[0]?.ticketTypeId}`,
+                    seatZone: fetchedOrder.items?.[0]?.ticketType?.name || 'Standard',
+                    seatNumber,
+                    price: Number(fetchedOrder.items?.[0]?.unitPrice || subtotal),
+                    status: 'ACTIVE' as const,
+                    createdAt: fetchedOrder.createdAt || new Date().toISOString(),
+                  };
+                })
+              };
+              setOrder(mappedOrder);
+              
+              const sessionKey = `notified-order-${orderId}`;
+              const alreadyNotified = typeof window !== 'undefined' && window.sessionStorage.getItem(sessionKey);
+              if (!alreadyNotified) {
+                addLocalNotification(
+                  'Đặt vé thành công!',
+                  `Đơn hàng #${actualOrderNumber} cho sự kiện "${mappedOrder.concertTitle}" đã được đặt thành công.`
+                );
+                if (typeof window !== 'undefined') {
+                  window.sessionStorage.setItem(sessionKey, 'true');
+                }
+              }
+            } else {
+              // fetchedOrder.tickets already exists
+              const mappedOrder = {
+                ...fetchedOrder,
+                id: actualOrderId,
+                orderNumber: actualOrderNumber,
+                concertTitle,
+                concertVenue,
+              };
+              setOrder(mappedOrder);
+              
+              const sessionKey = `notified-order-${orderId}`;
+              const alreadyNotified = typeof window !== 'undefined' && window.sessionStorage.getItem(sessionKey);
+              if (!alreadyNotified) {
+                addLocalNotification(
+                  'Đặt vé thành công!',
+                  `Đơn hàng #${actualOrderNumber} cho sự kiện "${concertTitle}" đã được đặt thành công.`
+                );
+                if (typeof window !== 'undefined') {
+                  window.sessionStorage.setItem(sessionKey, 'true');
+                }
               }
             }
           }
@@ -211,7 +255,7 @@ export default function SuccessPage() {
                 concertTitle={order.concertTitle}
                 date={order.createdAt} // Fallback to order date if concert date isn't saved in draft
                 time={new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                venue="Nhà hát Hòa Bình, TP. Hồ Chí Minh" // Fallback venue
+                venue={order.concertVenue || "Nhà hát Hòa Bình, TP. Hồ Chí Minh"}
                 seatZone={ticket.seatZone}
                 seatNumber={ticket.seatNumber}
                 price={ticket.price}

@@ -68,11 +68,11 @@ export function VenueMapOverview({ zones, selectedZone, onSelectZone }: VenueMap
               return (
                 <g
                   key={zone.id}
-                  aria-label={`${zone.name} ${zone.label}`}
+                  aria-label={zone.name}
                   onClick={() => !isSoldOut && onSelectZone(zone)}
                   className={isSoldOut ? 'cursor-not-allowed opacity-45 outline-none' : 'cursor-pointer outline-none'}
                 >
-                  <title>{`${zone.name} / ${zone.label}`}</title>
+                  <title>{zone.name}</title>
                   <path
                     d={zonePaths[zone.id]}
                     fill={zone.color}
@@ -91,7 +91,7 @@ export function VenueMapOverview({ zones, selectedZone, onSelectZone }: VenueMap
                     pointerEvents="none"
                     className="fill-white text-base font-bold"
                   >
-                    {zone.name} / {zone.label}
+                    {zone.name}
                   </text>
                   <text
                     x={labelPosition.x}
@@ -101,7 +101,7 @@ export function VenueMapOverview({ zones, selectedZone, onSelectZone }: VenueMap
                     pointerEvents="none"
                     className="fill-white/80 text-xs"
                   >
-                    {zone.price.toLocaleString('vi-VN')}đ · {isSoldOut ? 'Hết vé' : `Còn ${zone.remaining}`}
+                    {Number(zone.price).toLocaleString('vi-VN')}đ · {isSoldOut ? 'Hết vé' : `Còn ${zone.remaining}`}
                   </text>
                 </g>
               );

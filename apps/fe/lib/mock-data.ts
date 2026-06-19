@@ -294,7 +294,7 @@ const zoneTemplates = [
   },
   {
     code: 'premium',
-    name: 'Premium',
+    name: 'CAT1',
     label: 'Khu C',
     price: 650000,
     totalQuantity: 420,
@@ -304,7 +304,7 @@ const zoneTemplates = [
   },
   {
     code: 'standard',
-    name: 'Standard',
+    name: 'CAT2',
     label: 'Khu D',
     price: 420000,
     totalQuantity: 760,
@@ -314,13 +314,13 @@ const zoneTemplates = [
   },
   {
     code: 'economy',
-    name: 'Economy',
+    name: 'GA',
     label: 'Khu E',
     price: 250000,
     totalQuantity: 540,
-    remaining: 0,
+    remaining: 145,
     color: '#64748b',
-    description: 'Khu tiết kiệm phía xa sân khấu, hiện đã hết vé cho đợt mở bán này.',
+    description: 'Khu vực General Admission (GA) tự do sôi động, gần gũi với không khí lễ hội.',
   },
 ] as const;
 
@@ -452,21 +452,31 @@ export function getTicketZonesByConcertId(concertId: string): TicketZone[] {
 function createZoneSeats(concertId: string, zoneCode: string, rowNames: string[], seatsPerRow: number): Seat[] {
   const effectiveConcertId = ['1', '2', '3', '4', '5', '6'].includes(concertId) ? concertId : '1';
   const seatZone = mockSeatZones.find((zone) => zone.concertId === effectiveConcertId && zone.code === zoneCode)!;
+  const ticketType = mockTicketTypes.find(
+    (tt) => tt.concertId === effectiveConcertId && tt.seatZoneId === seatZone.id
+  );
+  const remaining = ticketType ? ticketType.remaining : 0;
   const seats: Seat[] = [];
+
+  let availablePlaced = 0;
 
   rowNames.forEach((row, rowIndex) => {
     for (let number = 1; number <= seatsPerRow; number += 1) {
-      const isOuterDisabled = rowIndex === rowNames.length - 1 && (number <= 2 || number >= seatsPerRow - 1);
-      const numericConcertId = parseInt(concertId.replace(/[^0-9]/g, ''), 10) || 1;
-      const isSold = (rowIndex + number + numericConcertId) % 9 === 0 || (rowIndex === 1 && number >= 7 && number <= 9);
-      const isHeld = (rowIndex + number + numericConcertId) % 13 === 0 || (rowIndex === 3 && number === 12);
+      let status: 'disabled' | 'sold' | 'held' | 'available' = 'available';
+      if (availablePlaced < remaining) {
+        status = 'available';
+        availablePlaced++;
+      } else {
+        // Distribute some held and some sold to look natural
+        status = (rowIndex + number) % 7 === 0 ? 'held' : 'sold';
+      }
 
       seats.push({
         id: `seat-${concertId}-${zoneCode}-${row}-${number}`,
         row,
         number,
         label: `${row}${number.toString().padStart(2, '0')}`,
-        status: isOuterDisabled ? 'disabled' : isSold ? 'sold' : isHeld ? 'held' : 'available',
+        status,
         zoneId: zoneCode,
         concertId,
         seatZoneId: seatZone.id,
@@ -483,10 +493,7 @@ export function getSeatsByConcertId(concertId: string): Seat[] {
     ...createZoneSeats(concertId, 'vip', ['G', 'H', 'I', 'J', 'K', 'L', 'M'], 18),
     ...createZoneSeats(concertId, 'premium', ['N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U'], 20),
     ...createZoneSeats(concertId, 'standard', ['V', 'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC'], 22),
-    ...createZoneSeats(concertId, 'economy', ['AD', 'AE', 'AF', 'AG', 'AH', 'AI'], 24).map((seat) => ({
-      ...seat,
-      status: 'sold' as const,
-    })),
+    ...createZoneSeats(concertId, 'economy', ['AD', 'AE', 'AF', 'AG', 'AH', 'AI'], 24),
   ];
 }
 
@@ -555,7 +562,7 @@ export const ticketTypes = ticketZones.map((zone) => ({
 
 export const seatZones = ticketZones.map((zone) => ({
   id: zone.seatZoneId ?? zone.id,
-  name: `${zone.name} / ${zone.label}`,
+  name: zone.name,
   rows: 8,
   seatsPerRow: 18,
   price: zone.price,
@@ -685,7 +692,7 @@ export const orderMock = {
     .filter((ticket) => ticket.orderId === demoOrder.id)
     .map((ticket) => ({
       ticketNumber: ticket.ticketCode,
-      seatZone: `${demoTicketType.name} / ${mockSeatZones.find((zone) => zone.id === demoTicketType.seatZoneId)?.label ?? ''}`,
+      seatZone: demoTicketType.name,
       seatNumber: ticket.seatNumber,
       qrPayload: ticket.qrPayload,
     })),
@@ -700,9 +707,9 @@ export const adminStats = {
   ticketDistribution: [
     { label: 'SVIP', value: 14, color: 'bg-primary' },
     { label: 'VIP', value: 24, color: 'bg-[#e0a82e]' },
-    { label: 'Premium', value: 29, color: 'bg-[#3d6f8f]' },
-    { label: 'Standard', value: 25, color: 'bg-accent' },
-    { label: 'Economy', value: 8, color: 'bg-slate-500' },
+    { label: 'CAT1', value: 29, color: 'bg-[#3d6f8f]' },
+    { label: 'CAT2', value: 25, color: 'bg-accent' },
+    { label: 'GA', value: 8, color: 'bg-slate-500' },
   ],
 };
 

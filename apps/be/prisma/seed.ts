@@ -302,10 +302,46 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
     console.log(`Seeded concert already exists with ID: ${concert.id}`);
   }
 
+  const zonesData = [
+    { code: 'svip', name: 'SVIP', color: '#e5484d' },
+    { code: 'vip', name: 'VIP', color: '#e0a82e' },
+    { code: 'premium', name: 'CAT1', color: '#3d6f8f' },
+    { code: 'standard', name: 'CAT2', color: '#123c3a' },
+    { code: 'economy', name: 'GA', color: '#64748b' },
+  ];
+
+  const zoneMap: Record<string, string> = {};
+
+  for (const zone of zonesData) {
+    let existingZone = await prisma.seatZone.findFirst({
+      where: {
+        concertId: concert.id,
+        code: zone.code,
+      },
+    });
+
+    if (!existingZone) {
+      existingZone = await prisma.seatZone.create({
+        data: {
+          concertId: concert.id,
+          code: zone.code,
+          name: zone.name,
+          color: zone.color,
+        },
+      });
+      console.log(`  Created SeatZone: ${zone.name} (ID: ${existingZone.id})`);
+    } else {
+      console.log(`  SeatZone ${zone.name} already exists (ID: ${existingZone.id})`);
+    }
+    zoneMap[zone.name] = existingZone.id;
+  }
+
   const ticketTypesData = [
     { name: 'SVIP', price: '1800000', totalQuantity: 50 },
     { name: 'VIP', price: '1200000', totalQuantity: 100 },
-    { name: 'GA', price: '450000', totalQuantity: 200 },
+    { name: 'CAT1', price: '850000', totalQuantity: 150 },
+    { name: 'CAT2', price: '600000', totalQuantity: 200 },
+    { name: 'GA', price: '450000', totalQuantity: 300 },
   ];
 
   for (const tt of ticketTypesData) {
@@ -322,6 +358,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       const created = await prisma.ticketType.create({
         data: {
           concertId: concert.id,
+          seatZoneId: zoneMap[tt.name] || null,
           name: tt.name,
           price: tt.price,
           totalQuantity: tt.totalQuantity,
@@ -331,6 +368,14 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       });
       console.log(`  Created TicketType: ${tt.name} (ID: ${created.id})`);
     } else {
+      // update seatZoneId if it's null
+      if (!existing.seatZoneId && zoneMap[tt.name]) {
+        await prisma.ticketType.update({
+          where: { id: existing.id },
+          data: { seatZoneId: zoneMap[tt.name] },
+        });
+        console.log(`  Updated SeatZoneId for existing TicketType ${tt.name}`);
+      }
       console.log(`  TicketType ${tt.name} already exists (ID: ${existing.id})`);
     }
   }
