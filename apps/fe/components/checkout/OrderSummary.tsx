@@ -23,33 +23,35 @@ export function OrderSummary({
   compact,
 }: OrderSummaryProps) {
   const quantity = selectedSeats.length;
-  const unitPrice = selectedZone?.price ?? 0;
+  const unitPrice = Number(selectedZone?.price ?? 0);
   const subtotal = quantity * unitPrice;
-  const fee = Math.round(subtotal * 0.05);
-  const tax = Math.round(subtotal * 0.1);
-  const total = subtotal + fee + tax;
+  const fee = 0;
+  const tax = 0;
+  const total = subtotal;
 
   if (compact) {
     return (
       <div className="rounded-t-3xl border border-border bg-card p-4 shadow-2xl shadow-foreground/15">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs text-muted-foreground">{selectedZone ? `${selectedZone.name} / ${selectedZone.label}` : 'Chưa chọn khu'}</p>
+            <p className="text-xs text-muted-foreground">{selectedZone ? selectedZone.name : 'Chưa chọn khu'}</p>
             <p className="font-bold text-foreground">
               {selectedSeats.length > 0 ? `${selectedSeats.length} ghế: ${selectedSeats.map((seat) => seat.label).join(', ')}` : 'Chọn khu và ghế để tiếp tục'}
             </p>
           </div>
           <p className="text-lg font-bold text-primary">{total.toLocaleString('vi-VN')}đ</p>
         </div>
-        <button
-          type="button"
-          disabled={primaryDisabled}
-          onClick={onPrimaryAction}
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 font-bold text-primary-foreground transition hover:bg-primary/90 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {primaryLabel}
-          <ArrowRight className="h-4 w-4" />
-        </button>
+        {onPrimaryAction && (
+          <button
+            type="button"
+            disabled={primaryDisabled}
+            onClick={onPrimaryAction}
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 font-bold text-primary-foreground transition hover:bg-primary/90 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            {primaryLabel}
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        )}
       </div>
     );
   }
@@ -75,7 +77,7 @@ export function OrderSummary({
             <div className="mt-1 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span className="h-3 w-3 rounded-full" style={{ backgroundColor: selectedZone.color }} />
-                <p className="font-semibold text-foreground">{selectedZone.name} / {selectedZone.label}</p>
+                <p className="font-semibold text-foreground">{selectedZone.name}</p>
               </div>
               {onChangeZone && (
                 <button type="button" onClick={onChangeZone} className="text-xs font-semibold text-primary hover:text-primary/80">
@@ -90,14 +92,16 @@ export function OrderSummary({
 
         {selectedZone && (
           <div className="rounded-2xl bg-muted/60 p-3 text-sm text-muted-foreground">
-            <div className="mb-1 flex justify-between gap-3">
-              <span>Giá vé</span>
-              <span className="font-semibold text-foreground">{selectedZone.price.toLocaleString('vi-VN')}đ</span>
-            </div>
             <div className="flex justify-between gap-3">
-              <span>Còn lại</span>
-              <span className="font-semibold text-foreground">{selectedZone.remaining.toLocaleString('vi-VN')} vé</span>
+              <span>Giá vé</span>
+              <span className="font-semibold text-foreground">{Number(selectedZone.price).toLocaleString('vi-VN')}đ</span>
             </div>
+            {selectedZone.remaining > 0 && (
+              <div className="mt-1 flex justify-between gap-3">
+                <span>Còn lại</span>
+                <span className="font-semibold text-foreground">{selectedZone.remaining.toLocaleString('vi-VN')} vé</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -128,11 +132,11 @@ export function OrderSummary({
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Phí dịch vụ</span>
-          <span className="font-semibold text-foreground">{fee.toLocaleString('vi-VN')}đ</span>
+          <span className="font-semibold text-foreground">Miễn phí</span>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">VAT</span>
-          <span className="font-semibold text-foreground">{tax.toLocaleString('vi-VN')}đ</span>
+          <span className="font-semibold text-foreground">Đã bao gồm</span>
         </div>
       </div>
 
@@ -141,15 +145,17 @@ export function OrderSummary({
         <span className="text-2xl font-black text-primary">{total.toLocaleString('vi-VN')}đ</span>
       </div>
 
-      <button
-        type="button"
-        disabled={primaryDisabled}
-        onClick={onPrimaryAction}
-        className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 font-bold text-primary-foreground transition hover:bg-primary/90 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45"
-      >
-        {primaryLabel}
-        <ArrowRight className="h-4 w-4" />
-      </button>
+      {onPrimaryAction && (
+        <button
+          type="button"
+          disabled={primaryDisabled}
+          onClick={onPrimaryAction}
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 font-bold text-primary-foreground transition hover:bg-primary/90 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {primaryLabel}
+          <ArrowRight className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 }

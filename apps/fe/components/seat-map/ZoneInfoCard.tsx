@@ -24,7 +24,7 @@ export function ZoneInfoCard({ zone, isSelected, onSelect }: ZoneInfoCardProps) 
         <div>
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-full" style={{ backgroundColor: zone.color }} />
-            <p className="font-black text-foreground">{zone.name} / {zone.label}</p>
+            <p className="font-black text-foreground">{zone.name}</p>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{zone.description}</p>
         </div>
@@ -36,7 +36,7 @@ export function ZoneInfoCard({ zone, isSelected, onSelect }: ZoneInfoCardProps) 
       </div>
       <div className="flex items-center justify-between border-t border-border pt-3">
         <span className="text-sm text-muted-foreground">Còn {zone.remaining.toLocaleString('vi-VN')} / {zone.total.toLocaleString('vi-VN')} vé</span>
-        <span className="font-black text-foreground">{zone.price.toLocaleString('vi-VN')}đ</span>
+        <span className="font-black text-foreground">{Number(zone.price).toLocaleString('vi-VN')}đ</span>
       </div>
     </button>
   );

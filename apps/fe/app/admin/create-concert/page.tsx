@@ -114,9 +114,10 @@ export default function CreateConcertPage() {
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">Giá vé tối thiểu</label>
                     <input
-                      type="number"
-                      defaultValue={ticketTypes[ticketTypes.length - 1].price}
+                      type="text"
+                      defaultValue={ticketTypes[ticketTypes.length - 1].price.toLocaleString('vi-VN')}
                       className="h-11 w-full rounded-2xl border border-border bg-muted px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
+                      readOnly
                     />
                   </div>
                 </div>

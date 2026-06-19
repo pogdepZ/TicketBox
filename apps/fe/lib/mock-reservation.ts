@@ -44,6 +44,7 @@ export interface StoredMockOrder {
   userId: string;
   concertId: string;
   concertTitle: string;
+  concertVenue?: string;
   reservationId: string;
   status: 'PAID';
   totalAmount: number;
@@ -68,7 +69,7 @@ export function createDraftReservation(input: {
   selectedSeats: Seat[];
 }): DraftReservation {
   const createdAt = new Date();
-  const expiresAt = new Date(createdAt.getTime() + 15 * 60 * 1000);
+  const expiresAt = new Date(createdAt.getTime() + 5 * 60 * 1000);
   const reservationId = `reservation-${input.concertId}-${createdAt.getTime()}`;
 
   const draft: DraftReservation = {
@@ -144,7 +145,7 @@ export function createMockOrderFromDraft(input: {
 }): StoredMockOrder {
   const paidAt = new Date();
   const subtotal = input.draft.item.quantity * input.draft.item.unitPrice;
-  const totalAmount = subtotal + Math.round(subtotal * 0.05) + Math.round(subtotal * 0.1);
+  const totalAmount = subtotal;
   const orderId = input.orderId || `order-${input.draft.concertId}-${paidAt.getTime()}`;
   const orderNumber = `ORD-${paidAt.getFullYear()}-${String(paidAt.getTime()).slice(-6)}`;
 
@@ -157,7 +158,7 @@ export function createMockOrderFromDraft(input: {
       ticketTypeId: input.draft.item.ticketTypeId,
       ticketCode,
       qrPayload: `mock-qr:${ticketCode}:${input.draft.concertId}:${input.draft.item.ticketTypeId}`,
-      seatZone: `${input.draft.item.zoneName} / ${input.draft.item.zoneLabel}`,
+      seatZone: input.draft.item.zoneName,
       seatNumber: seatLabel,
       price: input.draft.item.unitPrice,
       status: 'ACTIVE' as const,
