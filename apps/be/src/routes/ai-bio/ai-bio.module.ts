@@ -1,8 +1,7 @@
+import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { AiBioController } from './ai-bio.controller';
 import { AiBioService } from './ai-bio.service';
-import { BullModule } from '@nestjs/bullmq';
-import { AiBioProcessor } from './ai-bio.processor';
 
 @Module({
   imports: [
@@ -11,7 +10,7 @@ import { AiBioProcessor } from './ai-bio.processor';
     }),
   ],
   controllers: [AiBioController],
-  providers: [AiBioService, AiBioProcessor],
+  providers: [AiBioService],
   exports: [AiBioService],
 })
 export class AiBioModule {}

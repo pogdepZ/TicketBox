@@ -381,6 +381,7 @@ export class PaymentsService {
         OrderStatus.EXPIRED,
         OrderStatus.CANCELLED,
         OrderStatus.REFUND_REQUIRED,
+        OrderStatus.PAYMENT_FAILED,
       ];
 
       if (terminalStatuses.includes(order.status)) {

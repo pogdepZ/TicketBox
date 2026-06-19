@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "75b17bdb-f1c5-4d8c-bc2d-9fbff4d69a01",
     "name": "TicketBox Backend",
-    "description": "Postman collection for TicketBox backend endpoints. Includes real Orders + Payments flow using global interceptor response format. Set concertId + ticketTypeId from prisma seed output before running Orders + Payments.",
+    "description": "Postman collection for TicketBox backend endpoints after API/Worker split. Run API with: pnpm --filter @repo/be dev:api (default http://localhost:3000). Run Worker separately with: pnpm --filter @repo/be dev:worker. Worker has no HTTP server; it handles cron and BullMQ processors. Orders + Payments requires a customer accessToken, concertId, and ticketTypeId from seeded or manually created data. Queue smoke requests enqueue jobs through the API; keep the Worker terminal open to see processors consume jobs.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -2050,6 +2050,146 @@
       ]
     },
     {
+      "name": "Notifications / Worker Queue Smoke",
+      "description": "These endpoints enqueue BullMQ jobs from the API process. Run pnpm --filter @repo/be dev:worker in another terminal to verify the notification processor consumes jobs.",
+      "item": [
+        {
+          "name": "GET /notifications/test-single - Enqueue single notification",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const userId = pm.collectionVariables.get('userId') || pm.collectionVariables.get('adminUserId');",
+                  "if (!userId) {",
+                  "  throw new Error('Missing userId. Run Auth > Register/Login or Auth > Seed admin login first.');",
+                  "}",
+                  "pm.collectionVariables.set('userId', userId);",
+                  "if (!pm.collectionVariables.get('notificationType')) {",
+                  "  pm.collectionVariables.set('notificationType', 'POSTMAN_SMOKE');",
+                  "}",
+                  "if (!pm.collectionVariables.get('notificationChannel')) {",
+                  "  pm.collectionVariables.set('notificationChannel', 'EMAIL');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const data = json.data;",
+                  "",
+                  "pm.test('notification job is queued by API', function () {",
+                  "  pm.expect(json).to.have.property('statusCode', 200);",
+                  "  pm.expect(data).to.have.property('notificationId');",
+                  "  pm.expect(data).to.have.property('status', 'SENT');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('notificationId', data.notificationId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/test-single?userId={{userId}}&type={{notificationType}}&channel={{notificationChannel}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "test-single"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                },
+                {
+                  "key": "type",
+                  "value": "{{notificationType}}"
+                },
+                {
+                  "key": "channel",
+                  "value": "{{notificationChannel}}"
+                }
+              ]
+            },
+            "description": "Creates a PENDING notification record for the logged-in user and adds a send-single job to BullMQ. Run Auth > Register/Login or Seed admin login first. The API response confirms enqueue; the Worker terminal should log NotificationsProcessor processing the job."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /notifications/test-bulk - Enqueue bulk reminder",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('concertId')) {",
+                  "  pm.collectionVariables.set('concertId', pm.collectionVariables.get('mockConcertId') || '11111111-1111-4111-8111-111111111111');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const data = json.data;",
+                  "",
+                  "pm.test('bulk reminder job is queued by API', function () {",
+                  "  pm.expect(json).to.have.property('statusCode', 200);",
+                  "  pm.expect(data).to.have.property('status', 'QUEUED');",
+                  "  pm.expect(data).to.have.property('totalSent');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/test-bulk?concertId={{concertId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "test-bulk"
+              ],
+              "query": [
+                {
+                  "key": "concertId",
+                  "value": "{{concertId}}"
+                }
+              ]
+            },
+            "description": "Adds a send-bulk job to BullMQ. Keep the Worker process running to process the queued reminder job."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Checkin",
       "description": "CheckinModule endpoints from src/routes/checkin/checkin.controller.ts. These are current mock endpoints and do not require JWT in the controller.",
       "item": [
@@ -2071,6 +2211,10 @@
                   "",
                   "if (!pm.collectionVariables.get('checkinConcertId')) {",
                   "  pm.collectionVariables.set('checkinConcertId', pm.collectionVariables.get('concertId') || pm.collectionVariables.get('mockConcertId') || '11111111-1111-4111-8111-111111111111');",
+                  "}",
+                  "",
+                  "if (!pm.collectionVariables.get('checkinSourceDeviceId')) {",
+                  "  pm.collectionVariables.set('checkinSourceDeviceId', 'device-postman-001');",
                   "}"
                 ]
               }
@@ -2113,7 +2257,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"qrCodeData\": \"{{checkinQrCodeData}}\",\n  \"staffId\": \"{{checkinStaffId}}\",\n  \"concertId\": \"{{checkinConcertId}}\"\n}"
+              "raw": "{\n  \"qrCodeData\": \"{{checkinQrCodeData}}\",\n  \"staffId\": \"{{checkinStaffId}}\",\n  \"concertId\": \"{{checkinConcertId}}\",\n  \"deviceId\": \"{{checkinSourceDeviceId}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/checkin/scan",
@@ -2218,7 +2362,7 @@
     },
     {
       "name": "Admin Concert Uploads",
-      "description": "Admin/concert upload endpoints from GuestListModule and AiBioModule. Controllers currently do not enforce JWT, but run Seed Admin Login first if you want to follow the admin flow. In Postman, set guestListCsvFilePath and artistBioPdfFilePath to local files before running.",
+      "description": "Admin/concert upload endpoints from GuestListModule and AiBioModule. Guest-list import waits for the csv BullMQ job to finish, so run the Worker app before sending it. Artist-bio upload returns immediately and the Worker processes the ai queue in the background. In Postman, set guestListCsvFilePath and artistBioPdfFilePath to local files before running file upload requests.",
       "item": [
         {
           "name": "POST /admin/concerts/:id/guest-list/import - Import guest CSV",
@@ -2668,6 +2812,26 @@
     {
       "key": "momoSignature",
       "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testSeats",
+      "value": "[\"POSTMAN-A1\",\"POSTMAN-A2\"]",
+      "type": "string"
+    },
+    {
+      "key": "notificationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "notificationType",
+      "value": "POSTMAN_SMOKE",
+      "type": "string"
+    },
+    {
+      "key": "notificationChannel",
+      "value": "EMAIL",
       "type": "string"
     }
   ]
