@@ -23,7 +23,7 @@ export function OrderSummary({
   compact,
 }: OrderSummaryProps) {
   const quantity = selectedSeats.length;
-  const unitPrice = selectedZone?.price ?? 0;
+  const unitPrice = Number(selectedZone?.price ?? 0);
   const subtotal = quantity * unitPrice;
   const fee = 0;
   const tax = 0;
@@ -94,7 +94,7 @@ export function OrderSummary({
           <div className="rounded-2xl bg-muted/60 p-3 text-sm text-muted-foreground">
             <div className="flex justify-between gap-3">
               <span>Giá vé</span>
-              <span className="font-semibold text-foreground">{selectedZone.price.toLocaleString('vi-VN')}đ</span>
+              <span className="font-semibold text-foreground">{Number(selectedZone.price).toLocaleString('vi-VN')}đ</span>
             </div>
             {selectedZone.remaining > 0 && (
               <div className="mt-1 flex justify-between gap-3">

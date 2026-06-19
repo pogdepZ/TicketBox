@@ -53,12 +53,15 @@ export default function SuccessPage() {
               }
             }
 
+            const actualOrderId = fetchedOrder.orderId || fetchedOrder.id || '';
+            const actualOrderNumber = fetchedOrder.orderNumber || (actualOrderId ? actualOrderId.substring(0, 8).toUpperCase() : 'UNKNOWN');
+
             if (!fetchedOrder.tickets) {
               // DB order is real but tickets/concert relations might not be fully seeded/joined
               const subtotal = fetchedOrder.totalAmount ? Number(fetchedOrder.totalAmount) : 0;
               const mappedOrder: StoredMockOrder = {
-                id: fetchedOrder.id,
-                orderNumber: fetchedOrder.id.substring(0, 8).toUpperCase(),
+                id: actualOrderId,
+                orderNumber: actualOrderNumber,
                 userId: fetchedOrder.userId,
                 concertId: fetchedOrder.concertId,
                 concertTitle,
@@ -78,11 +81,11 @@ export default function SuccessPage() {
                   seatLabels: item.seatLabels || ['Tự do'],
                 })) || [],
                 tickets: Array.from({ length: fetchedOrder.items?.[0]?.quantity || 1 }).map((_, idx) => {
-                  const ticketCode = `TBX-${new Date(fetchedOrder.createdAt || Date.now()).getFullYear()}-${fetchedOrder.id.substring(0, 6).toUpperCase()}-${idx + 1}`;
+                  const ticketCode = `TBX-${new Date(fetchedOrder.createdAt || Date.now()).getFullYear()}-${actualOrderId.substring(0, 6).toUpperCase()}-${idx + 1}`;
                   const seatNumber = draftSeats[idx] || 'Tự do';
                   return {
-                    id: `ticket-${fetchedOrder.id}-${idx + 1}`,
-                    orderId: fetchedOrder.id,
+                    id: `ticket-${actualOrderId}-${idx + 1}`,
+                    orderId: actualOrderId,
                     ticketTypeId: fetchedOrder.items?.[0]?.ticketTypeId,
                     ticketCode,
                     qrPayload: `mock-qr:${ticketCode}:${fetchedOrder.concertId}:${fetchedOrder.items?.[0]?.ticketTypeId}`,
@@ -101,7 +104,7 @@ export default function SuccessPage() {
               if (!alreadyNotified) {
                 addLocalNotification(
                   'Đặt vé thành công!',
-                  `Đơn hàng #${mappedOrder.orderNumber} cho sự kiện "${mappedOrder.concertTitle}" đã được đặt thành công.`
+                  `Đơn hàng #${actualOrderNumber} cho sự kiện "${mappedOrder.concertTitle}" đã được đặt thành công.`
                 );
                 if (typeof window !== 'undefined') {
                   window.sessionStorage.setItem(sessionKey, 'true');
@@ -111,6 +114,8 @@ export default function SuccessPage() {
               // fetchedOrder.tickets already exists
               const mappedOrder = {
                 ...fetchedOrder,
+                id: actualOrderId,
+                orderNumber: actualOrderNumber,
                 concertTitle,
                 concertVenue,
               };
@@ -121,7 +126,7 @@ export default function SuccessPage() {
               if (!alreadyNotified) {
                 addLocalNotification(
                   'Đặt vé thành công!',
-                  `Đơn hàng #${fetchedOrder.orderNumber} cho sự kiện "${concertTitle}" đã được đặt thành công.`
+                  `Đơn hàng #${actualOrderNumber} cho sự kiện "${concertTitle}" đã được đặt thành công.`
                 );
                 if (typeof window !== 'undefined') {
                   window.sessionStorage.setItem(sessionKey, 'true');

@@ -101,7 +101,7 @@ export function VenueMapOverview({ zones, selectedZone, onSelectZone }: VenueMap
                     pointerEvents="none"
                     className="fill-white/80 text-xs"
                   >
-                    {zone.price.toLocaleString('vi-VN')}đ · {isSoldOut ? 'Hết vé' : `Còn ${zone.remaining}`}
+                    {Number(zone.price).toLocaleString('vi-VN')}đ · {isSoldOut ? 'Hết vé' : `Còn ${zone.remaining}`}
                   </text>
                 </g>
               );

@@ -452,21 +452,31 @@ export function getTicketZonesByConcertId(concertId: string): TicketZone[] {
 function createZoneSeats(concertId: string, zoneCode: string, rowNames: string[], seatsPerRow: number): Seat[] {
   const effectiveConcertId = ['1', '2', '3', '4', '5', '6'].includes(concertId) ? concertId : '1';
   const seatZone = mockSeatZones.find((zone) => zone.concertId === effectiveConcertId && zone.code === zoneCode)!;
+  const ticketType = mockTicketTypes.find(
+    (tt) => tt.concertId === effectiveConcertId && tt.seatZoneId === seatZone.id
+  );
+  const remaining = ticketType ? ticketType.remaining : 0;
   const seats: Seat[] = [];
+
+  let availablePlaced = 0;
 
   rowNames.forEach((row, rowIndex) => {
     for (let number = 1; number <= seatsPerRow; number += 1) {
-      const isOuterDisabled = rowIndex === rowNames.length - 1 && (number <= 2 || number >= seatsPerRow - 1);
-      const numericConcertId = parseInt(concertId.replace(/[^0-9]/g, ''), 10) || 1;
-      const isSold = (rowIndex + number + numericConcertId) % 9 === 0 || (rowIndex === 1 && number >= 7 && number <= 9);
-      const isHeld = (rowIndex + number + numericConcertId) % 13 === 0 || (rowIndex === 3 && number === 12);
+      let status: 'disabled' | 'sold' | 'held' | 'available' = 'available';
+      if (availablePlaced < remaining) {
+        status = 'available';
+        availablePlaced++;
+      } else {
+        // Distribute some held and some sold to look natural
+        status = (rowIndex + number) % 7 === 0 ? 'held' : 'sold';
+      }
 
       seats.push({
         id: `seat-${concertId}-${zoneCode}-${row}-${number}`,
         row,
         number,
         label: `${row}${number.toString().padStart(2, '0')}`,
-        status: isOuterDisabled ? 'disabled' : isSold ? 'sold' : isHeld ? 'held' : 'available',
+        status,
         zoneId: zoneCode,
         concertId,
         seatZoneId: seatZone.id,

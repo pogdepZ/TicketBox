@@ -93,7 +93,7 @@ export function ZoneSeatMap({ zone, seats, selectedSeatIds, onToggleSeat, onBack
             <p className="font-black text-foreground">{zone.name}</p>
             <p className="text-sm text-muted-foreground">{zone.description}</p>
           </div>
-          <p className="text-lg font-black text-primary">{zone.price.toLocaleString('vi-VN')}đ / vé</p>
+          <p className="text-lg font-black text-primary">{Number(zone.price).toLocaleString('vi-VN')}đ / vé</p>
         </div>
       </div>
     </div>

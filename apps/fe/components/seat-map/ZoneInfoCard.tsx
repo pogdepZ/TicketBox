@@ -36,7 +36,7 @@ export function ZoneInfoCard({ zone, isSelected, onSelect }: ZoneInfoCardProps) 
       </div>
       <div className="flex items-center justify-between border-t border-border pt-3">
         <span className="text-sm text-muted-foreground">Còn {zone.remaining.toLocaleString('vi-VN')} / {zone.total.toLocaleString('vi-VN')} vé</span>
-        <span className="font-black text-foreground">{zone.price.toLocaleString('vi-VN')}đ</span>
+        <span className="font-black text-foreground">{Number(zone.price).toLocaleString('vi-VN')}đ</span>
       </div>
     </button>
   );

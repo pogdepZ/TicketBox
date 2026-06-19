@@ -311,10 +311,13 @@ export default function AdminConcertDetailPage({ params }: AdminConcertDetailPag
                   <div className="relative">
                     <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                     <input
-                      type="number"
+                      type="text"
                       placeholder="Mệnh giá"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
+                      value={price ? Number(price.replace(/\D/g, '')).toLocaleString('vi-VN') : ''}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/\D/g, '');
+                        setPrice(raw);
+                      }}
                       className="h-11 w-full rounded-2xl border border-border bg-background pl-10 pr-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
                     />
                   </div>

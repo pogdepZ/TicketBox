@@ -28,46 +28,7 @@ export function SeatMap({ concertId, concertTitle, zones, seats }: SeatMapProps)
     setCurrentZones(zones);
   }, [zones]);
 
-  // Real-time simulated updates for ticket availability
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentZones((prevZones) => {
-        // Find zones that still have tickets
-        const availableZones = prevZones.filter((z) => z.remaining > 0);
-        if (availableZones.length === 0) return prevZones;
 
-        // Choose 1 or 2 random zones to decrease their remaining tickets
-        const numZonesToUpdate = Math.min(availableZones.length, Math.random() > 0.5 ? 2 : 1);
-        const shuffled = [...availableZones].sort(() => 0.5 - Math.random());
-        const targetZones = shuffled.slice(0, numZonesToUpdate);
-
-        return prevZones.map((zone) => {
-          const target = targetZones.find((tz) => tz.id === zone.id);
-          if (target) {
-            // Decrease by 1 or 2 tickets
-            const decrement = Math.random() > 0.7 ? 2 : 1;
-            const newRemaining = Math.max(0, zone.remaining - decrement);
-            
-            let status = zone.status;
-            if (newRemaining === 0) {
-              status = 'sold-out';
-            } else if (newRemaining / zone.total <= 0.15) {
-              status = 'limited';
-            }
-
-            return {
-              ...zone,
-              remaining: newRemaining,
-              status: status as TicketZoneStatus,
-            };
-          }
-          return zone;
-        });
-      });
-    }, 4000); // update every 4 seconds
-
-    return () => clearInterval(timer);
-  }, []);
 
   const activeSelectedZone = useMemo(() => {
     return selectedZone ? currentZones.find((z) => z.id === selectedZone.id) : undefined;

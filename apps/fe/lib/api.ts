@@ -317,7 +317,7 @@ export async function getTicketZonesAsync(concertId: string, preFetchedSeatZones
           id: t.id,
           name: t.name,
           label: t.name,
-          price: t.price,
+          price: Number(t.price),
           remaining: t.remaining,
           total: t.totalQuantity,
           color: ['#ff3b30', '#ffcc00', '#34c759', '#007aff', '#af52de'][idx % 5],
@@ -348,7 +348,7 @@ export async function getTicketZonesAsync(concertId: string, preFetchedSeatZones
         id: mockCode,
         name: zone.name,
         label: ticketType.name,
-        price: ticketType.price,
+        price: Number(ticketType.price),
         remaining: ticketType.remaining,
         total: ticketType.totalQuantity,
         color: zone.color || '#cccccc',
@@ -378,27 +378,56 @@ export async function getSeatsAsync(concertId: string, preFetchedSeatZones?: any
     }
 
     const seats: any[] = [];
+    const localTypes = getLocalTicketTypes(concertId);
     
     seatZones.forEach((zone: any) => {
       let mockCode = (zone.code || 'economy').toLowerCase();
       if (!['svip', 'vip', 'premium', 'standard', 'economy'].includes(mockCode)) {
         mockCode = 'economy';
       }
-      const rowNames = ['A', 'B', 'C', 'D'];
-      const seatsPerRow = 12;
+
+      const ticketType = zone.ticketTypes?.[0];
+      const localType = localTypes?.find((t) => t.id === zone.id || t.name === zone.name || t.id === ticketType?.id);
+      const remaining = localType ? Number(localType.remaining) : (ticketType ? Number(ticketType.remaining) : 0);
+      const total = localType ? Number(localType.totalQuantity) : (ticketType ? Number(ticketType.totalQuantity) : 48);
+
+      // Determine seats per row dynamically to make a balanced grid
+      let seatsPerRow = 12;
+      if (total > 200) seatsPerRow = 20;
+      else if (total > 100) seatsPerRow = 16;
+      else seatsPerRow = 12;
+
+      const numRows = Math.ceil(total / seatsPerRow);
+      const rowNames = Array.from({ length: numRows }).map((_, idx) => {
+        if (idx < 26) {
+          return String.fromCharCode(65 + idx); // A, B, C, ...
+        } else {
+          return 'A' + String.fromCharCode(65 + (idx - 26)); // AA, AB, AC, ...
+        }
+      });
+      
+      let availablePlaced = 0;
+      let totalPlaced = 0;
       
       rowNames.forEach((row, rowIndex) => {
         for (let number = 1; number <= seatsPerRow; number++) {
-           const isOuterDisabled = rowIndex === rowNames.length - 1 && (number <= 2 || number >= seatsPerRow - 1);
-           const isSold = (rowIndex + number) % 9 === 0;
-           const isHeld = (rowIndex + number) % 13 === 0;
+           if (totalPlaced >= total) break;
+           totalPlaced++;
+
+           let status: 'disabled' | 'sold' | 'held' | 'available' = 'available';
+           if (availablePlaced < remaining) {
+             status = 'available';
+             availablePlaced++;
+           } else {
+             status = (rowIndex + number) % 7 === 0 ? 'held' : 'sold';
+           }
 
            seats.push({
              id: `seat-${concertId}-${mockCode}-${row}-${number}`,
              row,
              number,
              label: `${row}${number.toString().padStart(2, '0')}`,
-             status: isOuterDisabled ? 'disabled' : isSold ? 'sold' : isHeld ? 'held' : 'available',
+             status,
              zoneId: mockCode,
              concertId,
              seatZoneId: zone.id,
