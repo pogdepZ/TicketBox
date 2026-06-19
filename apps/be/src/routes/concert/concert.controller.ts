@@ -7,25 +7,25 @@ import {
   Post,
   Query,
   UseGuards,
-} from '@nestjs/common';
-import { ConcertService } from './concert.service';
-import { CreateConcertDto } from './dto/create-concert.dto';
-import { UpdateConcertDto } from './dto/update-concert.dto';
-import { QueryConcertDto } from './dto/query-concert.dto';
-import { CancelConcertDto } from './dto/cancel-concert.dto';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { AuthUser } from '../auth/dto/user-response.dto';
-import { JwtAuthGuard } from '../auth/guard/jwt-auth.guard';
-import { PermissionGuard } from '../auth/guard/permission.guard';
-import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
+} from "@nestjs/common";
+import { ConcertService } from "./concert.service";
+import { CreateConcertDto } from "./dto/create-concert.dto";
+import { UpdateConcertDto } from "./dto/update-concert.dto";
+import { QueryConcertDto } from "./dto/query-concert.dto";
+import { CancelConcertDto } from "./dto/cancel-concert.dto";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { AuthUser } from "../auth/dto/user-response.dto";
+import { JwtAuthGuard } from "../auth/guard/jwt-auth.guard";
+import { PermissionGuard } from "../auth/guard/permission.guard";
+import { RequirePermissions } from "../auth/decorators/require-permissions.decorator";
 
-@Controller('concerts')
+@Controller("concerts")
 export class ConcertController {
   constructor(private readonly concertService: ConcertService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @RequirePermissions('concert:create')
+  @RequirePermissions("concert:create")
   create(
     @Body() createConcertDto: CreateConcertDto,
     @CurrentUser() user?: AuthUser,
@@ -38,39 +38,44 @@ export class ConcertController {
     return this.concertService.findAll(query);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
+  @Get(":id/seats/availability")
+  getSeatAvailability(@Param("id") id: string) {
+    return this.concertService.getSeatAvailability(id);
+  }
+
+  @Get(":id")
+  findOne(@Param("id") id: string) {
     return this.concertService.findOne(id);
   }
 
-  @Patch(':id')
+  @Patch(":id")
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @RequirePermissions('concert:update')
-  update(@Param('id') id: string, @Body() updateConcertDto: UpdateConcertDto) {
+  @RequirePermissions("concert:update")
+  update(@Param("id") id: string, @Body() updateConcertDto: UpdateConcertDto) {
     return this.concertService.update(id, updateConcertDto);
   }
 
-  @Patch(':id/publish')
+  @Patch(":id/publish")
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @RequirePermissions('concert:update')
-  publish(@Param('id') id: string) {
+  @RequirePermissions("concert:update")
+  publish(@Param("id") id: string) {
     return this.concertService.publish(id);
   }
 
-  @Patch(':id/cancel')
+  @Patch(":id/cancel")
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @RequirePermissions('concert:cancel')
+  @RequirePermissions("concert:cancel")
   cancel(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() cancelConcertDto: CancelConcertDto = new CancelConcertDto(),
   ) {
     return this.concertService.cancel(id, cancelConcertDto);
   }
 
-  @Patch(':id/complete')
+  @Patch(":id/complete")
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @RequirePermissions('concert:update')
-  complete(@Param('id') id: string) {
+  @RequirePermissions("concert:update")
+  complete(@Param("id") id: string) {
     return this.concertService.complete(id);
   }
 }

@@ -5,25 +5,25 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-} from '@nestjs/common';
-import { createHash } from 'crypto';
-import { CreateConcertDto } from './dto/create-concert.dto';
-import { UpdateConcertDto } from './dto/update-concert.dto';
-import { PrismaService } from '../../common/prisma/prisma.service';
+} from "@nestjs/common";
+import { createHash } from "crypto";
+import { CreateConcertDto } from "./dto/create-concert.dto";
+import { UpdateConcertDto } from "./dto/update-concert.dto";
+import { PrismaService } from "../../common/prisma/prisma.service";
 import {
   Concert,
   ConcertStatus as PrismaConcertStatus,
   Prisma,
-} from '../../generated/prisma';
-import { QueryConcertDto } from './dto/query-concert.dto';
-import { ConcertResponseDto } from './dto/concert-response.dto';
-import { toPrismaConcertStatus } from './types/concert-status.type';
-import { CancelConcertDto } from './dto/cancel-concert.dto';
-import { RedisService } from '../../common/redis/redis.service';
+} from "../../generated/prisma";
+import { QueryConcertDto } from "./dto/query-concert.dto";
+import { ConcertResponseDto } from "./dto/concert-response.dto";
+import { toPrismaConcertStatus } from "./types/concert-status.type";
+import { CancelConcertDto } from "./dto/cancel-concert.dto";
+import { RedisService } from "../../common/redis/redis.service";
 
 const CONCERT_CACHE_TTL_SECONDS = 60;
-const CONCERT_LIST_CACHE_KEY = 'cache:concert:list';
-const CONCERT_DETAIL_CACHE_KEY_PREFIX = 'cache:concert';
+const CONCERT_LIST_CACHE_KEY = "cache:concert:list";
+const CONCERT_DETAIL_CACHE_KEY_PREFIX = "cache:concert";
 
 type PaginatedConcerts = {
   items: ConcertResponseDto[];
@@ -33,6 +33,22 @@ type PaginatedConcerts = {
     total: number;
     totalPages: number;
   };
+};
+
+type SeatAvailabilityResponse = {
+  concertId: string;
+  checkedAt: string;
+  soldSeats: Array<{
+    seatNumber: string;
+    ticketTypeId: string;
+    status: "SOLD";
+  }>;
+  heldSeats: Array<{
+    seatNumber: string;
+    ticketTypeId: string;
+    status: "HELD";
+    heldUntil: string;
+  }>;
 };
 
 @Injectable()
@@ -48,7 +64,7 @@ export class ConcertService {
     createConcertDto: CreateConcertDto,
     createdById?: string,
   ): Promise<ConcertResponseDto> {
-    const eventDate = this.parseDate(createConcertDto.eventDate, 'eventDate');
+    const eventDate = this.parseDate(createConcertDto.eventDate, "eventDate");
     this.validateEventDateInFuture(eventDate);
     const concert = await this.prismaService.concert.create({
       data: {
@@ -99,7 +115,7 @@ export class ConcertService {
         skip,
         take: limit,
         // Upcoming concerts are more useful first for ticket browsing and operations.
-        orderBy: [{ eventDate: 'asc' }, { createdAt: 'desc' }],
+        orderBy: [{ eventDate: "asc" }, { createdAt: "desc" }],
       }),
       this.prismaService.concert.count({ where }),
     ]);
@@ -128,14 +144,14 @@ export class ConcertService {
       include: {
         seatZones: {
           include: {
-            ticketTypes: true
-          }
-        }
-      }
+            ticketTypes: true,
+          },
+        },
+      },
     });
 
     if (!concert) {
-      throw new NotFoundException('Concert not found');
+      throw new NotFoundException("Concert not found");
     }
 
     const response = this.toResponse(concert);
@@ -143,6 +159,69 @@ export class ConcertService {
     await this.setCache(cacheKey, response);
 
     return response;
+  }
+
+  async getSeatAvailability(
+    concertId: string,
+  ): Promise<SeatAvailabilityResponse> {
+    const concert = await this.prismaService.concert.findUnique({
+      where: { id: concertId },
+      select: { id: true },
+    });
+
+    if (!concert) {
+      throw new NotFoundException("Concert not found");
+    }
+
+    const now = new Date();
+
+    const [soldTickets, heldSeats] = await this.prismaService.$transaction([
+      this.prismaService.ticket.findMany({
+        where: {
+          concertId,
+          seatNumber: { not: null },
+          status: { in: ["ACTIVE", "USED"] },
+        },
+        select: {
+          seatNumber: true,
+          ticketTypeId: true,
+        },
+      }),
+      this.prismaService.reservationSeat.findMany({
+        where: {
+          concertId,
+          status: "HELD",
+          expiresAt: { gt: now },
+        },
+        select: {
+          seatNumber: true,
+          ticketTypeId: true,
+          expiresAt: true,
+        },
+      }),
+    ]);
+
+    return {
+      concertId,
+      checkedAt: now.toISOString(),
+      soldSeats: soldTickets.flatMap((ticket) =>
+        ticket.seatNumber
+          ? [
+              {
+                seatNumber: ticket.seatNumber,
+                ticketTypeId: ticket.ticketTypeId,
+                status: "SOLD" as const,
+              },
+            ]
+          : [],
+      ),
+      heldSeats: heldSeats.map((seat) => ({
+        seatNumber: seat.seatNumber,
+        ticketTypeId: seat.ticketTypeId,
+        status: "HELD",
+        heldUntil: seat.expiresAt.toISOString(),
+      })),
+    };
   }
 
   async update(
@@ -167,7 +246,7 @@ export class ConcertService {
     const concert = await this.findConcertOrThrow(id);
 
     if (concert.status !== PrismaConcertStatus.DRAFT) {
-      throw new ConflictException('Only draft concerts can be published');
+      throw new ConflictException("Only draft concerts can be published");
     }
 
     this.validatePublishable(concert);
@@ -190,7 +269,7 @@ export class ConcertService {
     const concert = await this.findConcertOrThrow(id);
 
     if (concert.status === PrismaConcertStatus.COMPLETED) {
-      throw new ConflictException('Completed concerts cannot be cancelled');
+      throw new ConflictException("Completed concerts cannot be cancelled");
     }
 
     if (concert.status === PrismaConcertStatus.CANCELLED) {
@@ -212,11 +291,13 @@ export class ConcertService {
     const concert = await this.findConcertOrThrow(id);
 
     if (concert.status !== PrismaConcertStatus.PUBLISHED) {
-      throw new ConflictException('Only published concerts can be completed');
+      throw new ConflictException("Only published concerts can be completed");
     }
 
     if (concert.eventDate.getTime() > Date.now()) {
-      throw new BadRequestException('Concert can only be completed after eventDate');
+      throw new BadRequestException(
+        "Concert can only be completed after eventDate",
+      );
     }
 
     const updatedConcert = await this.prismaService.concert.update({
@@ -235,7 +316,7 @@ export class ConcertService {
     });
 
     if (!concert) {
-      throw new NotFoundException('Concert not found');
+      throw new NotFoundException("Concert not found");
     }
 
     return concert;
@@ -243,25 +324,25 @@ export class ConcertService {
 
   private validateEventDateInFuture(eventDate: Date): void {
     if (Number.isNaN(eventDate.getTime())) {
-      throw new BadRequestException('eventDate must be a valid date');
+      throw new BadRequestException("eventDate must be a valid date");
     }
 
     if (eventDate.getTime() <= Date.now()) {
-      throw new BadRequestException('eventDate must be greater than now');
+      throw new BadRequestException("eventDate must be greater than now");
     }
   }
 
   private validatePublishable(concert: Concert): void {
     if (!concert.name.trim()) {
-      throw new BadRequestException('Concert name is required');
+      throw new BadRequestException("Concert name is required");
     }
 
     if (!concert.venueName.trim()) {
-      throw new BadRequestException('Concert venueName is required');
+      throw new BadRequestException("Concert venueName is required");
     }
 
     if (!concert.venueAddress.trim()) {
-      throw new BadRequestException('Concert venueAddress is required');
+      throw new BadRequestException("Concert venueAddress is required");
     }
 
     this.validateEventDateInFuture(concert.eventDate);
@@ -279,22 +360,22 @@ export class ConcertService {
     if (keyword) {
       andConditions.push({
         OR: [
-          { name: { contains: keyword, mode: 'insensitive' } },
-          { artistName: { contains: keyword, mode: 'insensitive' } },
-          { venueName: { contains: keyword, mode: 'insensitive' } },
+          { name: { contains: keyword, mode: "insensitive" } },
+          { artistName: { contains: keyword, mode: "insensitive" } },
+          { venueName: { contains: keyword, mode: "insensitive" } },
         ],
       });
     }
 
     if (query.fromDate || query.toDate) {
-      const eventDate: Prisma.DateTimeFilter<'Concert'> = {};
+      const eventDate: Prisma.DateTimeFilter<"Concert"> = {};
 
       if (query.fromDate) {
-        eventDate.gte = this.parseDate(query.fromDate, 'fromDate');
+        eventDate.gte = this.parseDate(query.fromDate, "fromDate");
       }
 
       if (query.toDate) {
-        eventDate.lte = this.parseDate(query.toDate, 'toDate');
+        eventDate.lte = this.parseDate(query.toDate, "toDate");
       }
 
       andConditions.push({ eventDate });
@@ -313,7 +394,7 @@ export class ConcertService {
       concert.status === PrismaConcertStatus.COMPLETED
     ) {
       throw new ForbiddenException(
-        'Cancelled or completed concerts cannot be updated',
+        "Cancelled or completed concerts cannot be updated",
       );
     }
 
@@ -322,10 +403,10 @@ export class ConcertService {
     }
 
     const safePublishedFields: Array<keyof UpdateConcertDto> = [
-      'description',
-      'posterUrl',
-      'seatMapSvg',
-      'artistBio',
+      "description",
+      "posterUrl",
+      "seatMapSvg",
+      "artistBio",
     ];
     const updatedFields = Object.keys(dto) as Array<keyof UpdateConcertDto>;
     const invalidField = updatedFields.find(
@@ -363,7 +444,7 @@ export class ConcertService {
       }
 
       if (dto.eventDate !== undefined) {
-        const eventDate = this.parseDate(dto.eventDate, 'eventDate');
+        const eventDate = this.parseDate(dto.eventDate, "eventDate");
         this.validateEventDateInFuture(eventDate);
         data.eventDate = eventDate;
       }
@@ -412,9 +493,9 @@ export class ConcertService {
       toDate: query.toDate ?? null,
     };
 
-    const hash = createHash('sha1')
+    const hash = createHash("sha1")
       .update(JSON.stringify(normalizedQuery))
-      .digest('hex');
+      .digest("hex");
 
     return `${CONCERT_LIST_CACHE_KEY}:${hash}`;
   }
@@ -447,7 +528,10 @@ export class ConcertService {
         this.redisService.del(this.buildConcertDetailCacheKey(concertId)),
       ]);
     } catch (error) {
-      this.logger.warn(`Failed to invalidate concert cache for ${concertId}`, error);
+      this.logger.warn(
+        `Failed to invalidate concert cache for ${concertId}`,
+        error,
+      );
     }
   }
 }
