@@ -29,6 +29,12 @@ const environmentSchema = z.object({
   MOMO_REDIRECT_URL: z.string().url(),
   MOMO_IPN_URL: z.string().url(),
   MOMO_REQUEST_TYPE: z.string(),
+  AWS_ACCESS_KEY_ID: z.string().optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().optional(),
+  AWS_S3_REGION: z.string().optional(),
+  AWS_S3_BUCKET: z.string().optional(),
+  AWS_S3_ENDPOINT: z.string().optional(),
+  AWS_S3_FORCE_PATH_STYLE: z.string().optional(),
 });
 
 export function validate(config: Record<string, unknown>) {

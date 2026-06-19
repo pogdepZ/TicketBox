@@ -5,6 +5,7 @@ import databaseConfig from './config/database.config';
 import { validate } from './config/env.validation';
 import jwtConfig from './config/jwt.config';
 import redisConfig from './config/redis.config';
+import s3Config from './config/s3.config';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { RedisModule } from './common/redis/redis.module';
 
@@ -13,7 +14,7 @@ import { RedisModule } from './common/redis/redis.module';
     ConfigModule.forRoot({
       isGlobal: true,
       validate,
-      load: [databaseConfig, jwtConfig, redisConfig],
+      load: [databaseConfig, jwtConfig, redisConfig, s3Config],
     }),
     BullModule.forRootAsync({
       inject: [redisConfig.KEY],

@@ -1,10 +1,12 @@
-import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { UploadedFileDto } from './dto/uploaded-file.dto';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue, QueueEvents } from 'bullmq';
 import redisConfig from '../../config/redis.config';
 import { ConfigType } from '@nestjs/config';
+import { S3Service } from '../../common/s3/s3.service';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class GuestListService implements OnModuleDestroy {
@@ -15,6 +17,7 @@ export class GuestListService implements OnModuleDestroy {
     @InjectQueue('csv') private readonly csvQueue: Queue,
     @Inject(redisConfig.KEY)
     private readonly redis: ConfigType<typeof redisConfig>,
+    private readonly s3Service: S3Service,
   ) {
     this.queueEvents = new QueueEvents('csv', {
       connection: {
@@ -38,10 +41,33 @@ export class GuestListService implements OnModuleDestroy {
       `[GuestListService] Importing CSV for concert ${concertId}, file: ${file?.originalname}`,
     );
 
+    const fileHash = createHash('sha256').update(file.buffer).digest('hex');
+
+    // Check if duplicate batch exists to prevent double-submit
+    const existing = await this.prisma.guestImportBatch.findFirst({
+      where: {
+        concertId,
+        fileHash,
+        status: 'COMPLETED',
+      },
+    });
+    if (existing) {
+      throw new ConflictException('This guest list has already been successfully imported');
+    }
+
+    // Upload CSV to S3
+    const s3Key = `concerts/${concertId}/guest-lists/${Date.now()}-${file.originalname}`;
+    const fileUrl = await this.s3Service.uploadFile(
+      s3Key,
+      file.buffer,
+      file.mimetype || 'text/csv',
+    );
+
     const batch = await this.prisma.guestImportBatch.create({
       data: {
         concertId,
-        fileUrl: file?.originalname || 'local_path.csv',
+        fileUrl,
+        fileHash,
         status: 'PENDING',
       },
     });
