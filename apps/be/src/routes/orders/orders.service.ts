@@ -32,7 +32,7 @@ import {
 } from '../../generated/prisma';
 
 /** Thời gian giữ vé tạm: 5 phút */
-const RESERVATION_TTL_MINUTES = 5;
+const RESERVATION_TTL_MINUTES = 10;
 
 /** Rate limit: tối đa 5 lần tạo order / 300 giây mỗi user */
 const RATE_LIMIT_CAPACITY = 5;
