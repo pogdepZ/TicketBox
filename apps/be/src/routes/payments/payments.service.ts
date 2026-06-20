@@ -14,6 +14,7 @@ import { PaymentGatewayService } from './payment-gateway.service';
 import { PaymentEventService } from './payment-event.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { PaymentCircuitBreakerService } from './payment-circuit-breaker.service';
+import { OutboxService } from '../../common/outbox/outbox.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { PaymentWebhookDto } from './dto/payment-webhook.dto';
 import {
@@ -46,6 +47,7 @@ export class PaymentsService {
     private readonly eventService: PaymentEventService,
     private readonly ticketsService: TicketsService,
     private readonly circuitBreaker: PaymentCircuitBreakerService,
+    private readonly outboxService: OutboxService,
   ) {}
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -528,7 +530,7 @@ export class PaymentsService {
     userId: string,
     orderId: string,
   ): Promise<void> {
-    await this.prisma.notification.create({
+    const notification = await this.prisma.notification.create({
       data: {
         userId,
         channel: NotificationChannel.EMAIL,
@@ -536,6 +538,10 @@ export class PaymentsService {
         payload: { orderId } as any,
         status: NotificationStatus.PENDING,
       },
+    });
+
+    await this.outboxService.put('notification', 'send-single', {
+      notificationId: notification.id,
     });
   }
 

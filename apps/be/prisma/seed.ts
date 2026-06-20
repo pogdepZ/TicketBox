@@ -197,16 +197,9 @@ async function cleanupRolesAndPermissions(
 }
 
 async function seedAdminUser(roleByName: Map<string, Role>): Promise<void> {
-  const email = process.env.SEED_ADMIN_EMAIL;
-  const password = process.env.SEED_ADMIN_PASSWORD;
+  const email = process.env.SEED_ADMIN_EMAIL ?? 'admin@gmail.com';
+  const password = process.env.SEED_ADMIN_PASSWORD ?? '123456';
   const fullName = process.env.SEED_ADMIN_FULL_NAME ?? 'System Admin';
-
-  if (!email || !password) {
-    console.log(
-      'Skipping admin user seed: SEED_ADMIN_EMAIL or SEED_ADMIN_PASSWORD is missing.',
-    );
-    return;
-  }
 
   const adminRole = roleByName.get('admin');
 
@@ -233,12 +226,13 @@ async function seedAdminUser(roleByName: Map<string, Role>): Promise<void> {
     await prisma.user.update({
       where: { id: existingAdmin.id },
       data: {
+        password: await bcrypt.hash(password, 10),
         fullName,
         status: UserStatus.ACTIVE,
       },
     });
     console.log(
-      `Admin user ${email} already exists. Password was not overwritten.`,
+      `Admin user ${email} already exists. Password and profile were updated/reset.`,
     );
   } else {
     console.log(`Created admin user ${email}.`);
@@ -275,10 +269,29 @@ async function upsertUserRole(params: {
 
 async function seedConcertsAndTicketTypes(): Promise<void> {
   const concertName = 'TicketBox Live Seeded';
+  const expectedConcertId = '202dedd0-18dc-4d48-a652-d0ee8aa1f441';
 
   let concert = await prisma.concert.findFirst({
     where: { name: concertName },
   });
+
+  if (concert && concert.id !== expectedConcertId) {
+    console.log(`Found seeded concert with incorrect ID (${concert.id}). Recreating with expected ID (${expectedConcertId})...`);
+    // Delete dependent records first to avoid foreign key violations
+    await prisma.ticket.deleteMany({ where: { concertId: concert.id } });
+    await prisma.order.deleteMany({ where: { concertId: concert.id } });
+    await prisma.reservation.deleteMany({ where: { concertId: concert.id } });
+    await prisma.reservationSeat.deleteMany({ where: { concertId: concert.id } });
+    await prisma.waitingRoomSession.deleteMany({ where: { concertId: concert.id } });
+    await prisma.checkinDevice.deleteMany({ where: { concertId: concert.id } });
+    await prisma.artistAsset.deleteMany({ where: { concertId: concert.id } });
+    await prisma.guestList.deleteMany({ where: { concertId: concert.id } });
+    await prisma.guestImportBatch.deleteMany({ where: { concertId: concert.id } });
+    await prisma.ticketType.deleteMany({ where: { concertId: concert.id } });
+    await prisma.seatZone.deleteMany({ where: { concertId: concert.id } });
+    await prisma.concert.delete({ where: { id: concert.id } });
+    concert = null;
+  }
 
   if (!concert) {
     const eventDate = new Date();
@@ -286,6 +299,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
 
     concert = await prisma.concert.create({
       data: {
+        id: expectedConcertId,
         name: concertName,
         description: 'A sample seeded concert for Postman flow.',
         artistName: 'The Seeded Band',
@@ -337,11 +351,11 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
   }
 
   const ticketTypesData = [
-    { name: 'SVIP', price: '1800000', totalQuantity: 50 },
-    { name: 'VIP', price: '1200000', totalQuantity: 100 },
-    { name: 'CAT1', price: '850000', totalQuantity: 150 },
-    { name: 'CAT2', price: '600000', totalQuantity: 200 },
-    { name: 'GA', price: '450000', totalQuantity: 300 },
+    { id: 'da8e128c-682d-4fbb-bee4-5f26545cae11', name: 'SVIP', price: '1800000', totalQuantity: 50 },
+    { id: 'f7c6c7ab-f989-40c8-b81b-8338fc30730e', name: 'VIP', price: '1200000', totalQuantity: 100 },
+    { id: '07ad8d58-b7cc-4fbc-9593-9a76067f9070', name: 'CAT1', price: '850000', totalQuantity: 150 },
+    { id: '4787e219-2270-4f98-8d15-1a7581171cb1', name: 'CAT2', price: '600000', totalQuantity: 200 },
+    { id: '0120ec7c-8c06-4159-a3df-e242d3b2be52', name: 'GA', price: '450000', totalQuantity: 300 },
   ];
 
   for (const tt of ticketTypesData) {
@@ -357,6 +371,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
     if (!existing) {
       const created = await prisma.ticketType.create({
         data: {
+          id: tt.id,
           concertId: concert.id,
           seatZoneId: zoneMap[tt.name] || null,
           name: tt.name,

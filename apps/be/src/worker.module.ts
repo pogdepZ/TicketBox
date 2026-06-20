@@ -7,10 +7,12 @@ import { NotificationsProcessor } from './routes/notifications/notifications.pro
 import { OrderExpirationJob } from './routes/orders/order-expiration.job';
 import { OrdersCoreModule } from './routes/orders/orders-core.module';
 import { SharedModule } from './shared.module';
+import { S3Module } from './common/s3/s3.module';
 
 @Module({
   imports: [
     SharedModule,
+    S3Module,
     ScheduleModule.forRoot(),
     OrdersCoreModule,
     BullModule.registerQueue(

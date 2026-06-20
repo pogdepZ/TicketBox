@@ -1,13 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
+import { OutboxService } from '../../common/outbox/outbox.service';
 
 @Injectable()
 export class NotificationsService {
   constructor(
     private prisma: PrismaService,
-    @InjectQueue('notification') private readonly notificationQueue: Queue,
+    private readonly outboxService: OutboxService,
   ) {}
 
   async sendNotification(
@@ -16,11 +15,6 @@ export class NotificationsService {
     channel: string,
     payload: Record<string, unknown>,
   ): Promise<{ notificationId: string; status: string }> {
-    console.log(
-      `[NotificationsService] sendNotification to ${userId} via ${channel}`,
-      { type, payload },
-    );
-
     const notification = await this.prisma.notification.create({
       data: {
         userId,
@@ -31,7 +25,7 @@ export class NotificationsService {
       },
     });
 
-    await this.notificationQueue.add('send-single', {
+    await this.outboxService.put('notification', 'send-single', {
       notificationId: notification.id,
     });
 
@@ -44,9 +38,7 @@ export class NotificationsService {
   async sendBulkReminder(
     concertId: string,
   ): Promise<{ totalSent: number; status: string }> {
-    console.log(`[NotificationsService] sendBulkReminder for concert ${concertId}`);
-
-    await this.notificationQueue.add('send-bulk', {
+    await this.outboxService.put('notification', 'send-bulk', {
       concertId,
     });
 
@@ -56,3 +48,4 @@ export class NotificationsService {
     };
   }
 }
+

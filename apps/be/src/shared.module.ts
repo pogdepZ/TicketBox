@@ -8,6 +8,7 @@ import redisConfig from './config/redis.config';
 import s3Config from './config/s3.config';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { RedisModule } from './common/redis/redis.module';
+import { OutboxModule } from './common/outbox/outbox.module';
 
 @Module({
   imports: [
@@ -30,7 +31,9 @@ import { RedisModule } from './common/redis/redis.module';
     }),
     PrismaModule,
     RedisModule,
+    OutboxModule,
   ],
-  exports: [ConfigModule, PrismaModule, RedisModule],
+  exports: [ConfigModule, PrismaModule, RedisModule, OutboxModule],
 })
 export class SharedModule {}
+
