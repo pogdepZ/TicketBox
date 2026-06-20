@@ -103,6 +103,7 @@ enum GuestRowStatus {
   PENDING
   VALID
   INVALID
+  DUPLICATE
 }
 
 enum GuestStatus {
@@ -151,12 +152,12 @@ enum AssetStatus {
  */
 
 model User {
-  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email        String     @unique @db.VarChar(255)
-  phone        String?    @db.VarChar(20)
+  id       String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email    String     @unique @db.VarChar(255)
+  phone    String?    @db.VarChar(20)
   password String?    @map("password") @db.VarChar(255)
-  fullName     String     @map("full_name") @db.VarChar(100)
-  status       UserStatus @default(ACTIVE)
+  fullName String     @map("full_name") @db.VarChar(100)
+  status   UserStatus @default(ACTIVE)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -380,7 +381,7 @@ model ReservationSeat {
   concertId     String   @map("concert_id") @db.Uuid
   ticketTypeId  String   @map("ticket_type_id") @db.Uuid
   seatNumber    String   @map("seat_number") @db.VarChar(30)
-  status        String   // HELD, CONFIRMED, RELEASED, EXPIRED
+  status        String // HELD, CONFIRMED, RELEASED, EXPIRED
   expiresAt     DateTime @map("expires_at") @db.Timestamptz(6)
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -436,11 +437,11 @@ model Order {
   paymentMethod PaymentMethod? @map("payment_method")
   paymentRef    String?        @unique @map("payment_ref") @db.VarChar(100)
 
-  paidAt    DateTime? @map("paid_at") @db.Timestamptz(6)
-  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  paidAt            DateTime? @map("paid_at") @db.Timestamptz(6)
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(6)
   paymentGraceUntil DateTime? @map("payment_grace_until") @db.Timestamptz(6)
-  releasedAt DateTime? @map("released_at") @db.Timestamptz(6)
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  releasedAt        DateTime? @map("released_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user        User        @relation(fields: [userId], references: [id])
   concert     Concert     @relation(fields: [concertId], references: [id])
@@ -545,12 +546,12 @@ model Ticket {
 
   checkinEvents CheckinEvent[]
 
+  @@unique([concertId, seatNumber])
   @@index([orderId])
   @@index([ownerUserId])
   @@index([status])
   @@index([ticketTypeId])
   @@index([ticketCode, status])
-  @@unique([concertId, seatNumber])
   @@map("tickets")
 }
 
@@ -630,9 +631,10 @@ model GuestImportBatch {
 
   status GuestImportStatus @default(PENDING)
 
-  totalRows   Int @default(0) @map("total_rows")
-  validRows   Int @default(0) @map("valid_rows")
-  invalidRows Int @default(0) @map("invalid_rows")
+  totalRows     Int @default(0) @map("total_rows")
+  validRows     Int @default(0) @map("valid_rows")
+  invalidRows   Int @default(0) @map("invalid_rows")
+  duplicateRows Int @default(0) @map("duplicate_rows")
 
   errorReportUrl String? @map("error_report_url") @db.VarChar(500)
 
@@ -657,11 +659,11 @@ model GuestImportRow {
 
   rowNumber Int @map("row_number")
 
-  fullName  String? @map("full_name") @db.VarChar(100)
-  email     String? @db.VarChar(255)
-  phone     String? @db.VarChar(20)
-  guestType String? @map("guest_type") @db.VarChar(50)
-  guestCode String? @map("guest_code") @db.VarChar(50)
+  fullName  String? @map("full_name")
+  email     String?
+  phone     String?
+  guestType String? @map("guest_type")
+  guestCode String? @map("guest_code")
 
   validationStatus GuestRowStatus @default(PENDING) @map("validation_status")
   errorMessage     String?        @map("error_message")
@@ -699,6 +701,8 @@ model GuestList {
   scannedBy User?             @relation("GuestScannedBy", fields: [scannedById], references: [id])
 
   @@unique([concertId, guestCode])
+  @@unique([concertId, email])
+  @@unique([concertId, phone])
   @@index([concertId])
   @@index([guestCode])
   @@map("guest_list")
@@ -843,4 +847,20 @@ model AuditLog {
   @@index([resourceType, resourceId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model OutboxMessage {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  queueName  String   @map("queue_name") @db.VarChar(100)
+  jobName    String   @map("job_name") @db.VarChar(100)
+  payload    Json
+  status     String   @default("PENDING") @db.VarChar(20)
+  error      String?
+  retryCount Int      @default(0) @map("retry_count")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("outbox_messages")
 }

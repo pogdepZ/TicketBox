@@ -1,15 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { UploadedFileDto } from './dto/uploaded-file.dto';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
 import { S3Service } from '../../common/s3/s3.service';
+import { OutboxService } from '../../common/outbox/outbox.service';
 
 @Injectable()
 export class AiBioService {
   constructor(
     private prisma: PrismaService,
-    @InjectQueue('ai') private readonly aiQueue: Queue,
+    private readonly outboxService: OutboxService,
     private readonly s3Service: S3Service,
   ) {}
 
@@ -17,6 +16,10 @@ export class AiBioService {
     concertId: string,
     file: UploadedFileDto,
   ): Promise<{ bio: string }> {
+    if (!file) {
+      throw new BadRequestException('PDF file is required');
+    }
+
     const fileExtension = file.originalname?.split('.').pop() || 'pdf';
     const s3Key = `concerts/${concertId}/artist-assets/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExtension}`;
 
@@ -37,8 +40,8 @@ export class AiBioService {
       },
     });
 
-    // Queue the job to process in the background
-    await this.aiQueue.add('generate-bio', {
+    // Queue the job to process in the background via Outbox
+    await this.outboxService.put('ai', 'generate-bio', {
       concertId,
       assetId: asset.id,
     });
@@ -51,3 +54,4 @@ export class AiBioService {
     };
   }
 }
+

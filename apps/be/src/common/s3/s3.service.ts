@@ -1,6 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
-import { PutObjectCommand, DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import { Readable } from 'stream';
 import s3Config from '../../config/s3.config';
 
 @Injectable()
@@ -62,6 +68,25 @@ export class S3Service {
   }
 
   /**
+   * Downloads a file from S3 bucket.
+   */
+  async downloadFile(key: string): Promise<Buffer> {
+    this.logger.log(`Downloading file from S3: ${key}`);
+
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    });
+
+    const response = await this.s3Client.send(command);
+    if (!response.Body) {
+      return Buffer.alloc(0);
+    }
+
+    return this.bodyToBuffer(response.Body);
+  }
+
+  /**
    * Deletes a file from S3 bucket.
    */
   async deleteFile(key: string): Promise<void> {
@@ -73,5 +98,36 @@ export class S3Service {
     });
 
     await this.s3Client.send(command);
+  }
+
+  private async bodyToBuffer(body: unknown): Promise<Buffer> {
+    if (body instanceof Readable) {
+      const chunks: Buffer[] = [];
+
+      for await (const chunk of body) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+
+      return Buffer.concat(chunks);
+    }
+
+    if (body instanceof Uint8Array) {
+      return Buffer.from(body);
+    }
+
+    const maybeWebBody = body as {
+      transformToByteArray?: () => Promise<Uint8Array>;
+      transformToString?: () => Promise<string>;
+    };
+
+    if (typeof maybeWebBody.transformToByteArray === 'function') {
+      return Buffer.from(await maybeWebBody.transformToByteArray());
+    }
+
+    if (typeof maybeWebBody.transformToString === 'function') {
+      return Buffer.from(await maybeWebBody.transformToString());
+    }
+
+    throw new Error('Unsupported S3 response body type');
   }
 }

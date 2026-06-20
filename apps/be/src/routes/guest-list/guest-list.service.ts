@@ -1,12 +1,12 @@
-import { ConflictException, Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { UploadedFileDto } from './dto/uploaded-file.dto';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue, QueueEvents } from 'bullmq';
+import { QueueEvents } from 'bullmq';
 import redisConfig from '../../config/redis.config';
 import { ConfigType } from '@nestjs/config';
 import { S3Service } from '../../common/s3/s3.service';
 import { createHash } from 'crypto';
+import { OutboxService } from '../../common/outbox/outbox.service';
 
 @Injectable()
 export class GuestListService implements OnModuleDestroy {
@@ -14,7 +14,7 @@ export class GuestListService implements OnModuleDestroy {
 
   constructor(
     private prisma: PrismaService,
-    @InjectQueue('csv') private readonly csvQueue: Queue,
+    private readonly outboxService: OutboxService,
     @Inject(redisConfig.KEY)
     private readonly redis: ConfigType<typeof redisConfig>,
     private readonly s3Service: S3Service,
@@ -37,10 +37,11 @@ export class GuestListService implements OnModuleDestroy {
     concertId: string,
     file: UploadedFileDto,
   ): Promise<{ imported: number; duplicates: number; errors: number }> {
-    console.log(
-      `[GuestListService] Importing CSV for concert ${concertId}, file: ${file?.originalname}`,
-    );
-
+    if (!file) {
+      throw new BadRequestException(
+        'CSV file is required. Send multipart/form-data with a file field named "file".',
+      );
+    }
     const fileHash = createHash('sha256').update(file.buffer).digest('hex');
 
     // Check if duplicate batch exists to prevent double-submit
@@ -72,13 +73,22 @@ export class GuestListService implements OnModuleDestroy {
       },
     });
 
-    const job = await this.csvQueue.add('import', {
+    const { job } = await this.outboxService.put('csv', 'import', {
       concertId,
       batchId: batch.id,
+      s3Key,
     });
 
-    const result = await job.waitUntilFinished(this.queueEvents);
+    if (job) {
+      const result = await job.waitUntilFinished(this.queueEvents);
+      return result as { imported: number; duplicates: number; errors: number };
+    }
 
-    return result as { imported: number; duplicates: number; errors: number };
+    return {
+      imported: 0,
+      duplicates: 0,
+      errors: 0,
+      message: 'Queue system is temporarily unavailable. The CSV file has been saved and will be processed automatically as soon as the queue recovers.',
+    } as any;
   }
 }
