@@ -1,16 +1,19 @@
 import 'dotenv/config';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { ApiModule } from './api.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/response.interceptor';
+import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
   const isProduction = process.env.NODE_ENV === 'production';
-  const app = await NestFactory.create(AppModule, {
+
+  const app = await NestFactory.create(ApiModule, {
     logger: isProduction
-    ? ['error', 'warn']
-    : ['log', 'debug', 'error', 'warn', 'verbose'],
+      ? ['error', 'warn']
+      : ['log', 'debug', 'error', 'warn', 'verbose'],
   });
   app.enableCors({
     origin: true,
@@ -19,7 +22,10 @@ async function bootstrap() {
   app.enableShutdownHooks();
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new TransformInterceptor());
-  await app.listen(process.env.PORT ? Number(process.env.PORT) : 3000, '0.0.0.0');
+
+  const port = process.env.PORT || 3001;
+  await app.listen(port);
+  logger.log(`API Server is running on port ${port}`);
 }
 
 void bootstrap();

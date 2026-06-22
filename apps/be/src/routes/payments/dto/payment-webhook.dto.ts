@@ -9,6 +9,11 @@ export const paymentWebhookSchema = z
     amount: z.union([z.string().min(1), z.number().positive()]),
     currency: z.literal('VND').default('VND'),
     signature: z.string().min(1),
+    gatewayPaidAt: z.union([z.string().min(1), z.number()]).optional(),
+    paidAt: z.union([z.string().min(1), z.number()]).optional(),
+    responseTime: z.union([z.string().min(1), z.number()]).optional(),
+    transTime: z.union([z.string().min(1), z.number()]).optional(),
+    transactionTime: z.union([z.string().min(1), z.number()]).optional(),
   })
   .strict();
 

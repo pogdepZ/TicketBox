@@ -11,6 +11,7 @@ type UnifiedWebhookPayload = {
   eventType: 'SUCCESS' | 'FAILED' | 'TIMEOUT';
   amount: number | string;
   currency: 'VND';
+  gatewayPaidAt?: number | string;
 };
 
 type MomoIpnPayload = {
@@ -225,6 +226,7 @@ export class PaymentGatewayService {
       eventType,
       amount: payload.amount ?? '',
       currency: 'VND',
+      gatewayPaidAt: payload.responseTime,
     };
   }
 

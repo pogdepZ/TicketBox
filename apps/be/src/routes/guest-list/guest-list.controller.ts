@@ -1,4 +1,4 @@
-import { Controller, Param, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, Logger, Param, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadedFileDto } from './dto/uploaded-file.dto';
 import { GuestListService } from './guest-list.service';
@@ -6,6 +6,7 @@ import { GuestListService } from './guest-list.service';
 @Controller('admin/concerts')
 export class GuestListController {
   constructor(private readonly guestListService: GuestListService) {}
+  private readonly logger = new Logger(GuestListController.name);
 
   @Post(':id/guest-list/import')
   @UseInterceptors(FileInterceptor('file'))

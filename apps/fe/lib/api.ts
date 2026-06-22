@@ -1,7 +1,7 @@
 import { getStoredMockOrder, getStoredMockOrders } from './mock-reservation';
 import { adminStats, concerts as mockConcerts } from './mock-data';
 
-export const API_BASE_URL = 'http://127.0.0.1:3001';
+export const API_BASE_URL = typeof window !== 'undefined' ? '/api' : 'http://127.0.0.1:3001';
 
 export class ApiError extends Error {
   statusCode?: number;

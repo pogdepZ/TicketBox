@@ -30,9 +30,10 @@ import {
   ReservationStatus,
   TicketType,
 } from '../../generated/prisma';
-
-/** Thời gian giữ vé tạm: 5 phút */
-const RESERVATION_TTL_MINUTES = 10;
+import {
+  getPaymentGraceUntil,
+  RESERVATION_TTL_MINUTES,
+} from './order-expiration.constants';
 
 /** Rate limit: tối đa 5 lần tạo order / 300 giây mỗi user */
 const RATE_LIMIT_CAPACITY = 5;
@@ -223,6 +224,7 @@ export class OrdersService {
       const expiresAt = new Date(
         Date.now() + RESERVATION_TTL_MINUTES * 60 * 1000,
       );
+      const paymentGraceUntil = getPaymentGraceUntil(expiresAt);
 
       const reservation = await tx.reservation.create({
         data: {
@@ -267,6 +269,7 @@ export class OrdersService {
           status: OrderStatus.PENDING_PAYMENT,
           totalAmount,
           expiresAt,
+          paymentGraceUntil,
         },
       });
 

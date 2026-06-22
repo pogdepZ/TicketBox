@@ -4,6 +4,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { OrderStatus, ReservationStatus } from '../../generated/prisma';
 import { OrderTransactionHelper, ReleaseResult } from './order-transaction.helper';
+import { PAYMENT_PROCESSING_GRACE_SECONDS } from './order-expiration.constants';
 
 /** Số lượng order xử lý mỗi lần chạy cron */
 const BATCH_SIZE = 100;
@@ -25,16 +26,41 @@ export class OrderExpirationJob {
   @Cron(CronExpression.EVERY_MINUTE)
   async expireOrders(): Promise<void> {
     const now = new Date();
+    const paymentProcessingCutoff = new Date(
+      now.getTime() - PAYMENT_PROCESSING_GRACE_SECONDS * 1000,
+    );
 
-    const expiredOrders = await this.prisma.order.findMany({
+    const expiredPendingOrders = await this.prisma.order.findMany({
       where: {
-        status: { in: [OrderStatus.PENDING_PAYMENT, OrderStatus.PAYMENT_PROCESSING] },
+        status: OrderStatus.PENDING_PAYMENT,
         expiresAt: { lt: now },
       },
       select: { id: true },
       take: BATCH_SIZE,
       orderBy: { expiresAt: 'asc' },
     });
+    const remainingBatchSize = BATCH_SIZE - expiredPendingOrders.length;
+
+    const expiredProcessingOrders =
+      remainingBatchSize > 0
+        ? await this.prisma.order.findMany({
+            where: {
+              status: OrderStatus.PAYMENT_PROCESSING,
+              OR: [
+                { paymentGraceUntil: { lt: now } },
+                {
+                  paymentGraceUntil: null,
+                  expiresAt: { lt: paymentProcessingCutoff },
+                },
+              ],
+            },
+            select: { id: true },
+            take: remainingBatchSize,
+            orderBy: { expiresAt: 'asc' },
+          })
+        : [];
+
+    const expiredOrders = [...expiredPendingOrders, ...expiredProcessingOrders];
 
     if (expiredOrders.length === 0) {
       return;
@@ -82,7 +108,9 @@ export class OrderExpirationJob {
   }
 
   /**
-   * Quét và expire các reservation_seats HELD đã quá expiresAt.
+   * Cleanup reservation_seats HELD đã quá expiresAt sau khi order đã release.
+   * Order release là nơi hoàn inventory/quota; cron này không được mở ghế
+   * trước khi order tương ứng được release.
    * Chạy mỗi 1 phút.
    */
   @Cron(CronExpression.EVERY_MINUTE)
@@ -98,27 +126,78 @@ export class OrderExpirationJob {
         id: true,
         concertId: true,
         seatNumber: true,
+        reservation: {
+          select: {
+            order: {
+              select: {
+                id: true,
+                status: true,
+                releasedAt: true,
+              },
+            },
+          },
+        },
       },
       take: BATCH_SIZE,
     });
 
-    if (expiredSeats.length === 0) {
+    const seatsToExpire = expiredSeats.filter((seat) => {
+      const order = seat.reservation.order;
+      if (!order) {
+        return true;
+      }
+
+      if (order.releasedAt) {
+        return true;
+      }
+
+      const releasedStatuses: OrderStatus[] = [
+        OrderStatus.PAYMENT_FAILED,
+        OrderStatus.EXPIRED,
+        OrderStatus.CANCELLED,
+        OrderStatus.REFUND_REQUIRED,
+      ];
+
+      return releasedStatuses.includes(order.status);
+    });
+
+    if (seatsToExpire.length === 0) {
       return;
     }
 
-    this.logger.log(`Expiring ${expiredSeats.length} reservation seats...`);
+    this.logger.log(`Expiring ${seatsToExpire.length} reservation seats...`);
 
-    await this.prisma.reservationSeat.updateMany({
-      where: {
-        id: { in: expiredSeats.map((s) => s.id) },
-      },
-      data: {
-        status: 'EXPIRED',
-      },
-    });
+    const expiredSeatIds = seatsToExpire
+      .filter((seat) => seat.reservation.order?.status === OrderStatus.EXPIRED)
+      .map((s) => s.id);
+    const releasedSeatIds = seatsToExpire
+      .filter((seat) => seat.reservation.order?.status !== OrderStatus.EXPIRED)
+      .map((s) => s.id);
+
+    if (expiredSeatIds.length > 0) {
+      await this.prisma.reservationSeat.updateMany({
+        where: {
+          id: { in: expiredSeatIds },
+        },
+        data: {
+          status: 'EXPIRED',
+        },
+      });
+    }
+
+    if (releasedSeatIds.length > 0) {
+      await this.prisma.reservationSeat.updateMany({
+        where: {
+          id: { in: releasedSeatIds },
+        },
+        data: {
+          status: 'RELEASED',
+        },
+      });
+    }
 
     // Clean up Redis keys
-    for (const seat of expiredSeats) {
+    for (const seat of seatsToExpire) {
       const key = `hold:seat:${seat.concertId}:${seat.seatNumber}`;
       try {
         await this.redis.del(key);

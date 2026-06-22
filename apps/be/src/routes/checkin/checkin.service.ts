@@ -17,9 +17,7 @@ export class CheckinService {
         order: true,
       },
     });
-
-    console.log("ticket>>>>>>:", ticket)
-
+    
     if (!ticket || ticket.order.concertId !== concertId) {
       return {
         ticketId: 'unknown',

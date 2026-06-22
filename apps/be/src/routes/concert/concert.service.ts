@@ -6,7 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { CreateConcertDto } from './dto/create-concert.dto';
 import { UpdateConcertDto } from './dto/update-concert.dto';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -20,6 +20,7 @@ import { ConcertResponseDto } from './dto/concert-response.dto';
 import { toPrismaConcertStatus } from './types/concert-status.type';
 import { CancelConcertDto } from './dto/cancel-concert.dto';
 import { RedisService } from '../../common/redis/redis.service';
+import { S3Service } from '../../common/s3/s3.service';
 
 const CONCERT_CACHE_TTL_SECONDS = 60;
 const CONCERT_LIST_CACHE_KEY = 'cache:concert:list';
@@ -42,7 +43,29 @@ export class ConcertService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly redisService: RedisService,
+    private readonly s3Service: S3Service,
   ) {}
+
+  private async uploadSeatMapSvgIfRaw(
+    concertId: string,
+    seatMapSvgOrUrl?: string,
+  ): Promise<string | undefined> {
+    if (!seatMapSvgOrUrl) {
+      return undefined;
+    }
+
+    const isRawSvg = seatMapSvgOrUrl.trim().startsWith('<') && seatMapSvgOrUrl.includes('svg');
+    if (isRawSvg) {
+      const s3Key = `concerts/${concertId}/seat-maps/map.svg`;
+      return this.s3Service.uploadFile(
+        s3Key,
+        Buffer.from(seatMapSvgOrUrl, 'utf-8'),
+        'image/svg+xml',
+      );
+    }
+
+    return seatMapSvgOrUrl;
+  }
 
   async create(
     createConcertDto: CreateConcertDto,
@@ -50,15 +73,23 @@ export class ConcertService {
   ): Promise<ConcertResponseDto> {
     const eventDate = this.parseDate(createConcertDto.eventDate, 'eventDate');
     this.validateEventDateInFuture(eventDate);
+
+    const concertId = randomUUID();
+    let seatMapSvgUrl = undefined;
+    if (createConcertDto.seatMapSvg) {
+      seatMapSvgUrl = await this.uploadSeatMapSvgIfRaw(concertId, createConcertDto.seatMapSvg);
+    }
+
     const concert = await this.prismaService.concert.create({
       data: {
+        id: concertId,
         name: createConcertDto.name.trim(),
         description: createConcertDto.description,
         artistName: createConcertDto.artistName,
         venueName: createConcertDto.venueName.trim(),
         venueAddress: createConcertDto.venueAddress.trim(),
         eventDate,
-        seatMapSvgUrl: createConcertDto.seatMapSvg,
+        seatMapSvgUrl,
         posterUrl: createConcertDto.posterUrl,
         status: PrismaConcertStatus.DRAFT,
         createdById,
@@ -151,6 +182,10 @@ export class ConcertService {
   ): Promise<ConcertResponseDto> {
     const concert = await this.findConcertOrThrow(id);
     this.assertCanUpdate(concert, updateConcertDto);
+
+    if (updateConcertDto.seatMapSvg !== undefined) {
+      updateConcertDto.seatMapSvg = await this.uploadSeatMapSvgIfRaw(id, updateConcertDto.seatMapSvg);
+    }
 
     const data = this.buildUpdateData(concert, updateConcertDto);
     const updatedConcert = await this.prismaService.concert.update({

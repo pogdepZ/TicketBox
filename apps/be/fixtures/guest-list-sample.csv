@@ -1,0 +1,9 @@
+full_name,email,phone,guest_type,guest_code
+Nguyen Van A,nguyen.van.a@example.com,0900000001,VIP,VIP001
+Tran Thi B,tran.thi.b@example.com,0900000002,Sponsor,VIP002
+Le Minh C,le.minh.c@example.com,0900000003,VIP,VIP003
+Pham Thu D,pham.thu.d@example.com,0900000004,Press,VIP004
+Hoang Nam E,hoang.nam.e@example.com,0900000005,Partner,VIP005
+Do Anh F,do.anh.f@example.com,0900000006,VIP,VIP006
+Vu Mai G,vu.mai.g@example.com,0900000007,Sponsor,VIP007
+Bui Quoc H,bui.quoc.h@example.com,0900000008,Partner,VIP008

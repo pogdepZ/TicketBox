@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { OutboxService } from '../../common/outbox/outbox.service';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly outboxService: OutboxService,
+  ) {}
 
   async sendNotification(
     userId: string,
@@ -11,20 +15,18 @@ export class NotificationsService {
     channel: string,
     payload: Record<string, unknown>,
   ): Promise<{ notificationId: string; status: string }> {
-    console.log(
-      `[NotificationsService] sendNotification to ${userId} via ${channel}`,
-      { type, payload },
-    );
-
     const notification = await this.prisma.notification.create({
       data: {
         userId,
         channel: channel === 'EMAIL' || channel === 'PUSH' || channel === 'SMS' || channel === 'ZALO' ? channel : 'EMAIL',
         template: type,
         payload: payload as any,
-        status: 'SENT',
-        sentAt: new Date(),
+        status: 'PENDING',
       },
+    });
+
+    await this.outboxService.put('notification', 'send-single', {
+      notificationId: notification.id,
     });
 
     return {
@@ -36,7 +38,9 @@ export class NotificationsService {
   async sendBulkReminder(
     concertId: string,
   ): Promise<{ totalSent: number; status: string }> {
-    console.log(`[NotificationsService] sendBulkReminder for concert ${concertId}`);
+    await this.outboxService.put('notification', 'send-bulk', {
+      concertId,
+    });
 
     return {
       totalSent: 0,
@@ -44,3 +48,4 @@ export class NotificationsService {
     };
   }
 }
+

@@ -37,14 +37,15 @@ export class OrderTransactionHelper {
       OrderStatus.PAYMENT_PROCESSING,
     ];
 
-    if (!releasableStatuses.includes(order.status)) {
-      const alreadyReleasedStatuses: OrderStatus[] = [
-        OrderStatus.PAYMENT_FAILED,
-        OrderStatus.EXPIRED,
-        OrderStatus.CANCELLED,
-      ];
+    const alreadyReleasedStatuses: OrderStatus[] = [
+      OrderStatus.PAYMENT_FAILED,
+      OrderStatus.EXPIRED,
+      OrderStatus.CANCELLED,
+      OrderStatus.REFUND_REQUIRED,
+    ];
 
-      if (alreadyReleasedStatuses.includes(order.status)) {
+    if (order.releasedAt || !releasableStatuses.includes(order.status)) {
+      if (order.releasedAt || alreadyReleasedStatuses.includes(order.status)) {
         this.logger.warn(
           `Skip releasing order ${orderId}; already ${order.status}`,
         );
@@ -62,11 +63,35 @@ export class OrderTransactionHelper {
       });
     }
 
-    // Cập nhật Order status
-    await tx.order.update({
-      where: { id: orderId },
-      data: { status: orderStatus },
+    const releasedAt = new Date();
+    const releaseAttempt = await tx.order.updateMany({
+      where: {
+        id: orderId,
+        status: { in: releasableStatuses },
+        releasedAt: null,
+      },
+      data: {
+        status: orderStatus,
+        releasedAt,
+      },
     });
+
+    if (releaseAttempt.count === 0) {
+      const latestOrder = await tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        select: { status: true },
+      });
+
+      this.logger.warn(
+        `Skip releasing order ${orderId}; conditional release did not match. currentStatus=${latestOrder.status}`,
+      );
+      return {
+        orderId,
+        releasedItems: [],
+        skipped: true,
+        previousStatus: latestOrder.status,
+      };
+    }
 
     // Cập nhật Reservation status
     await tx.reservation.update({

@@ -113,7 +113,7 @@ export class IdempotencyService {
 
   /**
    * Tạo record PROCESSING trước khi xử lý (ngăn concurrent duplicate).
-   * Dùng upsert để an toàn nếu record đã được tạo bởi instance khác.
+   * Dùng upsert/transaction để an toàn nếu record đã được tạo hoặc đã FAILED trước đó.
    */
   async markProcessing(
     key: string,
@@ -123,14 +123,50 @@ export class IdempotencyService {
     const expiresAt = new Date(
       Date.now() + IDEMPOTENCY_DB_TTL_HOURS * 60 * 60 * 1000,
     );
-    await this.prisma.idempotencyRecord.create({
-      data: {
-        key,
-        requestHash,
-        userId,
-        status: IdempotencyStatus.PROCESSING,
-        expiresAt,
-      },
+
+    await this.prisma.$transaction(async (tx) => {
+      // Lock dòng idempotency key nếu đã tồn tại
+      await tx.$executeRaw`SELECT key FROM idempotency_records WHERE key = ${key} FOR UPDATE`;
+
+      const record = await tx.idempotencyRecord.findUnique({
+        where: { key },
+      });
+
+      if (record) {
+        if (record.status === IdempotencyStatus.PROCESSING) {
+          throw new ConflictException({
+            message: 'Request is already being processed',
+            key,
+          });
+        }
+        if (record.status === IdempotencyStatus.COMPLETED) {
+          throw new ConflictException({
+            message: 'Request has already been completed',
+            key,
+          });
+        }
+
+        // Nếu trạng thái trước đó là FAILED, cho phép retry bằng cách cập nhật lại sang PROCESSING
+        await tx.idempotencyRecord.update({
+          where: { key },
+          data: {
+            requestHash,
+            userId,
+            status: IdempotencyStatus.PROCESSING,
+            expiresAt,
+          },
+        });
+      } else {
+        await tx.idempotencyRecord.create({
+          data: {
+            key,
+            requestHash,
+            userId,
+            status: IdempotencyStatus.PROCESSING,
+            expiresAt,
+          },
+        });
+      }
     });
   }
 
