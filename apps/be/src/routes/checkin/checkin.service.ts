@@ -1,18 +1,43 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
 import { ScanCheckinDto } from './dto/scan-checkin.dto';
 import { SyncCheckinDto } from './dto/sync-checkin.dto';
+import * as jwt from 'jsonwebtoken';
 
 @Injectable()
 export class CheckinService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(CheckinService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private config: ConfigService,
+  ) {}
 
   async scan(dto: ScanCheckinDto) {
     const { qrCodeData, staffId, concertId, deviceId, clientEventId } = dto;
 
-    // 1. Resolve ticket by qrCodeData (assuming ticketCode for now)
+    let extractedTicketCode = qrCodeData;
+    const ticketSecret = this.config.get<string>('JWT_TICKET_SECRET', 'ticket-secret');
+
+    // 1. Verify JWS and extract ticket_code
+    try {
+      const decoded = jwt.verify(qrCodeData, ticketSecret) as any;
+      if (decoded && decoded.ticket_code) {
+        extractedTicketCode = decoded.ticket_code;
+      }
+    } catch (e: any) {
+      this.logger.warn(`Failed to verify JWT for checkin: ${e.message}`);
+      return {
+        ticketId: 'unknown',
+        status: 'INVALID_TICKET',
+        checkedInAt: new Date().toISOString(),
+      };
+    }
+
+    // 2. Resolve ticket
     const ticket = await this.prisma.ticket.findUnique({
-      where: { ticketCode: qrCodeData },
+      where: { ticketCode: extractedTicketCode },
       include: {
         order: true,
       },
@@ -20,8 +45,8 @@ export class CheckinService {
     
     if (!ticket || ticket.order.concertId !== concertId) {
       return {
-        ticketId: 'unknown',
-        status: 'NOT_FOUND',
+        ticketId: ticket ? ticket.id : 'unknown',
+        status: 'INVALID_CONCERT',
         checkedInAt: new Date().toISOString(),
       };
     }
@@ -41,13 +66,13 @@ export class CheckinService {
 
       if (currentTicket.status === 'USED') {
         checkinResult = 'DUPLICATE';
-        returnStatus = 'DUPLICATE';
+        returnStatus = 'ALREADY_CHECKED_IN';
       } else if (currentTicket.status !== 'ACTIVE') {
         checkinResult = 'REJECTED';
-        returnStatus = 'NOT_FOUND'; // Or a specific status like INVALID
+        returnStatus = 'INVALID_TICKET';
       } else {
         checkinResult = 'ACCEPTED';
-        returnStatus = 'SUCCESS';
+        returnStatus = 'ACCEPTED';
         
         // Update ticket
         await tx.ticket.update({
@@ -61,6 +86,7 @@ export class CheckinService {
         });
       }
 
+      const checkedInAt = new Date();
       // Record the checkin event
       await tx.checkinEvent.create({
         data: {
@@ -70,14 +96,14 @@ export class CheckinService {
           clientEventId: clientEventId || `scan-${Date.now()}`,
           mode: 'ONLINE',
           result: checkinResult,
-          scannedAtClient: new Date(),
+          scannedAtClient: checkedInAt,
         },
       });
 
       return {
         ticketId: ticket.id,
         status: returnStatus,
-        checkedInAt: new Date().toISOString(),
+        checkedInAt: checkedInAt.toISOString(),
         guestName: 'Guest (Resolved)', // Normally resolved from ticket.owner
         ticketType: 'Resolved Type',
         ticketCode: ticket.ticketCode,

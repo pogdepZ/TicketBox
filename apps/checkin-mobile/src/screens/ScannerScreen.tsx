@@ -64,7 +64,7 @@ export default function ScannerScreen() {
       const userStr = await AsyncStorage.getItem('auth_user');
       const user = userStr ? JSON.parse(userStr) : null;
       // Provide valid UUIDs as fallbacks to prevent Prisma crash on backend
-      const staffId = user?.id || '00000000-0000-0000-0000-000000000001';
+      const staffId = user?.id;
       const deviceId = '00000000-0000-0000-0000-000000000002';
 
       const payload = {
@@ -180,22 +180,24 @@ export default function ScannerScreen() {
           <Text style={styles.cameraSectionLabel}>Khung quét</Text>
           <Text style={styles.scanCounter}>128 vào cổng</Text>
         </View>
-        <CameraView
-          style={StyleSheet.absoluteFill}
-          facing="back"
-          barcodeScannerSettings={{
-            barcodeTypes: ["qr"],
-          }}
-          onBarcodeScanned={({ data }) => handleScan(data)}
-        />
-        <View style={styles.cameraGridLineV} />
-        <View style={styles.cameraGridLineH} />
-        <View style={[styles.corner, styles.cornerTL]} />
-        <View style={[styles.corner, styles.cornerTR]} />
-        <View style={[styles.corner, styles.cornerBL]} />
-        <View style={[styles.corner, styles.cornerBR]} />
+        <View style={styles.cameraFrame}>
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            barcodeScannerSettings={{
+              barcodeTypes: ["qr"],
+            }}
+            onBarcodeScanned={({ data }) => handleScan(data)}
+          />
+          <View style={styles.cameraGridLineV} />
+          <View style={styles.cameraGridLineH} />
+          <View style={[styles.corner, styles.cornerTL]} />
+          <View style={[styles.corner, styles.cornerTR]} />
+          <View style={[styles.corner, styles.cornerBL]} />
+          <View style={[styles.corner, styles.cornerBR]} />
 
-        <View style={[styles.scanLine, scanning && { backgroundColor: COLORS.success }]} />
+          <View style={[styles.scanLine, scanning && { backgroundColor: COLORS.success }]} />
+        </View>
       </View>
 
       <View style={styles.buttonsContainer}>
