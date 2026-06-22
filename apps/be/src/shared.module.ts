@@ -1,21 +1,22 @@
-import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bullmq';
-import { ConfigModule, ConfigType } from '@nestjs/config';
-import databaseConfig from './config/database.config';
-import { validate } from './config/env.validation';
-import jwtConfig from './config/jwt.config';
-import redisConfig from './config/redis.config';
-import s3Config from './config/s3.config';
-import { PrismaModule } from './common/prisma/prisma.module';
-import { RedisModule } from './common/redis/redis.module';
-import { OutboxModule } from './common/outbox/outbox.module';
+import { BullModule } from "@nestjs/bullmq";
+import { ConfigModule, ConfigType } from "@nestjs/config";
+import { Module } from "@nestjs/common";
+import { OutboxModule } from "./common/outbox/outbox.module";
+import { PrismaModule } from "./common/prisma/prisma.module";
+import { RedisModule } from "./common/redis/redis.module";
+import databaseConfig from "./config/database.config";
+import { validate } from "./config/env.validation";
+import geminiConfig from "./config/openai.config";
+import jwtConfig from "./config/jwt.config";
+import redisConfig from "./config/redis.config";
+import s3Config from "./config/s3.config";
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       validate,
-      load: [databaseConfig, jwtConfig, redisConfig, s3Config],
+      load: [databaseConfig, jwtConfig, redisConfig, s3Config, geminiConfig],
     }),
     BullModule.forRootAsync({
       inject: [redisConfig.KEY],
@@ -36,4 +37,3 @@ import { OutboxModule } from './common/outbox/outbox.module';
   exports: [ConfigModule, PrismaModule, RedisModule, OutboxModule],
 })
 export class SharedModule {}
-

@@ -1,9 +1,9 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 enum Environment {
-  Development = 'development',
-  Production = 'production',
-  Test = 'test',
+  Development = "development",
+  Production = "production",
+  Test = "test",
 }
 
 const environmentSchema = z.object({
@@ -35,16 +35,17 @@ const environmentSchema = z.object({
   AWS_S3_BUCKET: z.string().optional(),
   AWS_S3_ENDPOINT: z.string().optional(),
   AWS_S3_FORCE_PATH_STYLE: z.string().optional(),
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_MODEL: z.string().optional(),
+  GEMINI_MAX_TOKENS: z.coerce.number().int().positive().optional(),
 });
 
 export function validate(config: Record<string, unknown>) {
   const result = environmentSchema.safeParse(config);
 
   if (!result.success) {
-    console.error('❌ Environment validation failed:', result.error.format());
-    throw new Error(
-      `Environment validation failed: ${result.error.message}`,
-    );
+    console.error("❌ Environment validation failed:", result.error.format());
+    throw new Error(`Environment validation failed: ${result.error.message}`);
   }
 
   return result.data;
