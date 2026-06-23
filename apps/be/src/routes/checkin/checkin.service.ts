@@ -118,17 +118,48 @@ export class CheckinService {
     // Process each item
     for (const item of dto.items) {
       try {
+        // Idempotency check: see if this exact event was already processed
+        if (item.clientEventId) {
+          const existingEvent = await this.prisma.checkinEvent.findUnique({
+            where: {
+              deviceId_clientEventId: {
+                deviceId: item.sourceDeviceId,
+                clientEventId: item.clientEventId,
+              },
+            },
+          });
+
+          if (existingEvent) {
+            results.push({
+              ticketId: item.ticketId,
+              status: 'SYNCED', // Already synced previously
+              serverId: existingEvent.id,
+              originalStatus: existingEvent.result,
+            });
+            continue;
+          }
+        }
+
         const result = await this.scan({
           qrCodeData: item.qrCodeData,
           staffId: item.staffId,
           concertId: item.concertId,
           deviceId: item.sourceDeviceId,
-          clientEventId: `sync-${item.ticketId}-${item.checkedAt}`,
+          clientEventId: item.clientEventId, // Use provided event ID
         });
+
+        let syncStatus = 'FAILED';
+        if (result.status === 'ACCEPTED') {
+          syncStatus = 'SYNCED';
+        } else if (result.status === 'ALREADY_CHECKED_IN') {
+          syncStatus = 'CONFLICT';
+        } else {
+          syncStatus = 'REJECTED';
+        }
 
         results.push({
           ticketId: item.ticketId,
-          status: result.status === 'SUCCESS' || result.status === 'DUPLICATE' ? 'SYNCED' : 'FAILED',
+          status: syncStatus,
           serverId: `server-${Date.now()}`,
           originalStatus: result.status,
         });

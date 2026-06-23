@@ -14,7 +14,7 @@ export interface ApiResponse<T = unknown> {
 export type ScanStatus = 'SUCCESS' | 'DUPLICATE' | 'NOT_FOUND' | 'WRONG_EVENT' | 'TEMP_ACCEPTED';
 
 /** Sync status for offline queue items */
-export type SyncStatus = 'PENDING' | 'SYNCED' | 'FAILED';
+export type SyncStatus = 'PENDING' | 'SYNCED' | 'FAILED' | 'CONFLICT' | 'REJECTED';
 
 /** User role */
 export type UserRole = 'CHECKIN_STAFF' | 'ADMIN' | 'ORGANIZER';

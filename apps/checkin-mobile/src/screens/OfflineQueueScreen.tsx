@@ -59,14 +59,27 @@ export default function OfflineQueueScreen() {
           staffId: item.staffId,
           sourceDeviceId: item.sourceDeviceId,
           checkedAt: item.checkedAt,
+          clientEventId: item.id,
         }))
       });
 
       if (response.success && response.data) {
+        let db: any = null;
+        try {
+          db = require('../services/db').db;
+        } catch (e) {}
+
         for (const res of response.data.results) {
           const item = toSync.find((i) => i.ticketId === res.ticketId);
           if (item) {
             await queueService.updateItemStatus(item.id, res.status);
+            if ((res.status === 'SYNCED' || res.status === 'CONFLICT') && db) {
+              try {
+                await db.runAsync('UPDATE ticket_snapshot SET status = ? WHERE ticketCode = ?', ['USED', item.ticketCode]);
+              } catch (e) {
+                console.error("Failed to update snapshot after sync", e);
+              }
+            }
           }
         }
       } else {
@@ -87,12 +100,16 @@ export default function OfflineQueueScreen() {
   const renderItem = ({ item }: { item: OfflineQueueItem }) => {
     const isSynced = item.syncStatus === 'SYNCED';
     const isFailed = item.syncStatus === 'FAILED';
+    const isConflict = item.syncStatus === 'CONFLICT';
+    const isRejected = item.syncStatus === 'REJECTED';
     const time = new Date(item.checkedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
     let statusColor = COLORS.warning;
     let statusLabel = 'PENDING';
     if (isSynced) { statusColor = COLORS.success; statusLabel = 'SYNCED'; }
     if (isFailed) { statusColor = COLORS.error; statusLabel = 'FAILED'; }
+    if (isConflict) { statusColor = COLORS.warning; statusLabel = 'CONFLICT'; }
+    if (isRejected) { statusColor = COLORS.error; statusLabel = 'REJECTED'; }
 
     return (
       <View style={styles.queueItem}>
