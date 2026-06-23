@@ -168,7 +168,7 @@ function CheckoutResultContent() {
         </Link>
         {isSuccess ? (
           <Link
-            href="/success"
+            href={`/success?orderId=${txnRef}`}
             className="flex items-center justify-center gap-2 rounded-full bg-primary px-8 py-3.5 font-bold text-primary-foreground transition hover:bg-primary/95 active:translate-y-px shadow-lg shadow-primary/10"
           >
             <Ticket className="size-5" />
@@ -176,7 +176,7 @@ function CheckoutResultContent() {
           </Link>
         ) : (
           <Link
-            href="/checkout"
+            href={`/checkout?orderId=${txnRef}`}
             className="flex items-center justify-center gap-2 rounded-full bg-primary px-8 py-3.5 font-bold text-primary-foreground transition hover:bg-primary/95 active:translate-y-px shadow-lg shadow-primary/10"
           >
             Thử lại thanh toán

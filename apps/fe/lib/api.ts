@@ -5,43 +5,192 @@ export const API_BASE_URL = typeof window !== 'undefined' ? '/api' : 'http://127
 
 export class ApiError extends Error {
   statusCode?: number;
-  constructor(message: string, statusCode?: number) {
-    super(message);
+  rawMessage?: string | string[];
+  constructor(message: string | string[], statusCode?: number) {
+    const displayMsg = Array.isArray(message) ? message.join(', ') : String(message);
+    super(displayMsg);
     this.name = 'ApiError';
     this.statusCode = statusCode;
+    this.rawMessage = message;
   }
 }
 
 export function getFriendlyErrorMessage(error: any): string {
-  if (error instanceof ApiError) {
-    const code = error.statusCode;
-    const msg = error.message?.toLowerCase() || '';
+  const translateSingleMessage = (msg: string): string => {
+    if (!msg || typeof msg !== 'string') return '';
+    const msgLower = msg.toLowerCase().trim();
 
-    if (code === 429) {
-      return 'Yêu cầu quá nhanh. Vui lòng thử lại sau vài giây (Rate Limit).';
+    // 1. Authentication and authorization
+    if (msgLower === 'email already registered' || msgLower === 'email already exists' || msgLower.includes('email_exists')) {
+      return 'Email này đã được sử dụng. Vui lòng đăng ký bằng email khác.';
     }
-    if (code === 503) {
-      return 'Hệ thống đang bận hoặc đang bảo trì (Circuit Breaker). Vui lòng quay lại sau.';
+    if (msgLower === 'invalid email or password' || msgLower === 'invalid credentials' || msgLower === 'incorrect password') {
+      return 'Email hoặc mật khẩu không chính xác.';
     }
-    if (code === 403) {
-      return 'Bạn không có quyền thực hiện hành động này.';
+    if (msgLower === 'refresh token is missing' || msgLower === 'invalid refresh token' || msgLower === 'unauthorized') {
+      return 'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.';
+    }
+    if (msgLower === 'user is not active') {
+      return 'Tài khoản của bạn tạm thời đã bị khóa hoặc chưa được kích hoạt.';
+    }
+    if (msgLower.includes('do not have permission') || msgLower.includes('forbidden') || msgLower === 'forbidden resource') {
+      return 'Bạn không có quyền thực hiện chức năng này.';
     }
 
-    if (msg.includes('sold out') || msg.includes('hết vé') || msg.includes('sold_out')) {
+    // 2. Ticket purchasing / Seat Map
+    if (msgLower.includes('concert not found')) {
+      return 'Sự kiện không tồn tại hoặc đã bị gỡ bỏ.';
+    }
+    if (msgLower.includes('ticket type not found')) {
+      return 'Không tìm thấy thông tin hạng vé yêu cầu.';
+    }
+    if (msgLower.includes('sold out') || msgLower.includes('hết vé') || msgLower.includes('sold_out')) {
       return 'Xin lỗi, loại vé này đã được bán hết.';
     }
-    if (msg.includes('max_per_user') || msg.includes('max per user') || msg.includes('vượt quá số lượng')) {
-      return 'Bạn đã vượt quá số lượng vé tối đa được phép mua cho mỗi tài khoản.';
+    if (msgLower.includes('max_per_user') || msgLower.includes('max per user') || msgLower.includes('vượt quá số lượng') || msgLower.includes('limit exceeded')) {
+      return 'Bạn đã đạt giới hạn số lượng vé tối đa được phép mua cho mỗi tài khoản.';
     }
-    if (msg.includes('expired') || msg.includes('hết hạn')) {
-      return 'Phiên đặt giữ ghế của bạn đã hết hạn. Vui lòng chọn lại ghế.';
+    if (msgLower.includes('expired') || msgLower.includes('hết hạn') || msgLower.includes('order expired') || msgLower.includes('hold expired')) {
+      return 'Đơn đặt vé hoặc phiên giữ ghế của bạn đã hết hạn. Vui lòng thao tác lại.';
     }
+    if (msgLower.includes('seat')) {
+      if (msgLower.includes('taken') || msgLower.includes('booked') || msgLower.includes('reserved') || msgLower.includes('occupied') || msgLower.includes('already')) {
+        return 'Một hoặc nhiều ghế bạn chọn đã được đặt trước đó. Vui lòng chọn ghế khác.';
+      }
+    }
+
+    // 3. AI Bio PDF Upload
+    if (msgLower.includes('pdf file is required')) {
+      return 'Vui lòng chọn một tệp tài liệu PDF tải lên.';
+    }
+    if (msgLower.includes('only pdf files are supported')) {
+      return 'Hệ thống chỉ hỗ trợ xử lý tài liệu định dạng PDF.';
+    }
+    if (msgLower.includes('uploaded pdf is empty')) {
+      return 'Tệp PDF được tải lên trống, vui lòng kiểm tra lại.';
+    }
+    if (msgLower.includes('pdf file size must not exceed')) {
+      return 'Dung lượng tệp PDF tối đa được phép tải lên là 10MB.';
+    }
+
+    // 4. Admin operations
+    if (msgLower.includes('only draft concerts can be published')) {
+      return 'Chỉ sự kiện đang ở trạng thái Nháp mới có thể xuất bản.';
+    }
+    if (msgLower.includes('completed concerts cannot be cancelled')) {
+      return 'Sự kiện đã kết thúc thì không thể hủy.';
+    }
+    if (msgLower.includes('only published concerts can be completed')) {
+      return 'Chỉ sự kiện đã xuất bản mới có thể chuyển sang trạng thái Hoàn thành.';
+    }
+    if (msgLower.includes('concert can only be completed after eventdate')) {
+      return 'Chỉ có thể kết thúc sự kiện sau khi thời gian diễn ra sự kiện kết thúc.';
+    }
+    if (msgLower.includes('eventdate must be a valid date')) {
+      return 'Thời gian diễn ra sự kiện không hợp lệ.';
+    }
+    if (msgLower.includes('eventdate must be greater than now')) {
+      return 'Thời gian diễn ra sự kiện phải ở tương lai.';
+    }
+    if (msgLower.includes('name is required')) {
+      return 'Vui lòng điền tên sự kiện.';
+    }
+    if (msgLower.includes('venuename is required')) {
+      return 'Vui lòng điền tên địa điểm tổ chức.';
+    }
+    if (msgLower.includes('venueaddress is required')) {
+      return 'Vui lòng điền địa chỉ tổ chức.';
+    }
+
+    // 5. Zod Validation (format: "fieldName: message")
+    if (msg.includes(':')) {
+      const idx = msg.indexOf(':');
+      const fieldRaw = msg.substring(0, idx).trim();
+      const detailRaw = msg.substring(idx + 1).trim().toLowerCase();
+
+      const fieldsMap: Record<string, string> = {
+        email: 'Email',
+        password: 'Mật khẩu',
+        fullname: 'Họ và tên',
+        name: 'Tên',
+        phone: 'Số điện thoại',
+        phonenumber: 'Số điện thoại',
+        username: 'Tên đăng nhập',
+        concertid: 'Sự kiện',
+        tickettypeid: 'Hạng vé',
+        seatnumbers: 'Danh sách ghế',
+        quantity: 'Số lượng vé',
+        paymentmethod: 'Phương thức thanh toán',
+        provider: 'Kênh thanh toán',
+      };
+
+      const fieldFriendly = fieldsMap[fieldRaw.toLowerCase()] || fieldRaw;
+
+      if (detailRaw.includes('invalid email') || detailRaw.includes('email must be') || detailRaw.includes('format')) {
+        return `${fieldFriendly} không hợp lệ hoặc không đúng định dạng.`;
+      }
+      if (detailRaw.includes('too small') || detailRaw.includes('at least') || detailRaw.includes('too short') || detailRaw.includes('min') || detailRaw.includes('must contain')) {
+        return `${fieldFriendly} không đạt độ dài tối thiểu yêu cầu.`;
+      }
+      if (detailRaw.includes('too large') || detailRaw.includes('too long') || detailRaw.includes('max')) {
+        return `${fieldFriendly} vượt quá độ dài tối đa cho phép.`;
+      }
+      if (detailRaw.includes('required') || detailRaw.includes('empty') || detailRaw.includes('must be') || detailRaw.includes('invalid_type')) {
+        return `${fieldFriendly} không được bỏ trống.`;
+      }
+      if (detailRaw.includes('unique') || detailRaw.includes('exists') || detailRaw.includes('taken')) {
+        return `${fieldFriendly} đã tồn tại trong hệ thống.`;
+      }
+
+      return `${fieldFriendly}: ${msg.substring(idx + 1).trim()}`;
+    }
+
+    // 6. Generic system messages
+    if (msgLower === 'internal server error') {
+      return 'Hệ thống đang gặp sự cố. Vui lòng quay lại sau.';
+    }
+
+    return msg;
+  };
+
+  if (!error) return 'Đã có lỗi xảy ra.';
+
+  if (error instanceof ApiError) {
+    const code = error.statusCode;
+
+    // Direct status-code error formatting
+    if (code === 429) {
+      return 'Yêu cầu quá nhanh. Vui lòng thử lại sau vài giây.';
+    }
+    if (code === 503) {
+      return 'Hệ thống đang bảo trì hoặc quá tải. Vui lòng thử lại sau.';
+    }
+    if (code === 403) {
+      return 'Bạn không có quyền thực hiện thao tác này.';
+    }
+    if (code === 404) {
+      return 'Thông tin yêu cầu không tồn tại.';
+    }
+    if (code === 401) {
+      return 'Phiên làm việc hết hạn. Vui lòng đăng nhập lại.';
+    }
+
+    const raw = error.rawMessage || error.message;
+    if (Array.isArray(raw)) {
+      return raw.map((r) => translateSingleMessage(r)).filter(Boolean).join('\n');
+    }
+    return translateSingleMessage(String(raw));
   }
-  
+
   if (error instanceof Error) {
-    return error.message;
+    return translateSingleMessage(error.message);
   }
-  return 'Đã có lỗi xảy ra.';
+
+  if (typeof error === 'string') {
+    return translateSingleMessage(error);
+  }
+
+  return 'Đã có lỗi xảy ra. Vui lòng thử lại.';
 }
 
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
@@ -374,7 +523,24 @@ export async function getSeatsAsync(concertId: string, preFetchedSeatZones?: any
     }
 
     if (!seatZones || seatZones.length === 0) {
-       return getSeatsByConcertId(concertId);
+      return getSeatsByConcertId(concertId);
+    }
+
+    // Fetch real-time reserved/held seats from backend
+    let reservedSeats: any[] = [];
+    try {
+      reservedSeats = await fetchApi(`/concerts/${concertId}/reserved-seats`);
+    } catch (e) {
+      console.warn('Failed to fetch real-time reserved seats, falling back to static allocation', e);
+    }
+
+    const reservedMap = new Map<string, string>();
+    if (Array.isArray(reservedSeats)) {
+      reservedSeats.forEach((s: any) => {
+        if (s && s.seatNumber) {
+          reservedMap.set(s.seatNumber, s.status);
+        }
+      });
     }
 
     const seats: any[] = [];
@@ -411,27 +577,37 @@ export async function getSeatsAsync(concertId: string, preFetchedSeatZones?: any
       
       rowNames.forEach((row, rowIndex) => {
         for (let number = 1; number <= seatsPerRow; number++) {
-           if (totalPlaced >= total) break;
-           totalPlaced++;
+          if (totalPlaced >= total) break;
+          totalPlaced++;
 
-           let status: 'disabled' | 'sold' | 'held' | 'available' = 'available';
-           if (availablePlaced < remaining) {
-             status = 'available';
-             availablePlaced++;
-           } else {
-             status = (rowIndex + number) % 7 === 0 ? 'held' : 'sold';
-           }
+          const seatLabel = `${row}${number.toString().padStart(2, '0')}`;
+          let status: 'disabled' | 'sold' | 'held' | 'available' = 'available';
 
-           seats.push({
-             id: `seat-${concertId}-${mockCode}-${row}-${number}`,
-             row,
-             number,
-             label: `${row}${number.toString().padStart(2, '0')}`,
-             status,
-             zoneId: mockCode,
-             concertId,
-             seatZoneId: zone.id,
-           });
+          const dbStatus = reservedMap.get(seatLabel);
+          if (dbStatus === 'CONFIRMED') {
+            status = 'sold';
+          } else if (dbStatus === 'HELD') {
+            status = 'held';
+          } else {
+            // Fallback: allocate available status based on zone remaining count
+            if (availablePlaced < remaining) {
+              status = 'available';
+              availablePlaced++;
+            } else {
+              status = 'sold';
+            }
+          }
+
+          seats.push({
+            id: `seat-${concertId}-${mockCode}-${row}-${number}`,
+            row,
+            number,
+            label: seatLabel,
+            status,
+            zoneId: mockCode,
+            concertId,
+            seatZoneId: zone.id,
+          });
         }
       });
     });

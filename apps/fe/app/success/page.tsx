@@ -17,6 +17,8 @@ export default function SuccessPage() {
 
   const [order, setOrder] = useState<StoredMockOrder | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dbFailed, setDbFailed] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     async function loadOrder() {
@@ -24,6 +26,22 @@ export default function SuccessPage() {
         try {
           const fetchedOrder = await getOrderById(orderId);
           if (fetchedOrder) {
+            const actualStatus = fetchedOrder.status || 'PAID';
+            if (actualStatus === 'PAYMENT_FAILED' || actualStatus === 'CANCELLED' || actualStatus === 'EXPIRED') {
+              setDbFailed(true);
+              setLoading(false);
+              return;
+            }
+
+            if (actualStatus === 'PENDING_PAYMENT' || actualStatus === 'PAYMENT_PROCESSING') {
+              if (retryCount < 5) {
+                setTimeout(() => {
+                  setRetryCount((prev) => prev + 1);
+                }, 2000);
+                return;
+              }
+            }
+
             let concertTitle = fetchedOrder.concert?.name || fetchedOrder.concert?.title || 'Sự kiện âm nhạc';
             let concertVenue = 'Nhà hát Hòa Bình, TP. Hồ Chí Minh';
             let concertDate = fetchedOrder.createdAt;
@@ -141,9 +159,9 @@ export default function SuccessPage() {
       setLoading(false);
     }
     loadOrder();
-  }, [orderId]);
+  }, [orderId, retryCount]);
 
-  const isFailed = status === 'failed';
+  const isFailed = status === 'failed' || dbFailed;
 
   if (loading) {
     return (

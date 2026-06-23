@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { LogIn, UserPlus } from 'lucide-react';
 import { login, register, getFriendlyErrorMessage } from '@/lib/api';
 
@@ -14,6 +14,8 @@ interface AuthFormProps {
 
 export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect') || '/';
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -60,7 +62,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         await login({ email, password });
       }
 
-      router.push('/');
+      router.push(redirect);
     } catch (error) {
       setMessage(getFriendlyErrorMessage(error));
     } finally {
