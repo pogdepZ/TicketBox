@@ -2674,12 +2674,12 @@
     },
     {
       "key": "guestListCsvFilePath",
-      "value": "/home/pognova/TicketBox/apps/be/fixtures/guest-list-sample.csv",
+      "value": "apps/be/fixtures/guest-list-sample.csv",
       "type": "string"
     },
     {
       "key": "artistBioPdfFilePath",
-      "value": "/home/pognova/TicketBox/apps/be/fixtures/sample.pdf",
+      "value": "apps/be/fixtures/sample.pdf",
       "type": "string"
     },
     {
