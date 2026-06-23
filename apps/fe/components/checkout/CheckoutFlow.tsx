@@ -2,12 +2,12 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { CheckoutSummary } from '@/components/checkout-summary';
 import { checkoutMock, concerts, paymentMethods } from '@/lib/mock-data';
 import { createDraftReservation, DraftReservation, getDraftReservation } from '@/lib/mock-reservation';
-import { createOrder, createPayment, getFriendlyErrorMessage, getProfile } from '@/lib/api';
+import { createOrder, createPayment, getFriendlyErrorMessage, getProfile, getOrderById } from '@/lib/api';
 
 interface CheckoutViewModel {
   concertId: string;
@@ -62,6 +62,12 @@ function onlyDigits(value: string) {
 
 export function CheckoutFlow() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const existingOrderId = searchParams.get('orderId');
+
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [isLoadingOrder, setIsLoadingOrder] = useState(() => !!existingOrderId);
+
   const [checkout, setCheckout] = useState<CheckoutViewModel>(() => {
     if (typeof window !== 'undefined') {
       const draft = getDraftReservation();
@@ -80,6 +86,61 @@ export function CheckoutFlow() {
   const [paymentMethod, setPaymentMethod] = useState('momo');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!existingOrderId) return;
+
+    async function fetchExistingOrder() {
+      setIsLoadingOrder(true);
+      setError('');
+      try {
+        const order = await getOrderById(existingOrderId);
+        if (order) {
+          if (order.status === 'PAID') {
+            router.replace(`/success?orderId=${encodeURIComponent(existingOrderId)}`);
+            return;
+          }
+
+          // Check if expired
+          const now = new Date();
+          const expiresAt = new Date(order.expiresAt);
+          if (expiresAt <= now || order.status === 'EXPIRED' || order.status === 'CANCELLED') {
+            setError('Đơn hàng đã hết hạn hoặc đã bị huỷ. Vui lòng quay lại sự kiện để chọn ghế mới.');
+            setIsLoadingOrder(false);
+            return;
+          }
+
+          // Populate CheckoutViewModel
+          const firstItem = order.items?.[0];
+          setCheckout((prev) => ({
+            concertId: order.concertId,
+            concertTitle: order.concertTitle || 'Sự kiện',
+            concertDate: order.concertDate || new Date().toISOString(),
+            ticketType: firstItem?.name || 'Vé',
+            ticketTypeId: firstItem?.ticketTypeId || '',
+            quantity: firstItem?.quantity || order.items?.reduce((acc: number, item: any) => acc + item.quantity, 0) || 0,
+            unitPrice: Number(firstItem?.unitPrice || 0),
+            selectedSeats: order.selectedSeats || [],
+            customerName: prev.customerName,
+            expiresAt: order.expiresAt,
+          }));
+
+          if (order.paymentMethod) {
+            setPaymentMethod(order.paymentMethod.toLowerCase());
+          }
+
+          setActiveOrderId(order.orderId || order.id);
+        }
+      } catch (err) {
+        console.error('Failed to fetch existing order:', err);
+        setError('Không tìm thấy thông tin đơn hàng này hoặc đơn hàng đã bị huỷ.');
+      } finally {
+        setIsLoadingOrder(false);
+      }
+    }
+
+    fetchExistingOrder();
+  }, [existingOrderId, router]);
 
   useEffect(() => {
     async function loadUserProfile() {
@@ -116,22 +177,26 @@ export function CheckoutFlow() {
     setError('');
 
     try {
-      const idempotencyKey = typeof window !== 'undefined' && window.crypto?.randomUUID 
-        ? window.crypto.randomUUID() 
-        : `idempotency-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      let orderId = activeOrderId;
 
-      const orderResponse = await createOrder({
-        concertId: checkout.concertId,
-        ticketTypeId: checkout.ticketTypeId,
-        seatNumbers: checkout.selectedSeats,
-      }, idempotencyKey);
-
-      const orderId = orderResponse.orderId || orderResponse.data?.orderId;
       if (!orderId) {
-        throw new Error('Không nhận được Mã đơn hàng từ hệ thống.');
+        const idempotencyKey = typeof window !== 'undefined' && window.crypto?.randomUUID 
+          ? window.crypto.randomUUID() 
+          : `idempotency-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+        const orderResponse = await createOrder({
+          concertId: checkout.concertId,
+          ticketTypeId: checkout.ticketTypeId,
+          seatNumbers: checkout.selectedSeats,
+        }, idempotencyKey);
+
+        orderId = orderResponse.orderId || orderResponse.data?.orderId;
+        if (!orderId) {
+          throw new Error('Không nhận được Mã đơn hàng từ hệ thống.');
+        }
       }
 
-      const returnUrl = `${window.location.origin}/success?orderId=${encodeURIComponent(orderId)}`;
+      const returnUrl = `${window.location.origin}/checkout/result`;
 
       const paymentIdempotencyKey = typeof window !== 'undefined' && window.crypto?.randomUUID 
         ? window.crypto.randomUUID() 
@@ -152,6 +217,39 @@ export function CheckoutFlow() {
       setError(getFriendlyErrorMessage(err));
       setIsSubmitting(false);
     }
+  }
+
+  if (isLoadingOrder) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-10 animate-pulse">
+        <div className="mb-8 h-10 w-32 rounded-full bg-muted"></div>
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="h-[400px] rounded-[2rem] bg-muted"></div>
+            <div className="h-48 rounded-[2rem] bg-muted"></div>
+          </div>
+          <div className="h-[500px] rounded-3xl bg-muted"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && existingOrderId && !activeOrderId && !isLoadingOrder) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 text-center">
+        <div className="mb-6 inline-flex size-16 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+          <AlertCircle className="size-10" />
+        </div>
+        <h2 className="mb-2 text-2xl font-black text-foreground">Không thể tiếp tục thanh toán</h2>
+        <p className="mb-8 text-muted-foreground">{error}</p>
+        <Link
+          href="/"
+          className="rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground transition hover:bg-primary/90"
+        >
+          Quay về Trang chủ
+        </Link>
+      </div>
+    );
   }
 
   return (
@@ -240,7 +338,7 @@ export function CheckoutFlow() {
 
 
             {error && (
-              <p className="mb-4 rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-semibold text-foreground">
+              <p className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive whitespace-pre-line">
                 {error}
               </p>
             )}

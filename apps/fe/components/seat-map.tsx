@@ -59,6 +59,21 @@ export function SeatMap({ concertId, concertTitle, zones, seats }: SeatMapProps)
       return;
     }
 
+    const token = typeof window !== 'undefined' ? window.localStorage.getItem('access_token') : null;
+    if (!token) {
+      window.dispatchEvent(
+        new CustomEvent('ticketbox-toast', {
+          detail: {
+            title: 'Yêu cầu đăng nhập',
+            message: 'Vui lòng đăng nhập trước khi thực hiện chọn ghế.',
+            type: 'error',
+          },
+        })
+      );
+      router.push(`/login?redirect=/concert/${concertId}`);
+      return;
+    }
+
     setStep('seats');
   }
 

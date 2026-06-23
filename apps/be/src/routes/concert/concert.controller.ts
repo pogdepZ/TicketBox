@@ -43,6 +43,11 @@ export class ConcertController {
     return this.concertService.findOne(id);
   }
 
+  @Get(':id/reserved-seats')
+  getReservedSeats(@Param('id') id: string) {
+    return this.concertService.getReservedSeats(id);
+  }
+
   @Patch(':id')
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermissions('concert:update')

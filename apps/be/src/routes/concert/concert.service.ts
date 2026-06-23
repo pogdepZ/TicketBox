@@ -14,6 +14,7 @@ import {
   Concert,
   ConcertStatus as PrismaConcertStatus,
   Prisma,
+  ReservationStatus,
 } from '../../generated/prisma';
 import { QueryConcertDto } from './dto/query-concert.dto';
 import { ConcertResponseDto } from './dto/concert-response.dto';
@@ -174,6 +175,26 @@ export class ConcertService {
     await this.setCache(cacheKey, response);
 
     return response;
+  }
+
+  async getReservedSeats(concertId: string) {
+    const seats = await this.prismaService.reservationSeat.findMany({
+      where: {
+        concertId,
+        OR: [
+          { status: ReservationStatus.CONFIRMED },
+          {
+            status: ReservationStatus.HELD,
+            expiresAt: { gt: new Date() },
+          },
+        ],
+      },
+      select: {
+        seatNumber: true,
+        status: true,
+      },
+    });
+    return seats;
   }
 
   async update(

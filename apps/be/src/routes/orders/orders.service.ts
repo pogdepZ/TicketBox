@@ -324,12 +324,23 @@ export class OrdersService {
     orderId: string,
     requestingUser: AuthUser,
   ): Promise<OrderDetailResponseDto> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
     const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
+      where: isUuid ? { id: orderId } : { paymentRef: orderId },
       include: {
         items: {
           include: { ticketType: { select: { name: true } } },
         },
+        concert: {
+          select: { name: true, eventDate: true }
+        },
+        reservation: {
+          include: {
+            reservationSeats: {
+              select: { seatNumber: true }
+            }
+          }
+        }
       },
     });
 
@@ -341,7 +352,7 @@ export class OrdersService {
     }
 
     // Query tickets via ticketsService to ensure we use the tickets module
-    await this.ticketsService.getTicketsForOrder(orderId, requestingUser);
+    await this.ticketsService.getTicketsForOrder(order.id, requestingUser);
 
     return this.buildDetailResponse(order as any);
   }
@@ -354,8 +365,9 @@ export class OrdersService {
     orderId: string,
     userId: string,
   ): Promise<OrderDetailResponseDto> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
     const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
+      where: isUuid ? { id: orderId } : { paymentRef: orderId },
       include: { items: true },
     });
 
@@ -393,7 +405,15 @@ export class OrdersService {
 
     const updated = await this.prisma.order.findUniqueOrThrow({
       where: { id: orderId },
-      include: { items: { include: { ticketType: { select: { name: true } } } } },
+      include: {
+        items: { include: { ticketType: { select: { name: true } } } },
+        concert: { select: { name: true, eventDate: true } },
+        reservation: {
+          include: {
+            reservationSeats: { select: { seatNumber: true } }
+          }
+        }
+      },
     });
 
     return this.buildDetailResponse(updated as any);
@@ -406,6 +426,8 @@ export class OrdersService {
   private buildDetailResponse(
     order: Order & {
       items: (OrderItem & { ticketType: { name: string } })[];
+      concert: { name: string; eventDate: Date };
+      reservation: { reservationSeats: { seatNumber: string }[] };
     },
   ): OrderDetailResponseDto {
     const items: OrderItemResponseDto[] = order.items.map((item) => ({
@@ -417,6 +439,8 @@ export class OrdersService {
         Number(item.unitPrice) * item.quantity,
       ),
     }));
+
+    const selectedSeats = order.reservation?.reservationSeats?.map((s) => s.seatNumber) ?? [];
 
     return {
       orderId: order.id,
@@ -430,6 +454,9 @@ export class OrdersService {
       createdAt: order.createdAt.toISOString(),
       paymentMethod: order.paymentMethod,
       paidAt: order.paidAt?.toISOString() ?? null,
+      concertTitle: order.concert.name,
+      concertDate: order.concert.eventDate.toISOString(),
+      selectedSeats,
       items,
     };
   }

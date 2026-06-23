@@ -25,6 +25,9 @@ export interface OrderDetailResponseDto extends OrderResponseDto {
   createdAt: string;
   paymentMethod?: string | null;
   paidAt?: string | null;
+  concertTitle: string;
+  concertDate: string;
+  selectedSeats: string[];
 }
 
 /**

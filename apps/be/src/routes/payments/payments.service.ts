@@ -128,6 +128,7 @@ export class PaymentsService {
       const payableStatuses: OrderStatus[] = [
         OrderStatus.PENDING_PAYMENT,
         OrderStatus.PAYMENT_PROCESSING,
+        OrderStatus.PAYMENT_FAILED,
       ];
 
       if (!payableStatuses.includes(order.status)) {
@@ -136,20 +137,6 @@ export class PaymentsService {
           orderId: order.id,
           currentStatus: order.status,
         });
-      }
-
-      if (order.paymentRef) {
-        const provider = (order.paymentMethod ?? dto.provider) as Provider;
-        return {
-          orderId: order.id,
-          paymentRef: order.paymentRef,
-          provider,
-          orderStatus: order.status,
-          paymentStatus: this.toPaymentStatus(order.status),
-          expiresAt: order.expiresAt.toISOString(),
-          amount: order.totalAmount.toString(),
-          currency: 'VND',
-        };
       }
 
       const paymentRef = this.gateway.generatePaymentRef(dto.provider as Provider);
@@ -163,6 +150,8 @@ export class PaymentsService {
           paymentMethod: dto.provider as any,
           paymentRef,
           paymentGraceUntil,
+          paymentRetryCount: order.paymentRef ? { increment: 1 } : 0,
+          lastRetryAt: order.paymentRef ? now : null,
         },
       });
 
@@ -494,7 +483,7 @@ export class PaymentsService {
 
       const order = await tx.order.findUniqueOrThrow({
         where: { id: orderId },
-        select: { id: true, status: true },
+        select: { id: true, status: true, expiresAt: true },
       });
 
       if (order.status === OrderStatus.PAID) {
@@ -511,8 +500,18 @@ export class PaymentsService {
         OrderStatus.REFUND_REQUIRED,
       ];
 
-      if (alreadyReleased.includes(order.status)) {
+      if (alreadyReleased.includes(order.status as OrderStatus)) {
         return order.status;
+      }
+
+      // If the order has not expired yet, revert its status to PENDING_PAYMENT
+      // and keep the seats locked so the user can retry.
+      if (order.expiresAt > new Date()) {
+        await tx.order.update({
+          where: { id: orderId },
+          data: { status: OrderStatus.PENDING_PAYMENT },
+        });
+        return OrderStatus.PENDING_PAYMENT;
       }
 
       await this.txHelper.releaseOrder(

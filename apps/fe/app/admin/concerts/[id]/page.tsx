@@ -376,7 +376,7 @@ export default function AdminConcertDetailPage({ params }: AdminConcertDetailPag
                 </div>
 
                 {error && (
-                  <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive">
+                  <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive whitespace-pre-line">
                     {error}
                   </p>
                 )}
@@ -491,8 +491,8 @@ export default function AdminConcertDetailPage({ params }: AdminConcertDetailPag
                   </div>
 
                   {bioError && (
-                    <div className="flex gap-2 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive font-semibold">
-                      <AlertCircle className="size-5 flex-shrink-0" />
+                    <div className="flex gap-2 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive font-semibold whitespace-pre-line">
+                      <AlertCircle className="size-5 flex-shrink-0 mt-0.5" />
                       <span>{bioError}</span>
                     </div>
                   )}
