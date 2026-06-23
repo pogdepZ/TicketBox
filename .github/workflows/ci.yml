@@ -131,9 +131,10 @@ jobs:
       - name: Seed Database
         run: pnpm --filter @repo/be run db:seed
 
-      - name: Start NestJS Backend API
+      - name: Start NestJS Backend API and Worker
         run: |
           pnpm --filter @repo/be run start:api &
+          pnpm --filter @repo/be run start:worker &
           echo "Waiting for API backend to listen on port 3000..."
           npx wait-on http://localhost:3000/health -t 30000
 
