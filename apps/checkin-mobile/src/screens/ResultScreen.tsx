@@ -27,6 +27,14 @@ const STATUS_CONFIG: Record<ScanStatus, { label: string; sublabel: string; color
     border: COLORS.success + '40', // 25% opacity
     icon: CheckCircle2,
   },
+  TEMP_ACCEPTED: {
+    label: 'TEMP ACCEPTED',
+    sublabel: 'Allow entry (Offline)',
+    color: COLORS.success,
+    bg: COLORS.success + '1A',
+    border: COLORS.success + '40',
+    icon: CheckCircle2,
+  },
   DUPLICATE: {
     label: 'ALREADY USED',
     sublabel: 'Deny entry — already scanned',

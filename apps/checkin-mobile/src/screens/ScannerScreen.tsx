@@ -30,6 +30,7 @@ const MOCK_CONCERT = {
 // --- Mock Status ---
 const STATUS_CONFIG = {
   SUCCESS: { label: 'VALID', dot: COLORS.success, bg: COLORS.success + '1A', border: COLORS.success + '40', color: COLORS.success },
+  TEMP_ACCEPTED: { label: 'TEMP ACCEPTED', dot: COLORS.success, bg: COLORS.success + '1A', border: COLORS.success + '40', color: COLORS.success },
   DUPLICATE: { label: 'ALREADY USED', dot: COLORS.warning, bg: COLORS.warning + '1A', border: COLORS.warning + '40', color: COLORS.warning },
   NOT_FOUND: { label: 'INVALID', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
   WRONG_EVENT: { label: 'INVALID', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
@@ -104,14 +105,55 @@ export default function ScannerScreen() {
           setIsOffline(true);
           const checkedAt = new Date().toISOString();
 
+          let isValid = false;
           let extractedTicketCode = qrData;
+          
           try {
             const { jwtDecode } = require('jwt-decode');
-            const decoded = jwtDecode(qrData) as any;
-            if (decoded && decoded.ticket_code) {
-              extractedTicketCode = decoded.ticket_code;
+            const CryptoJS = require('crypto-js');
+            const { db } = require('../services/db');
+
+            const parts = qrData.split('.');
+            if (parts.length === 3) {
+              const header = parts[0];
+              const payload = parts[1];
+              const signature = parts[2];
+              
+              const concertCache = await db.getAllAsync<{ publicKey: string }>('SELECT publicKey FROM concert_cache LIMIT 1');
+              if (concertCache && concertCache.length > 0) {
+                const publicKey = concertCache[0].publicKey;
+                
+                const hmac = CryptoJS.HmacSHA256(`${header}.${payload}`, publicKey);
+                let expectedSignature = CryptoJS.enc.Base64.stringify(hmac);
+                expectedSignature = expectedSignature.replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+                
+                if (signature === expectedSignature) {
+                   isValid = true;
+                   const decoded = jwtDecode(qrData) as any;
+                   if (decoded && decoded.ticket_code) {
+                     extractedTicketCode = decoded.ticket_code;
+                   }
+                }
+              }
             }
-          } catch (e) {}
+          } catch (e) {
+             console.error("Offline verify error", e);
+          }
+
+          if (!isValid) {
+             const notFoundTicket: TicketInfo = {
+               ticketId: 'unknown',
+               ticketCode: extractedTicketCode,
+               guestName: 'Unknown',
+               ticketType: '---',
+               concertName: MOCK_CONCERT.name,
+               checkedInAt: checkedAt,
+               status: 'NOT_FOUND',
+             };
+             navigation.navigate('Result', { ticket: notFoundTicket, isOffline: true });
+             setTimeout(() => setScanning(false), 2000);
+             return;
+          }
 
           let localTicket = null;
           try {
@@ -140,7 +182,7 @@ export default function ScannerScreen() {
              return;
           }
 
-          if (localTicket.status === 'USED') {
+          if (localTicket.status === 'USED' || localTicket.status === 'TEMP_ACCEPTED') {
              const duplicateTicket: TicketInfo = {
                ticketId: localTicket.id,
                ticketCode: extractedTicketCode,
@@ -157,7 +199,7 @@ export default function ScannerScreen() {
 
           try {
              const { db } = require('../services/db');
-             await db.runAsync('UPDATE ticket_snapshot SET status = ? WHERE ticketCode = ?', ['USED', extractedTicketCode]);
+             await db.runAsync('UPDATE ticket_snapshot SET status = ? WHERE ticketCode = ?', ['TEMP_ACCEPTED', extractedTicketCode]);
           } catch (e) {}
 
           const offlineItem: OfflineQueueItem = {
@@ -185,7 +227,7 @@ export default function ScannerScreen() {
             ticketType: localTicket.ticketType,
             concertName: MOCK_CONCERT.name,
             checkedInAt: checkedAt,
-            status: 'SUCCESS',
+            status: 'TEMP_ACCEPTED',
           };
 
           navigation.navigate('Result', { ticket: displayTicket, isOffline: true });

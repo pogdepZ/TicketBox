@@ -244,6 +244,54 @@ async function seedAdminUser(roleByName: Map<string, Role>): Promise<void> {
   });
 }
 
+async function seedCheckerUser(roleByName: Map<string, Role>): Promise<void> {
+  const email = 'staff@ticketbox.vn';
+  const password = 'password123';
+  const fullName = 'Check-in Staff';
+
+  const checkerRole = roleByName.get('checker');
+
+  if (!checkerRole) {
+    throw new Error('Missing checker role');
+  }
+
+  const existingStaff = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  const staffUser =
+    existingStaff ??
+    (await prisma.user.create({
+      data: {
+        email,
+        password: await bcrypt.hash(password, 10),
+        fullName,
+        status: UserStatus.ACTIVE,
+      },
+    }));
+
+  if (existingStaff) {
+    await prisma.user.update({
+      where: { id: existingStaff.id },
+      data: {
+        password: await bcrypt.hash(password, 10),
+        fullName,
+        status: UserStatus.ACTIVE,
+      },
+    });
+    console.log(
+      `Checker user ${email} already exists. Password and profile were updated/reset.`,
+    );
+  } else {
+    console.log(`Created checker user ${email}.`);
+  }
+
+  await upsertUserRole({
+    userId: staffUser.id,
+    roleId: checkerRole.id,
+  });
+}
+
 async function upsertUserRole(params: {
   userId: string;
   roleId: string;
@@ -416,6 +464,7 @@ async function main(): Promise<void> {
   await seedRolePermissions(roleByName, permissionByCode);
   await cleanupRolesAndPermissions(roleByName, permissionByCode);
   await seedAdminUser(roleByName);
+  await seedCheckerUser(roleByName);
   await seedConcertsAndTicketTypes();
 
   console.log('RBAC seed completed.');
