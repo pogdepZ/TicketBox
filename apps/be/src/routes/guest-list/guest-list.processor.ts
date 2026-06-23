@@ -165,49 +165,184 @@ export class GuestListProcessor extends WorkerHost {
   ): Promise<void> {
     const seenEmails = new Set<string>();
     const seenPhones = new Set<string>();
+    const seenGuestCodes = new Set<string>();
 
     for (const row of stagedRows) {
       if (row.validationStatus === 'VALID') {
         this.addSeenGuestIdentity(row, seenEmails, seenPhones);
+        if (row.guestCode) {
+          seenGuestCodes.add(row.guestCode.trim().toUpperCase());
+        }
       }
     }
 
-    for (const row of stagedRows) {
-      if (row.validationStatus !== 'PENDING') {
+    const chunkSize = 200;
+    for (let i = 0; i < stagedRows.length; i += chunkSize) {
+      const chunk = stagedRows.slice(i, i + chunkSize);
+
+      const pendingRows = chunk.filter((r) => r.validationStatus === 'PENDING');
+      if (pendingRows.length === 0) {
         continue;
       }
 
-      const validation = this.validateStagedRow(row);
-      if (!validation.valid) {
-        await this.markRowInvalid(row.id, validation.errorMessage);
+      const validRowsToProcess: { stagedRow: StagedGuestRow; validatedRow: ValidGuestRow }[] = [];
+      const invalidRowUpdates: { id: string; errorMessage: string }[] = [];
+
+      for (const row of pendingRows) {
+        const validation = this.validateStagedRow(row);
+        if (!validation.valid) {
+          invalidRowUpdates.push({ id: row.id, errorMessage: validation.errorMessage });
+        } else {
+          validRowsToProcess.push({ stagedRow: row, validatedRow: validation.row });
+        }
+      }
+
+      if (validRowsToProcess.length === 0 && invalidRowUpdates.length === 0) {
         continue;
       }
 
-      const duplicateReason = await this.findDuplicateReason(
-        concertId,
-        validation.row,
-        seenEmails,
-        seenPhones,
+      const emailsToCheck = validRowsToProcess
+        .map((r) => r.validatedRow.email)
+        .filter(Boolean) as string[];
+      const phonesToCheck = validRowsToProcess
+        .map((r) => r.validatedRow.phone)
+        .filter(Boolean) as string[];
+      const guestCodesToCheck = validRowsToProcess
+        .map((r) => r.validatedRow.guestCode)
+        .filter(Boolean) as string[];
+
+      const existingGuests = await this.prisma.guestList.findMany({
+        where: {
+          concertId,
+          OR: [
+            ...(guestCodesToCheck.length > 0 ? [{ guestCode: { in: guestCodesToCheck } }] : []),
+            ...(emailsToCheck.length > 0 ? [{ email: { in: emailsToCheck } }] : []),
+            ...(phonesToCheck.length > 0 ? [{ phone: { in: phonesToCheck } }] : []),
+          ],
+        },
+        select: {
+          guestCode: true,
+          email: true,
+          phone: true,
+        },
+      });
+
+      const dbGuestCodes = new Set(
+        existingGuests.map((g) => g.guestCode.trim().toUpperCase()),
       );
-      if (duplicateReason) {
-        await this.markRowDuplicate(row.id, duplicateReason);
-        continue;
-      }
+      const dbEmails = new Set(
+        existingGuests
+          .map((g) => g.email?.trim().toLowerCase())
+          .filter(Boolean) as string[],
+      );
+      const dbPhones = new Set(
+        existingGuests.map((g) => g.phone?.trim()).filter(Boolean) as string[],
+      );
 
-      try {
-        await this.upsertGuestList(concertId, validation.row);
-        this.addSeenGuestIdentity(validation.row, seenEmails, seenPhones);
-      } catch (error) {
-        if (this.isUniqueConstraintViolation(error)) {
-          await this.markRowDuplicate(
-            row.id,
-            'email or phone already exists for this concert',
-          );
-          continue;
+      const validGuestsToUpsert: ValidGuestRow[] = [];
+      const duplicateRowUpdates: { id: string; reason: string }[] = [];
+
+      for (const { stagedRow, validatedRow } of validRowsToProcess) {
+        const reasons: string[] = [];
+
+        if (validatedRow.email && seenEmails.has(validatedRow.email)) {
+          reasons.push('email is duplicated in CSV file');
+        }
+        if (validatedRow.phone && seenPhones.has(validatedRow.phone)) {
+          reasons.push('phone is duplicated in CSV file');
+        }
+        if (seenGuestCodes.has(validatedRow.guestCode.toUpperCase())) {
+          reasons.push('guest_code is duplicated in CSV file');
         }
 
-        await this.markRowInvalid(row.id, this.getErrorMessage(error));
+        if (reasons.length === 0) {
+          if (dbGuestCodes.has(validatedRow.guestCode.toUpperCase())) {
+            reasons.push('guest_code already exists for this concert');
+          }
+          if (validatedRow.email && dbEmails.has(validatedRow.email)) {
+            reasons.push('email already exists for this concert');
+          }
+          if (validatedRow.phone && dbPhones.has(validatedRow.phone)) {
+            reasons.push('phone already exists for this concert');
+          }
+        }
+
+        if (reasons.length > 0) {
+          duplicateRowUpdates.push({ id: stagedRow.id, reason: reasons.join('; ') });
+        } else {
+          validGuestsToUpsert.push(validatedRow);
+          this.addSeenGuestIdentity(validatedRow, seenEmails, seenPhones);
+          seenGuestCodes.add(validatedRow.guestCode.toUpperCase());
+        }
       }
+
+      await this.prisma.$transaction(async (tx) => {
+        const upserts = validGuestsToUpsert.map((row) =>
+          tx.guestList.upsert({
+            where: {
+              concertId_guestCode: {
+                concertId,
+                guestCode: row.guestCode,
+              },
+            },
+            update: {
+              fullName: row.fullName,
+              email: row.email,
+              phone: row.phone,
+              guestType: row.guestType,
+              status: 'ACTIVE',
+              csvBatchId: row.batchId,
+            },
+            create: {
+              concertId,
+              fullName: row.fullName,
+              email: row.email,
+              phone: row.phone,
+              guestType: row.guestType,
+              guestCode: row.guestCode,
+              status: 'ACTIVE',
+              csvBatchId: row.batchId,
+            },
+          }),
+        );
+
+        const validUpdates = validGuestsToUpsert.map((row) =>
+          tx.guestImportRow.update({
+            where: { id: row.id },
+            data: {
+              validationStatus: 'VALID',
+              errorMessage: null,
+            },
+          }),
+        );
+
+        const invalidUpdates = invalidRowUpdates.map((item) =>
+          tx.guestImportRow.update({
+            where: { id: item.id },
+            data: {
+              validationStatus: 'INVALID',
+              errorMessage: item.errorMessage,
+            },
+          }),
+        );
+
+        const duplicateUpdates = duplicateRowUpdates.map((item) =>
+          tx.guestImportRow.update({
+            where: { id: item.id },
+            data: {
+              validationStatus: 'DUPLICATE',
+              errorMessage: item.reason,
+            },
+          }),
+        );
+
+        await Promise.all([
+          ...upserts,
+          ...validUpdates,
+          ...invalidUpdates,
+          ...duplicateUpdates,
+        ]);
+      });
     }
   }
 
@@ -355,100 +490,6 @@ export class GuestListProcessor extends WorkerHost {
         guestCode,
       },
     };
-  }
-
-  private async findDuplicateReason(
-    concertId: string,
-    row: ValidGuestRow,
-    seenEmails: Set<string>,
-    seenPhones: Set<string>,
-  ): Promise<string | null> {
-    const reasons: string[] = [];
-
-    if (row.email && seenEmails.has(row.email)) {
-      reasons.push('email is duplicated in CSV file');
-    }
-
-    if (row.phone && seenPhones.has(row.phone)) {
-      reasons.push('phone is duplicated in CSV file');
-    }
-
-    if (reasons.length > 0) {
-      return reasons.join('; ');
-    }
-
-    const duplicateFilters = [
-      ...(row.email ? [{ email: row.email }] : []),
-      ...(row.phone ? [{ phone: row.phone }] : []),
-    ];
-
-    if (duplicateFilters.length === 0) {
-      return null;
-    }
-
-    const existingGuest = await this.prisma.guestList.findFirst({
-      where: {
-        concertId,
-        OR: duplicateFilters,
-      },
-      select: {
-        email: true,
-        phone: true,
-      },
-    });
-
-    if (!existingGuest) {
-      return null;
-    }
-
-    if (row.email && existingGuest.email === row.email) {
-      reasons.push('email already exists for this concert');
-    }
-
-    if (row.phone && existingGuest.phone === row.phone) {
-      reasons.push('phone already exists for this concert');
-    }
-
-    return reasons.length > 0 ? reasons.join('; ') : 'guest already exists for this concert';
-  }
-
-  private async upsertGuestList(concertId: string, row: ValidGuestRow): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      await tx.guestList.upsert({
-        where: {
-          concertId_guestCode: {
-            concertId,
-            guestCode: row.guestCode,
-          },
-        },
-        update: {
-          fullName: row.fullName,
-          email: row.email,
-          phone: row.phone,
-          guestType: row.guestType,
-          status: 'ACTIVE',
-          csvBatchId: row.batchId,
-        },
-        create: {
-          concertId,
-          fullName: row.fullName,
-          email: row.email,
-          phone: row.phone,
-          guestType: row.guestType,
-          guestCode: row.guestCode,
-          status: 'ACTIVE',
-          csvBatchId: row.batchId,
-        },
-      });
-
-      await tx.guestImportRow.update({
-        where: { id: row.id },
-        data: {
-          validationStatus: 'VALID',
-          errorMessage: null,
-        },
-      });
-    });
   }
 
   private async markRowInvalid(rowId: string, errorMessage: string): Promise<void> {

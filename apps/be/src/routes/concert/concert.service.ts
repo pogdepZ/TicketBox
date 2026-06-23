@@ -22,7 +22,7 @@ import { CancelConcertDto } from './dto/cancel-concert.dto';
 import { RedisService } from '../../common/redis/redis.service';
 import { S3Service } from '../../common/s3/s3.service';
 
-const CONCERT_CACHE_TTL_SECONDS = 60;
+const CONCERT_CACHE_TTL_SECONDS = 300;
 const CONCERT_LIST_CACHE_KEY = 'cache:concert:list';
 const CONCERT_DETAIL_CACHE_KEY_PREFIX = 'cache:concert';
 

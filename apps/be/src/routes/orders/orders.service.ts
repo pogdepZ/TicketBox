@@ -184,7 +184,7 @@ export class OrdersService {
         user.id,
         dto.ticketTypeId,
       );
-      //this.inventory.checkQuota(quota, tt.maxPerUser, quantity);
+      this.inventory.checkQuota(quota, tt.maxPerUser, quantity);
 
       // ── Kiểm tra ghế đã bán hoặc đang giữ ──
       const now = new Date();
