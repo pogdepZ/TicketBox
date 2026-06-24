@@ -29,9 +29,16 @@ class ApiService {
     const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
     try {
+      let currentToken = this.token;
+      if (!currentToken) {
+        const { default: AsyncStorage } = require('@react-native-async-storage/async-storage');
+        currentToken = await AsyncStorage.getItem('auth_token');
+        if (currentToken) this.token = currentToken;
+      }
+
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
-        ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
+        ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
         ...(options.headers || {}),
       };
 

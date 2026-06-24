@@ -1,24 +1,20 @@
-/**
- * ScannerScreen
- * - Mock camera frame (yellow square)
- * - Concert name display
- * - 4 simulation buttons: Success, Duplicate, Not Found, Wrong Event
- * - Results via navigation to ResultScreen
- */
-
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   StatusBar,
+  Animated,
+  Easing,
+  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { QrCode, Zap, Search, CloudOff, RefreshCw, Settings as SettingsIcon } from 'lucide-react-native';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
 import { apiService } from '../services/api';
 import { queueService } from '../services/queue';
@@ -26,80 +22,216 @@ import type { RootStackParamList, TicketInfo, ScanStatus, OfflineQueueItem } fro
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Scanner'>;
 
-const MOCK_CONCERT = {
-  id: 'a35ba9c7-89e4-425c-9d00-8016ac4afc3d',
-  name: 'Sơn Tùng M-TP - Sky Tour 2026',
-};
+// MOCK_CONCERT removed
 
-const MOCK_TICKETS: Record<ScanStatus, { ticketCode: string }> = {
-  SUCCESS: { ticketCode: 'TKB-2026-VIP-001' },
-  DUPLICATE: { ticketCode: 'TKB-2026-SVIP-002' },
-  NOT_FOUND: { ticketCode: 'INVALID-CODE' },
-  WRONG_EVENT: { ticketCode: 'TKB-2026-GA-003' },
+// --- Mock Status ---
+const STATUS_CONFIG = {
+  SUCCESS: { label: 'VALID', dot: COLORS.success, bg: COLORS.success + '1A', border: COLORS.success + '40', color: COLORS.success },
+  TEMP_ACCEPTED: { label: 'TEMP ACCEPTED', dot: COLORS.success, bg: COLORS.success + '1A', border: COLORS.success + '40', color: COLORS.success },
+  DUPLICATE: { label: 'ALREADY USED', dot: COLORS.warning, bg: COLORS.warning + '1A', border: COLORS.warning + '40', color: COLORS.warning },
+  NOT_FOUND: { label: 'INVALID', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
+  WRONG_EVENT: { label: 'INVALID', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
 };
-
-const SCAN_BUTTONS: { status: ScanStatus; label: string; color: string; tone: string }[] = [
-  { status: 'SUCCESS', label: 'Hợp lệ', color: COLORS.success, tone: 'OK' },
-  { status: 'DUPLICATE', label: 'Đã check-in', color: COLORS.warning, tone: '2X' },
-  { status: 'NOT_FOUND', label: 'Không tồn tại', color: COLORS.error, tone: 'NO' },
-  { status: 'WRONG_EVENT', label: 'Sai sự kiện', color: COLORS.errorDark, tone: 'EV' },
-];
 
 export default function ScannerScreen() {
   const navigation = useNavigation<NavigationProp>();
   const [isOffline, setIsOffline] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
+  
+  const [concert, setConcert] = useState({ id: '', name: 'No Active Concert' });
+  const [checkedIn, setCheckedIn] = useState(0);
+  const [total, setTotal] = useState(0);
+  const pct = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let isMounted = true;
+      const loadData = async () => {
+        try {
+          const { db } = require('../services/db');
+          const cache: any[] = await db.getAllAsync('SELECT id, name FROM concert_cache LIMIT 1');
+          if (cache && cache.length > 0 && isMounted) {
+            setConcert({ id: cache[0].id, name: cache[0].name });
+          }
+
+          const totalRes: any[] = await db.getAllAsync('SELECT COUNT(*) as c FROM ticket_snapshot');
+          const checkedRes: any[] = await db.getAllAsync('SELECT COUNT(*) as c FROM ticket_snapshot WHERE status IN ("USED", "TEMP_ACCEPTED")');
+          
+          if (isMounted) {
+            setTotal(totalRes[0]?.c || 0);
+            setCheckedIn(checkedRes[0]?.c || 0);
+          }
+        } catch (e) {
+          console.error('Failed to load stats', e);
+        }
+      };
+      loadData();
+      return () => { isMounted = false; };
+    }, [])
+  );
+
+  // Animations
+  const scanAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Pulse animation for online indicator
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.4, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  useEffect(() => {
+    if (scanning) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(scanAnim, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(scanAnim, { toValue: 0, duration: 1600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ])
+      ).start();
+    } else {
+      scanAnim.stopAnimation();
+      scanAnim.setValue(0);
+    }
+  }, [scanning]);
 
   const handleScan = async (qrData: string) => {
     if (scanning) return;
     setScanning(true);
 
-    // Xử lý quét qua QR text thay vì mock status
-    const mockTicket = MOCK_TICKETS.SUCCESS; // Dự phòng
-    const qrCodeDataToScan = qrData || mockTicket.ticketCode;
-
-    // Attempt online scan
     try {
       const userStr = await AsyncStorage.getItem('auth_user');
       const user = userStr ? JSON.parse(userStr) : null;
-      // Provide valid UUIDs as fallbacks to prevent Prisma crash on backend
-      const staffId = user?.id || '00000000-0000-0000-0000-000000000001';
+      const staffId = user?.id;
       const deviceId = '00000000-0000-0000-0000-000000000002';
 
       const payload = {
-        qrCodeData: qrCodeDataToScan,
+        qrCodeData: qrData,
         staffId,
-        concertId: MOCK_CONCERT.id,
+        concertId: concert.id,
         deviceId,
         clientEventId: `scan-${Date.now()}`,
       };
 
-      // In payload ra màn hình Console để debug
-      console.log("\n🚀 [DEBUG] PAYLOAD GỬI LÊN SERVER:");
-      console.log(JSON.stringify(payload, null, 2));
-
       const response = await apiService.post<TicketInfo>('/checkin/scan', payload);
-
-      console.log("response ticket>>>>>>:", response)
 
       if (response.success && response.data) {
         setIsOffline(false);
         navigation.navigate('Result', { ticket: response.data, isOffline: false });
       } else {
-        // If API fails with error or timeout, treat as offline
         const isNetworkError = !response.data || response.message?.toLowerCase().includes('fetch') || response.message?.toLowerCase().includes('timeout');
 
         if (isNetworkError) {
           setIsOffline(true);
           const checkedAt = new Date().toISOString();
 
+          let isValid = false;
+          let extractedTicketCode = qrData;
+          
+          try {
+            const { jwtDecode } = require('jwt-decode');
+            const CryptoJS = require('crypto-js');
+            const { db } = require('../services/db');
+
+            const parts = qrData.split('.');
+            if (parts.length === 3) {
+              const header = parts[0];
+              const payload = parts[1];
+              const signature = parts[2];
+              
+              const concertCache: any[] = await db.getAllAsync('SELECT publicKey FROM concert_cache LIMIT 1');
+              if (concertCache && concertCache.length > 0) {
+                const publicKey = concertCache[0].publicKey;
+                
+                const hmac = CryptoJS.HmacSHA256(`${header}.${payload}`, publicKey);
+                let expectedSignature = CryptoJS.enc.Base64.stringify(hmac);
+                expectedSignature = expectedSignature.replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+                
+                if (signature === expectedSignature) {
+                   isValid = true;
+                   const decoded = jwtDecode(qrData) as any;
+                   if (decoded && decoded.ticket_code) {
+                     extractedTicketCode = decoded.ticket_code;
+                   }
+                }
+              }
+            }
+          } catch (e) {
+             console.error("Offline verify error", e);
+          }
+
+          if (!isValid) {
+             const notFoundTicket: TicketInfo = {
+               ticketId: 'unknown',
+               ticketCode: extractedTicketCode,
+               guestName: 'Unknown',
+               ticketType: '---',
+               concertName: concert.name,
+               checkedInAt: checkedAt,
+               status: 'NOT_FOUND',
+             };
+             navigation.navigate('Result', { ticket: notFoundTicket, isOffline: true });
+             setTimeout(() => setScanning(false), 2000);
+             return;
+          }
+
+          let localTicket = null;
+          try {
+            const { db } = require('../services/db');
+            const tickets: any[] = await db.getAllAsync(
+              'SELECT * FROM ticket_snapshot WHERE ticketCode = ?',
+              [extractedTicketCode]
+            );
+            if (tickets && tickets.length > 0) {
+              localTicket = tickets[0];
+            }
+          } catch (e) {}
+
+          if (!localTicket) {
+             const notFoundTicket: TicketInfo = {
+               ticketId: 'unknown',
+               ticketCode: extractedTicketCode,
+               guestName: 'Unknown',
+               ticketType: '---',
+               concertName: concert.name,
+               checkedInAt: checkedAt,
+               status: 'NOT_FOUND',
+             };
+             navigation.navigate('Result', { ticket: notFoundTicket, isOffline: true });
+             setTimeout(() => setScanning(false), 2000);
+             return;
+          }
+
+          if (localTicket.status === 'USED' || localTicket.status === 'TEMP_ACCEPTED') {
+             const duplicateTicket: TicketInfo = {
+               ticketId: localTicket.id,
+               ticketCode: extractedTicketCode,
+               guestName: localTicket.guestName,
+               ticketType: localTicket.ticketType,
+               concertName: concert.name,
+               checkedInAt: checkedAt,
+               status: 'DUPLICATE',
+             };
+             navigation.navigate('Result', { ticket: duplicateTicket, isOffline: true });
+             setTimeout(() => setScanning(false), 2000);
+             return;
+          }
+
+          try {
+             const { db } = require('../services/db');
+             await db.runAsync('UPDATE ticket_snapshot SET status = ? WHERE ticketCode = ?', ['TEMP_ACCEPTED', extractedTicketCode]);
+          } catch (e) {}
+
           const offlineItem: OfflineQueueItem = {
             id: `q-${Date.now()}`,
-            ticketId: 'offline-ticket', // Can't know actual ID offline
-            ticketCode: qrCodeDataToScan,
-            qrCodeData: qrCodeDataToScan,
-            concertId: MOCK_CONCERT.id,
+            ticketId: localTicket.id,
+            ticketCode: extractedTicketCode,
+            qrCodeData: qrData,
+            concertId: concert.id,
             staffId,
             sourceDeviceId: deviceId,
             checkedAt,
@@ -112,40 +244,29 @@ export default function ScannerScreen() {
 
           await queueService.enqueue(offlineItem);
 
-          // Construct a display ticket for offline
           const displayTicket: TicketInfo = {
-            ticketId: 'offline-ticket',
-            ticketCode: qrCodeDataToScan,
-            guestName: 'Đang tải (Offline)',
-            ticketType: '---',
-            concertName: MOCK_CONCERT.name,
+            ticketId: localTicket.id,
+            ticketCode: extractedTicketCode,
+            guestName: localTicket.guestName,
+            ticketType: localTicket.ticketType,
+            concertName: concert.name,
             checkedInAt: checkedAt,
-            status: 'SUCCESS', // Always allow in offline mode
+            status: 'TEMP_ACCEPTED',
           };
 
           navigation.navigate('Result', { ticket: displayTicket, isOffline: true });
         } else {
-          // It's a server error or rejection, don't queue
           Alert.alert('Lỗi quét vé', response.message || 'Lỗi không xác định');
         }
       }
     } catch (e) {
       console.error(e);
     } finally {
-      // Đợi 2s trước khi cho phép quét tiếp
       setTimeout(() => setScanning(false), 2000);
     }
   };
 
-  // Helper cho các nút mock (Developer Tools)
-  const handleMockScan = (status: ScanStatus) => {
-    const mockTicket = MOCK_TICKETS[status];
-    handleScan(mockTicket.ticketCode);
-  };
-
-  if (!permission) {
-    return <View />; // Lần render đầu
-  }
+  if (!permission) return <View />;
 
   if (!permission.granted) {
     return (
@@ -158,91 +279,96 @@ export default function ScannerScreen() {
     );
   }
 
+  const translateY = scanAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 176], // Approximate height of the scan area
+  });
+
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
 
-      <View style={styles.concertBanner}>
+      {/* Top bar */}
+      <View style={styles.topBar}>
         <View>
-          <Text style={styles.concertLabel}>Cổng đang hoạt động</Text>
-          <Text style={styles.concertName}>{MOCK_CONCERT.name}</Text>
+          <Text style={styles.liveTag}>LIVE · JUN 22</Text>
+          <Text style={styles.concertName}>{concert.name}</Text>
         </View>
-        <View style={[styles.livePill, isOffline && { backgroundColor: COLORS.error + '14', borderColor: COLORS.error + '55' }]}>
-          <View style={[styles.liveDot, isOffline && { backgroundColor: COLORS.error }]} />
-          <Text style={[styles.liveText, isOffline && { color: COLORS.errorLight }]}>
-            {isOffline ? 'Offline' : 'Online'}
+        <View style={styles.statusPill}>
+          <Animated.View style={[styles.statusDot, { opacity: pulseAnim, backgroundColor: isOffline ? COLORS.error : COLORS.primary }]} />
+          <Text style={[styles.statusText, isOffline && { color: COLORS.error }]}>
+            {isOffline ? 'OFFLINE' : 'ONLINE'}
           </Text>
         </View>
       </View>
 
-      <View style={styles.cameraContainer}>
-        <View style={styles.scanHeader}>
-          <Text style={styles.cameraSectionLabel}>Khung quét</Text>
-          <Text style={styles.scanCounter}>128 vào cổng</Text>
+      {/* Stats row */}
+      <View style={styles.statsRow}>
+        <View style={styles.statBox}>
+          <Text style={[styles.statVal, { color: COLORS.primary }]}>{checkedIn}</Text>
+          <Text style={styles.statSub}>Checked in</Text>
         </View>
-        <CameraView
-          style={StyleSheet.absoluteFill}
-          facing="back"
-          barcodeScannerSettings={{
-            barcodeTypes: ["qr"],
-          }}
-          onBarcodeScanned={({ data }) => handleScan(data)}
-        />
-        <View style={styles.cameraGridLineV} />
-        <View style={styles.cameraGridLineH} />
-        <View style={[styles.corner, styles.cornerTL]} />
-        <View style={[styles.corner, styles.cornerTR]} />
-        <View style={[styles.corner, styles.cornerBL]} />
-        <View style={[styles.corner, styles.cornerBR]} />
-
-        <View style={[styles.scanLine, scanning && { backgroundColor: COLORS.success }]} />
+        <View style={styles.statBox}>
+          <Text style={styles.statVal}>{total - checkedIn}</Text>
+          <Text style={styles.statSub}>Remaining</Text>
+        </View>
+        <View style={styles.statBox}>
+          <Text style={styles.statVal}>{pct}%</Text>
+          <Text style={styles.statSub}>Complete</Text>
+        </View>
       </View>
 
-      <View style={styles.buttonsContainer}>
-        <View style={styles.buttonsHeader}>
-          <Text style={styles.buttonsTitle}>Developer Tools: Mô phỏng quét</Text>
-          <Text style={styles.buttonsHint}>Hỗ trợ test nhanh trên máy ảo</Text>
-        </View>
-        <View style={styles.buttonGrid}>
-          {SCAN_BUTTONS.map((btn) => (
-            <TouchableOpacity
-              key={btn.status}
-              style={[styles.scanButton, { borderColor: btn.color + '66' }]}
-              onPress={() => handleMockScan(btn.status)}
-              activeOpacity={0.82}
-            >
-              <View style={[styles.scanTone, { backgroundColor: btn.color + '20' }]}>
-                <Text style={[styles.scanToneText, { color: btn.color }]}>
-                  {btn.tone}
-                </Text>
+      {/* Progress bar */}
+      <View style={styles.progressBarBg}>
+        <View style={[styles.progressBarFill, { width: `${pct}%` }]} />
+      </View>
+
+      {/* Viewfinder */}
+      <View style={styles.viewfinderWrapper}>
+        <View style={styles.viewfinderContainer}>
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+            onBarcodeScanned={({ data }) => handleScan(data)}
+          />
+          {/* Simulated Dark overlay and vignette can be added here if needed */}
+          <View style={styles.finderBox}>
+            <View style={[styles.corner, styles.cornerTL]} />
+            <View style={[styles.corner, styles.cornerTR]} />
+            <View style={[styles.corner, styles.cornerBL]} />
+            <View style={[styles.corner, styles.cornerBR]} />
+
+            {scanning ? (
+              <Animated.View style={[styles.scanLine, { transform: [{ translateY }] }]} />
+            ) : (
+              <View style={styles.centerIcon}>
+                <QrCode color="rgba(255,255,255,0.3)" size={40} />
               </View>
-              <Text style={styles.scanButtonText}>{btn.label}</Text>
-            </TouchableOpacity>
-          ))}
+            )}
+          </View>
+          <View style={styles.bottomLabel}>
+            <Text style={styles.bottomLabelText}>{scanning ? 'SCANNING...' : 'POINT AT QR CODE'}</Text>
+          </View>
         </View>
       </View>
 
+      {/* Spacer to push bottom nav down */}
+      <View style={{ flex: 1 }} />
+
+      {/* Bottom Nav */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => navigation.navigate('OfflineQueue')}
-        >
-          <Text style={styles.navIcon}>03</Text>
-          <Text style={styles.navLabel}>Queue</Text>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('OfflineQueue')}>
+          <CloudOff color={COLORS.textMuted} size={24} />
+          <Text style={styles.navItemText}>Queue</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => navigation.navigate('SyncHistory')}
-        >
-          <Text style={styles.navIcon}>OK</Text>
-          <Text style={styles.navLabel}>Sync</Text>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Scanner')}>
+          <QrCode color={COLORS.primary} size={24} />
+          <Text style={[styles.navItemText, { color: COLORS.primary }]}>Scan</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => navigation.navigate('Settings')}
-        >
-          <Text style={styles.navIcon}>ID</Text>
-          <Text style={styles.navLabel}>Cài đặt</Text>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Settings')}>
+          <SettingsIcon color={COLORS.textMuted} size={24} />
+          <Text style={styles.navItemText}>Settings</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -254,243 +380,218 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  concertBanner: {
+  topBar: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    paddingTop: SPACING.xxxl,
+    paddingBottom: SPACING.md,
   },
-  concertLabel: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZES.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+  liveTag: {
+    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 2,
+    marginBottom: 2,
   },
   concertName: {
     color: COLORS.text,
-    fontSize: FONT_SIZES.md,
-    fontWeight: '700',
-    marginTop: 2,
-    maxWidth: 245,
+    fontSize: 18,
+    fontWeight: 'bold',
   },
-  livePill: {
+  statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.success + '14',
+    backgroundColor: COLORS.primary + '1A',
     borderWidth: 1,
-    borderColor: COLORS.success + '55',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.round,
+    borderColor: COLORS.primary + '33',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
   },
-  liveDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: COLORS.success,
-    marginRight: SPACING.xs,
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.primary,
+    marginRight: 6,
   },
-  liveText: {
-    color: COLORS.successLight,
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '800',
+  statusText: {
+    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: 'bold',
   },
-  cameraContainer: {
-    paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING.xxl,
-    paddingBottom: SPACING.xl,
-  },
-  scanHeader: {
+  statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.lg,
+    gap: 8,
   },
-  cameraSectionLabel: {
-    color: COLORS.text,
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '800',
-  },
-  scanCounter: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-  },
-  cameraFrame: {
-    width: '100%',
-    aspectRatio: 1,
-    borderWidth: 2,
-    borderColor: COLORS.borderLight,
-    borderRadius: BORDER_RADIUS.lg,
+  statBox: {
+    flex: 1,
     backgroundColor: COLORS.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  statVal: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
+  },
+  statSub: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    marginTop: 2,
+  },
+  progressBarBg: {
+    height: 4,
+    backgroundColor: COLORS.surfaceLight,
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.lg,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: COLORS.primary,
+    borderRadius: 2,
+  },
+  viewfinderWrapper: {
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.lg,
+  },
+  viewfinderContainer: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    backgroundColor: '#080808',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    overflow: 'hidden',
   },
-  cameraGridLineV: {
-    position: 'absolute',
-    top: 28,
-    bottom: 28,
-    width: 1,
-    backgroundColor: COLORS.border,
-    opacity: 0.45,
-  },
-  cameraGridLineH: {
-    position: 'absolute',
-    left: 28,
-    right: 28,
-    height: 1,
-    backgroundColor: COLORS.border,
-    opacity: 0.45,
+  finderBox: {
+    width: 176,
+    height: 176,
+    position: 'relative',
   },
   corner: {
     position: 'absolute',
-    width: 42,
-    height: 42,
+    width: 24,
+    height: 24,
     borderColor: COLORS.primary,
   },
-  cornerTL: {
-    top: 14,
-    left: 14,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderTopLeftRadius: BORDER_RADIUS.lg,
-  },
-  cornerTR: {
-    top: 14,
-    right: 14,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderTopRightRadius: BORDER_RADIUS.lg,
-  },
-  cornerBL: {
-    bottom: 14,
-    left: 14,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderBottomLeftRadius: BORDER_RADIUS.lg,
-  },
-  cornerBR: {
-    bottom: 14,
-    right: 14,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderBottomRightRadius: BORDER_RADIUS.lg,
-  },
+  cornerTL: { top: 0, left: 0, borderTopWidth: 2, borderLeftWidth: 2 },
+  cornerTR: { top: 0, right: 0, borderTopWidth: 2, borderRightWidth: 2 },
+  cornerBL: { bottom: 0, left: 0, borderBottomWidth: 2, borderLeftWidth: 2 },
+  cornerBR: { bottom: 0, right: 0, borderBottomWidth: 2, borderRightWidth: 2 },
   scanLine: {
     position: 'absolute',
-    left: 42,
-    right: 42,
+    top: 0,
+    left: 0,
+    right: 0,
     height: 2,
-    backgroundColor: COLORS.primaryLight,
-    opacity: 0.8,
+    backgroundColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  cameraText: {
-    color: COLORS.text,
-    fontSize: FONT_SIZES.xxl,
-    fontWeight: '800',
-  },
-  cameraHint: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.md,
-    marginTop: SPACING.sm,
-  },
-  cameraSubHint: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZES.xs,
-    marginTop: SPACING.xs,
-    textAlign: 'center',
-    paddingHorizontal: SPACING.md,
-  },
-  buttonsContainer: {
-    paddingHorizontal: SPACING.xl,
-    flex: 1,
-  },
-  buttonsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginBottom: SPACING.md,
-  },
-  buttonsTitle: {
-    color: COLORS.text,
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '800',
-  },
-  buttonsHint: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZES.xs,
-  },
-  buttonGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-  },
-  scanButton: {
-    width: '48.5%',
-    flexDirection: 'row',
+  centerIcon: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.surface + 'CC',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
   },
-  scanTone: {
-    width: 32,
-    height: 32,
-    borderRadius: BORDER_RADIUS.md,
+  bottomLabel: {
+    position: 'absolute',
+    bottom: 12,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  bottomLabelText: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 10,
+    letterSpacing: 2,
+    fontFamily: 'monospace',
+  },
+  actionsContainer: {
+    flex: 1,
+    paddingHorizontal: SPACING.lg,
+    justifyContent: 'flex-end',
+    paddingBottom: SPACING.lg,
+    gap: 10,
+  },
+  primaryActionBtn: {
+    width: '100%',
+    height: 56,
+    backgroundColor: COLORS.primary,
+    borderRadius: 16,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  scanToneText: {
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '900',
+  primaryActionTextBlack: {
+    color: '#000000',
+    fontSize: 15,
+    fontWeight: 'bold',
   },
-  scanButtonText: {
+  secondaryActionBtn: {
+    width: '100%',
+    height: 48,
+    backgroundColor: COLORS.surfaceLight,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryActionText: {
     color: COLORS.text,
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '700',
-    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
   },
   bottomNav: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginHorizontal: SPACING.xl,
-    marginBottom: SPACING.sm,
-    paddingVertical: SPACING.sm,
     borderTopWidth: 1,
-    borderWidth: 1,
     borderTopColor: COLORS.border,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.backgroundSecondary,
-    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.background,
+    paddingBottom: 10, // Adjust for safe area
+    paddingTop: 10,
   },
-  navButton: {
+  navItem: {
+    flex: 1,
     alignItems: 'center',
-    paddingVertical: SPACING.xs,
-    minWidth: 72,
+    justifyContent: 'center',
   },
-  navIcon: {
-    color: COLORS.text,
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '900',
-    width: 34,
-    height: 28,
-    lineHeight: 28,
-    textAlign: 'center',
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: COLORS.surfaceRaised,
-    overflow: 'hidden',
+  navItemText: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    marginTop: 4,
+    fontWeight: '500',
   },
-  navLabel: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.xs,
-    marginTop: 2,
+  scanButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
   },
+  scanButtonText: {
+    color: '#000',
+    fontWeight: 'bold',
+  }
 });

@@ -7,7 +7,7 @@ export const initDb = () => {
   const { user_version: currentDbVersion } = db.getFirstSync<{ user_version: number }>('PRAGMA user_version') || { user_version: 0 };
 
   // Mục tiêu version của code hiện tại
-  const TARGET_DB_VERSION = 6;
+  const TARGET_DB_VERSION = 7;
 
   if (currentDbVersion >= TARGET_DB_VERSION) {
     // Đã ở version mới nhất, không cần migrate

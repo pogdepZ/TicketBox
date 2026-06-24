@@ -5,6 +5,7 @@ export class SyncCheckinItemDto {
   staffId!: string;
   sourceDeviceId!: string;
   checkedAt!: string;
+  clientEventId!: string;
 }
 
 export class SyncCheckinDto {

@@ -11,10 +11,10 @@ export interface ApiResponse<T = unknown> {
 }
 
 /** Check-in scan result status */
-export type ScanStatus = 'SUCCESS' | 'DUPLICATE' | 'NOT_FOUND' | 'WRONG_EVENT';
+export type ScanStatus = 'SUCCESS' | 'DUPLICATE' | 'NOT_FOUND' | 'WRONG_EVENT' | 'TEMP_ACCEPTED';
 
 /** Sync status for offline queue items */
-export type SyncStatus = 'PENDING' | 'SYNCED' | 'FAILED';
+export type SyncStatus = 'PENDING' | 'SYNCED' | 'FAILED' | 'CONFLICT' | 'REJECTED';
 
 /** User role */
 export type UserRole = 'CHECKIN_STAFF' | 'ADMIN' | 'ORGANIZER';
@@ -94,6 +94,26 @@ export interface SyncResultItem {
   ticketId: string;
   status: SyncStatus;
   serverId: string;
+}
+
+/** Snapshot response */
+export interface SnapshotResponse {
+  version: string;
+  publicKey: string;
+  tickets: {
+    id: string;
+    ticketCode: string;
+    status: string;
+    guestName: string;
+    ticketType: string;
+  }[];
+  guests: {
+    id: string;
+    guestCode: string;
+    fullName: string;
+    email: string | null;
+    status: string;
+  }[];
 }
 
 /** Navigation params */
