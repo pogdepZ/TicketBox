@@ -16,7 +16,7 @@ interface HomePageProps {
 export default async function HomePage({ searchParams }: HomePageProps) {
   const params = await searchParams;
   const initialKeyword = params?.q ?? '';
-  const { items: concerts } = await getConcerts({ keyword: initialKeyword });
+  const { items: concerts } = await getConcerts({ keyword: initialKeyword, status: 'published' });
   const featured = concerts[0] || null;
 
   return (

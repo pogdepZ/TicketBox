@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -13,6 +14,8 @@ import { CreateConcertDto } from './dto/create-concert.dto';
 import { UpdateConcertDto } from './dto/update-concert.dto';
 import { QueryConcertDto } from './dto/query-concert.dto';
 import { CancelConcertDto } from './dto/cancel-concert.dto';
+import { CreateTicketTypeDto } from './dto/create-ticket-type.dto';
+import { UpdateTicketTypeDto } from './dto/update-ticket-type.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthUser } from '../auth/dto/user-response.dto';
 import { JwtAuthGuard } from '../auth/guard/jwt-auth.guard';
@@ -77,5 +80,36 @@ export class ConcertController {
   @RequirePermissions('concert:update')
   complete(@Param('id') id: string) {
     return this.concertService.complete(id);
+  }
+
+  @Post(':concertId/ticket-types')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermissions('ticket_type:manage')
+  createTicketType(
+    @Param('concertId') concertId: string,
+    @Body() dto: CreateTicketTypeDto,
+  ) {
+    return this.concertService.createTicketType(concertId, dto);
+  }
+
+  @Patch(':concertId/ticket-types/:id')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermissions('ticket_type:manage')
+  updateTicketType(
+    @Param('concertId') concertId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateTicketTypeDto,
+  ) {
+    return this.concertService.updateTicketType(concertId, id, dto);
+  }
+
+  @Delete(':concertId/ticket-types/:id')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermissions('ticket_type:manage')
+  deleteTicketType(
+    @Param('concertId') concertId: string,
+    @Param('id') id: string,
+  ) {
+    return this.concertService.deleteTicketType(concertId, id);
   }
 }

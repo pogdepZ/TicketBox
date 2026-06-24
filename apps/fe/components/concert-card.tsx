@@ -70,9 +70,9 @@ export function ConcertCard({
   }
 
   return (
-    <Link href={`/concert/${id}`} className="group block">
-      <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/45 hover:shadow-xl hover:shadow-primary/10">
-        <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+    <Link href={`/concert/${id}`} className="group block h-full">
+      <div className="flex flex-col h-full overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/45 hover:shadow-xl hover:shadow-primary/10">
+        <div className="relative aspect-[4/3] overflow-hidden bg-muted flex-shrink-0">
           <Image
             src={image}
             alt={title}
@@ -102,33 +102,33 @@ export function ConcertCard({
             </div>
           )}
         </div>
-        <div className="p-5">
-          <h3 className="text-xl font-black leading-tight text-foreground transition group-hover:text-primary">
+        <div className="p-5 flex flex-col flex-grow">
+          <h3 className="text-xl font-black leading-tight text-foreground transition group-hover:text-primary line-clamp-2 min-h-[3.5rem] flex-shrink-0">
             {title}
           </h3>
-          <p className="mt-1 text-sm font-medium text-muted-foreground">{artist}</p>
+          <p className="mt-1 text-sm font-medium text-muted-foreground line-clamp-1 flex-shrink-0">{artist}</p>
 
-          <div className="my-5 space-y-2 text-sm text-muted-foreground">
+          <div className="mt-4 mb-5 space-y-2 text-sm text-muted-foreground flex-grow">
             <div className="flex items-center gap-2">
-              <Calendar className="size-4 text-primary" />
-              {formattedDate}
+              <Calendar className="size-4 text-primary flex-shrink-0" />
+              <span>{formattedDate}</span>
             </div>
             <div className="flex items-center gap-2">
-              <Clock className="size-4 text-primary" />
-              {time}
+              <Clock className="size-4 text-primary flex-shrink-0" />
+              <span>{time}</span>
             </div>
             <div className="flex items-center gap-2">
-              <MapPin className="size-4 text-primary" />
-              {venue}, {city}
+              <MapPin className="size-4 text-primary flex-shrink-0" />
+              <span className="line-clamp-1">{venue}, {city}</span>
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
+          <div className="mt-auto border-t border-border pt-4 flex items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Từ</p>
               <p className="text-lg font-black text-foreground">{price.toLocaleString('vi-VN')}đ</p>
             </div>
-            <button className="rounded-full bg-foreground px-4 py-2 text-sm font-bold text-background transition hover:bg-primary">
+            <button className="rounded-full bg-foreground px-4 py-2 text-sm font-bold text-background transition hover:bg-primary cursor-pointer">
               Xem chi tiết
             </button>
           </div>

@@ -157,6 +157,15 @@ export function getFriendlyErrorMessage(error: any): string {
 
   if (error instanceof ApiError) {
     const code = error.statusCode;
+    const raw = error.rawMessage || error.message;
+    const rawStr = String(Array.isArray(raw) ? raw[0] : raw).toLowerCase();
+
+    if (rawStr.includes('cancelled or completed concerts cannot be updated')) {
+      return 'Không thể chỉnh sửa sự kiện đã hủy hoặc đã hoàn thành.';
+    }
+    if (rawStr.includes('cannot be updated after publish')) {
+      return 'Không thể thay đổi thông tin này sau khi sự kiện đã xuất bản (đang mở bán).';
+    }
 
     // Direct status-code error formatting
     if (code === 429) {
@@ -172,7 +181,6 @@ export function getFriendlyErrorMessage(error: any): string {
       return 'Thông tin yêu cầu không tồn tại.';
     }
     if (code === 401) {
-      const raw = error.rawMessage || error.message;
       if (raw) {
         const checkMsg = (msg: string) => {
           const m = msg.toLowerCase().trim();
@@ -186,7 +194,6 @@ export function getFriendlyErrorMessage(error: any): string {
       return 'Phiên làm việc hết hạn. Vui lòng đăng nhập lại.';
     }
 
-    const raw = error.rawMessage || error.message;
     if (Array.isArray(raw)) {
       return raw.map((r) => translateSingleMessage(r)).filter(Boolean).join('\n');
     }
@@ -220,6 +227,12 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  if (typeof window !== 'undefined') {
+    headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    headers.set('Pragma', 'no-cache');
+    headers.set('Expires', '0');
   }
 
   const response = await fetch(url, {
@@ -272,16 +285,18 @@ export async function getConcerts(params?: { status?: string; keyword?: string; 
     }
     
     const queryString = query.toString() ? `?${query.toString()}` : '';
-    const data = await fetchApi(`/concerts${queryString}`, { next: { revalidate: 60 } } as any); // use ISR cache
+    const options = { cache: 'no-store' as const };
+
+    const data = await fetchApi(`/concerts${queryString}`, options);
     
     // data format: { items: [], meta: {} }
     return {
-      items: data.items.map((concert: any) => mapConcertToDisplay(concert)),
+      items: data.items.map((concert: any) => mapConcertToDisplay(concert, false)),
       meta: data.meta,
     };
   } catch (error) {
     console.warn('Backend API /concerts failed, falling back to mock data:', error);
-    let items = mockConcerts.map(c => mapConcertToDisplay(mapLocalMockToBEConcert(c)));
+    let items = mockConcerts.map(c => mapConcertToDisplay(mapLocalMockToBEConcert(c), true));
     
     if (params?.keyword) {
       const kw = params.keyword.toLowerCase();
@@ -304,17 +319,27 @@ export async function getConcerts(params?: { status?: string; keyword?: string; 
   }
 }
 
+export async function createConcert(payload: any): Promise<any> {
+  return await fetchApi('/concerts', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function getConcertById(id: string) {
   try {
-    const concert = await fetchApi(`/concerts/${id}`, { next: { revalidate: 60 } } as any);
-    return mapConcertToDisplay(concert);
+    const url = `/concerts/${id}`;
+    const options = { cache: 'no-store' as const };
+      
+    const concert = await fetchApi(url, options);
+    return mapConcertToDisplay(concert, false);
   } catch (error) {
     console.warn(`Backend API /concerts/${id} failed, falling back to mock data:`, error);
     const mock = mockConcerts.find(c => c.id === id);
     if (!mock) {
       throw error;
     }
-    return mapConcertToDisplay(mapLocalMockToBEConcert(mock));
+    return mapConcertToDisplay(mapLocalMockToBEConcert(mock), true);
   }
 }
 
@@ -341,7 +366,46 @@ function mapLocalMockToBEConcert(mock: any) {
 }
 
 
-function mapConcertToDisplay(concert: any) {
+const CONCERT_STATUS_LOCAL_KEY = 'ticketbox-local-concert-statuses';
+
+export function getLocalConcertStatus(concertId: string): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage.getItem(`${CONCERT_STATUS_LOCAL_KEY}-${concertId}`);
+  } catch {
+    return null;
+  }
+}
+
+export function saveLocalConcertStatus(concertId: string, status: string) {
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(`${CONCERT_STATUS_LOCAL_KEY}-${concertId}`, status);
+  }
+}
+
+export function clearLocalConcertStatus(concertId: string) {
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(`${CONCERT_STATUS_LOCAL_KEY}-${concertId}`);
+  }
+}
+
+function mapConcertToDisplay(concert: any, useLocalOverride = false) {
+  // Normalize status to uppercase to resolve casing mismatches between FE and BE
+  if (concert && typeof concert.status === 'string') {
+    concert.status = concert.status.toUpperCase();
+  }
+
+  // Override status from localStorage if mock fallback mode is active
+  if (useLocalOverride) {
+    const localStatus = getLocalConcertStatus(concert.id);
+    if (localStatus) {
+      concert = { ...concert, status: localStatus };
+    }
+  } else {
+    // Clear the localStorage override once the backend API succeeds and loads the real status
+    clearLocalConcertStatus(concert.id);
+  }
+
   // Mapping BE model to what FE components expect based on mock data
   const ticketsSold = concert.ticketsSold ?? 0;
   const capacity = concert.capacity ?? 0;
@@ -349,7 +413,8 @@ function mapConcertToDisplay(concert: any) {
   const isSoldOut = capacity > 0 && ticketsSold >= capacity;
   let statusDisplay = 'Đang bán';
   
-  if (concert.status === 'CANCELLED') statusDisplay = 'Đã hủy';
+  if (concert.status === 'DRAFT') statusDisplay = 'Nháp';
+  else if (concert.status === 'CANCELLED') statusDisplay = 'Đã hủy';
   else if (concert.status === 'COMPLETED') statusDisplay = 'Đã kết thúc';
   else if (isSoldOut) statusDisplay = 'Hết vé';
   else if (capacity > 0 && capacity - ticketsSold <= capacity * 0.2) statusDisplay = 'Sắp hết vé';
@@ -386,6 +451,8 @@ function mapConcertToDisplay(concert: any) {
     seatMapSvgUrl: concert.seatMapSvgUrl,
     rawStatus: concert.status,
     seatZones: concert.seatZones,
+    artistBio: concert.artistBio,
+    artistBioStatus: concert.artistBioStatus,
   };
 }
 
@@ -865,7 +932,7 @@ export async function uploadArtistBioPdf(concertId: string, file: File): Promise
   try {
     const formData = new FormData();
     formData.append('file', file);
-    return await fetchApi(`/concerts/${concertId}/ai-bio/upload`, {
+    return await fetchApi(`/admin/concerts/${concertId}/artist-bio/upload`, {
       method: 'POST',
       body: formData,
     });
@@ -886,7 +953,11 @@ export async function uploadArtistBioPdf(concertId: string, file: File): Promise
 
 export async function getAiBioStatus(concertId: string): Promise<any> {
   try {
-    return await fetchApi(`/concerts/${concertId}/ai-bio/status`);
+    const concert = await getConcertById(concertId);
+    return {
+      status: (concert.artistBioStatus || 'empty').toUpperCase(),
+      bio: concert.artistBio,
+    };
   } catch (error) {
     if (typeof window !== 'undefined') {
       const status = window.localStorage.getItem(`${BIO_STATUS_LOCAL_PREFIX}${concertId}`) || 'EMPTY';
@@ -899,9 +970,9 @@ export async function getAiBioStatus(concertId: string): Promise<any> {
 
 export async function updateConcertBio(concertId: string, bio: string): Promise<any> {
   try {
-    return await fetchApi(`/concerts/${concertId}/bio`, {
+    return await fetchApi(`/concerts/${concertId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ bio }),
+      body: JSON.stringify({ artistBio: bio }),
     });
   } catch (error) {
     console.warn(`Failed to update concert bio, saving to LocalStorage`, error);
@@ -910,6 +981,57 @@ export async function updateConcertBio(concertId: string, bio: string): Promise<
       window.localStorage.setItem(`${BIO_STATUS_LOCAL_PREFIX}${concertId}`, 'DONE');
     }
     return { success: true, bio };
+  }
+}
+
+export async function importGuestList(concertId: string, file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append('file', file);
+  return await fetchApi(`/admin/concerts/${concertId}/guest-list/import`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export async function cancelConcert(concertId: string, reason = 'Hủy bởi quản trị viên'): Promise<any> {
+  try {
+    const res = await fetchApi(`/concerts/${concertId}/cancel`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
+    });
+    saveLocalConcertStatus(concertId, 'CANCELLED');
+    return res;
+  } catch (err) {
+    if (err instanceof ApiError) {
+      throw err;
+    }
+    console.warn('Backend cancel API failed, falling back to LocalStorage', err);
+    saveLocalConcertStatus(concertId, 'CANCELLED');
+    return { success: true };
+  }
+}
+
+export async function updateConcert(concertId: string, payload: any): Promise<any> {
+  return await fetchApi(`/concerts/${concertId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function publishConcert(concertId: string): Promise<any> {
+  try {
+    const res = await fetchApi(`/concerts/${concertId}/publish`, {
+      method: 'PATCH',
+    });
+    saveLocalConcertStatus(concertId, 'PUBLISHED');
+    return res;
+  } catch (err) {
+    if (err instanceof ApiError) {
+      throw err;
+    }
+    console.warn('Backend publish API failed, falling back to LocalStorage', err);
+    saveLocalConcertStatus(concertId, 'PUBLISHED');
+    return { success: true };
   }
 }
 

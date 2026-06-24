@@ -9,6 +9,8 @@ import {
 import { createHash, randomUUID } from 'crypto';
 import { CreateConcertDto } from './dto/create-concert.dto';
 import { UpdateConcertDto } from './dto/update-concert.dto';
+import { CreateTicketTypeDto } from './dto/create-ticket-type.dto';
+import { UpdateTicketTypeDto } from './dto/update-ticket-type.dto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import {
   Concert,
@@ -81,25 +83,70 @@ export class ConcertService {
       seatMapSvgUrl = await this.uploadSeatMapSvgIfRaw(concertId, createConcertDto.seatMapSvg);
     }
 
-    const concert = await this.prismaService.concert.create({
-      data: {
-        id: concertId,
-        name: createConcertDto.name.trim(),
-        description: createConcertDto.description,
-        artistName: createConcertDto.artistName,
-        venueName: createConcertDto.venueName.trim(),
-        venueAddress: createConcertDto.venueAddress.trim(),
-        eventDate,
-        seatMapSvgUrl,
-        posterUrl: createConcertDto.posterUrl,
-        status: PrismaConcertStatus.DRAFT,
-        createdById,
-      },
+    const concert = await this.prismaService.$transaction(async (tx) => {
+      const createdConcert = await tx.concert.create({
+        data: {
+          id: concertId,
+          name: createConcertDto.name.trim(),
+          description: createConcertDto.description,
+          artistName: createConcertDto.artistName,
+          venueName: createConcertDto.venueName.trim(),
+          venueAddress: createConcertDto.venueAddress.trim(),
+          eventDate,
+          seatMapSvgUrl,
+          posterUrl: createConcertDto.posterUrl,
+          status: PrismaConcertStatus.DRAFT,
+          createdById,
+        },
+      });
+
+      if (createConcertDto.ticketTypes && createConcertDto.ticketTypes.length > 0) {
+        for (let i = 0; i < createConcertDto.ticketTypes.length; i++) {
+          const tt = createConcertDto.ticketTypes[i];
+          const zoneCode = tt.name.replace(/\s+/g, '-').toLowerCase();
+
+          // 1. Create SeatZone
+          const zone = await tx.seatZone.create({
+            data: {
+              concertId,
+              code: zoneCode,
+              name: tt.name.trim(),
+              color: ['#e5484d', '#e0a82e', '#3d6f8f', '#123c3a', '#64748b'][i % 5],
+            },
+          });
+
+          // 2. Create TicketType
+          await tx.ticketType.create({
+            data: {
+              concertId,
+              seatZoneId: zone.id,
+              name: tt.name.trim(),
+              price: tt.price,
+              totalQuantity: tt.totalQuantity,
+              remaining: tt.totalQuantity,
+              maxPerUser: tt.maxPerUser ?? 4,
+              status: 'ACTIVE',
+            },
+          });
+        }
+      }
+
+      // Fetch the concert with seatZones and ticketTypes included so that it matches what we return
+      return tx.concert.findUnique({
+        where: { id: concertId },
+        include: {
+          seatZones: {
+            include: {
+              ticketTypes: true,
+            },
+          },
+        },
+      });
     });
 
-    await this.invalidateConcertCache(concert.id);
+    await this.invalidateConcertCache(concert!.id);
     // TODO: emit audit log event: concert.created.
-    return this.toResponse(concert);
+    return this.toResponse(concert!);
   }
 
   async findAll(query: QueryConcertDto): Promise<PaginatedConcerts> {
@@ -505,5 +552,150 @@ export class ConcertService {
     } catch (error) {
       this.logger.warn(`Failed to invalidate concert cache for ${concertId}`, error);
     }
+  }
+
+  async createTicketType(
+    concertId: string,
+    dto: CreateTicketTypeDto,
+  ) {
+    await this.findConcertOrThrow(concertId);
+
+    const zoneCode = dto.name.replace(/\s+/g, '-').toLowerCase();
+
+    const ticketType = await this.prismaService.$transaction(async (tx) => {
+      // 1. Find or create SeatZone
+      let seatZone = await tx.seatZone.findFirst({
+        where: { concertId, code: zoneCode },
+      });
+
+      if (!seatZone) {
+        // Find existing seatZones count to pick a color
+        const zonesCount = await tx.seatZone.count({ where: { concertId } });
+        seatZone = await tx.seatZone.create({
+          data: {
+            concertId,
+            code: zoneCode,
+            name: dto.name.trim(),
+            color: ['#e5484d', '#e0a82e', '#3d6f8f', '#123c3a', '#64748b'][zonesCount % 5],
+          },
+        });
+      }
+
+      // 2. Create TicketType
+      return tx.ticketType.create({
+        data: {
+          concertId,
+          seatZoneId: seatZone.id,
+          name: dto.name.trim(),
+          price: dto.price,
+          totalQuantity: dto.totalQuantity,
+          remaining: dto.totalQuantity,
+          maxPerUser: dto.maxPerUser,
+          saleStartAt: dto.saleStartAt ? new Date(dto.saleStartAt) : null,
+          saleEndAt: dto.saleEndAt ? new Date(dto.saleEndAt) : null,
+          status: 'ACTIVE',
+        },
+      });
+    });
+
+    await this.invalidateConcertCache(concertId);
+    return ticketType;
+  }
+
+  async updateTicketType(
+    concertId: string,
+    ticketTypeId: string,
+    dto: UpdateTicketTypeDto,
+  ) {
+    await this.findConcertOrThrow(concertId);
+
+    const ticketType = await this.prismaService.ticketType.findFirst({
+      where: { id: ticketTypeId, concertId },
+    });
+
+    if (!ticketType) {
+      throw new NotFoundException('Ticket type not found');
+    }
+
+    const diff = dto.totalQuantity !== undefined ? dto.totalQuantity - ticketType.totalQuantity : 0;
+    const newRemaining = ticketType.remaining + diff;
+    if (newRemaining < 0) {
+      throw new BadRequestException('Cannot reduce total quantity below currently sold tickets');
+    }
+
+    const updated = await this.prismaService.$transaction(async (tx) => {
+      // 1. Update SeatZone if name changed
+      if (dto.name && ticketType.seatZoneId) {
+        try {
+          const newCode = dto.name.replace(/\s+/g, '-').toLowerCase();
+          await tx.seatZone.update({
+            where: { id: ticketType.seatZoneId },
+            data: {
+              name: dto.name.trim(),
+              code: newCode,
+            },
+          });
+        } catch {
+          await tx.seatZone.update({
+            where: { id: ticketType.seatZoneId },
+            data: {
+              name: dto.name.trim(),
+            },
+          });
+        }
+      }
+
+      // 2. Update TicketType
+      return tx.ticketType.update({
+        where: { id: ticketTypeId },
+        data: {
+          name: dto.name?.trim(),
+          price: dto.price,
+          totalQuantity: dto.totalQuantity,
+          remaining: dto.totalQuantity !== undefined ? newRemaining : undefined,
+          maxPerUser: dto.maxPerUser,
+          saleStartAt: dto.saleStartAt !== undefined ? (dto.saleStartAt ? new Date(dto.saleStartAt) : null) : undefined,
+          saleEndAt: dto.saleEndAt !== undefined ? (dto.saleEndAt ? new Date(dto.saleEndAt) : null) : undefined,
+        },
+      });
+    });
+
+    await this.invalidateConcertCache(concertId);
+    return updated;
+  }
+
+  async deleteTicketType(concertId: string, ticketTypeId: string) {
+    await this.findConcertOrThrow(concertId);
+
+    const ticketType = await this.prismaService.ticketType.findFirst({
+      where: { id: ticketTypeId, concertId },
+    });
+
+    if (!ticketType) {
+      throw new NotFoundException('Ticket type not found');
+    }
+
+    const ticketsCount = await this.prismaService.ticket.count({
+      where: { ticketTypeId },
+    });
+
+    if (ticketsCount > 0) {
+      throw new BadRequestException('Cannot delete ticket type that already has purchased tickets');
+    }
+
+    await this.prismaService.$transaction(async (tx) => {
+      await tx.ticketType.delete({
+        where: { id: ticketTypeId },
+      });
+
+      if (ticketType.seatZoneId) {
+        await tx.seatZone.delete({
+          where: { id: ticketType.seatZoneId },
+        });
+      }
+    });
+
+    await this.invalidateConcertCache(concertId);
+    return { success: true };
   }
 }

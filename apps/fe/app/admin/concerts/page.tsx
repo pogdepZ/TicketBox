@@ -1,10 +1,111 @@
+"use client";
+
+import { useEffect, useState } from 'react';
 import { AdminLayout } from '@/components/admin-layout';
 import { ConcertTable } from '@/components/concert-table';
-import { concerts } from '@/lib/mock-data';
+import { getConcerts, cancelConcert, publishConcert } from '@/lib/api';
 import Link from 'next/link';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, RefreshCw } from 'lucide-react';
+import { ConfirmModal } from '@/components/confirm-modal';
 
 export default function AdminConcertsPage() {
+  const [concertsList, setConcertsList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [keyword, setKeyword] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmConcertId, setConfirmConcertId] = useState<string | null>(null);
+
+  async function loadConcerts(searchKeyword = '') {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await getConcerts({ keyword: searchKeyword });
+      setConcertsList(res.items || []);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || 'Không thể tải danh sách sự kiện.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadConcerts();
+  }, []);
+
+  function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setKeyword(e.target.value);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      loadConcerts(keyword);
+    }
+  }
+
+  async function handleToggleActive(id: string, currentStatus: string) {
+    const isActivating = currentStatus !== 'PUBLISHED';
+    if (isActivating) {
+      try {
+        await publishConcert(id);
+        window.dispatchEvent(
+          new CustomEvent('ticketbox-toast', {
+            detail: {
+              title: 'Kích hoạt sự kiện thành công',
+              message: 'Sự kiện đã được xuất bản và hiển thị công khai!',
+              type: 'success',
+            },
+          })
+        );
+        loadConcerts(keyword);
+      } catch (err: any) {
+        window.dispatchEvent(
+          new CustomEvent('ticketbox-toast', {
+            detail: {
+              title: 'Kích hoạt thất bại',
+              message: err?.message || 'Không thể thay đổi trạng thái sự kiện.',
+              type: 'error',
+            },
+          })
+        );
+      }
+    } else {
+      setConfirmConcertId(id);
+      setConfirmOpen(true);
+    }
+  }
+
+  async function confirmCancel() {
+    if (!confirmConcertId) return;
+    setConfirmOpen(false);
+    try {
+      await cancelConcert(confirmConcertId);
+      window.dispatchEvent(
+        new CustomEvent('ticketbox-toast', {
+          detail: {
+            title: 'Ngưng kích hoạt thành công',
+            message: 'Sự kiện đã được chuyển sang trạng thái Đã hủy.',
+            type: 'success',
+          },
+        })
+      );
+      loadConcerts(keyword);
+    } catch (err: any) {
+      window.dispatchEvent(
+        new CustomEvent('ticketbox-toast', {
+          detail: {
+            title: 'Ngưng kích hoạt thất bại',
+            message: err?.message || 'Không thể thay đổi trạng thái sự kiện.',
+            type: 'error',
+          },
+        })
+      );
+    } finally {
+      setConfirmConcertId(null);
+    }
+  }
+
   return (
     <AdminLayout>
       <div className="space-y-8">
@@ -27,17 +128,56 @@ export default function AdminConcertsPage() {
             <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Tìm kiếm sự kiện..."
-              className="h-12 w-full rounded-full border border-border bg-card pl-11 pr-4 shadow-sm focus:outline-none focus:ring-4 focus:ring-primary/15"
+              value={keyword}
+              onChange={handleSearchChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Tìm kiếm sự kiện (Nhấn Enter để tìm)..."
+              className="h-12 w-full rounded-full border border-border bg-card pl-11 pr-4 shadow-sm focus:outline-none focus:ring-4 focus:ring-primary/15 text-foreground text-sm"
             />
           </div>
-          <button className="rounded-full border border-border bg-card px-5 py-2 font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary">
-            Bộ lọc
+          <button
+            onClick={() => loadConcerts(keyword)}
+            disabled={loading}
+            className="flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2 font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary active:scale-95 disabled:opacity-50 cursor-pointer"
+          >
+            <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            Tìm kiếm
           </button>
         </div>
 
-        <ConcertTable concerts={concerts} />
+        {error && (
+          <div className="rounded-3xl border border-destructive/20 bg-destructive/5 p-6 text-center text-destructive font-semibold">
+            {error}
+          </div>
+        )}
+
+        {loading && concertsList.length === 0 ? (
+          <div className="space-y-4">
+            <div className="h-12 rounded-3xl border border-border bg-card animate-pulse" />
+            <div className="h-64 rounded-3xl border border-border bg-card animate-pulse" />
+          </div>
+        ) : concertsList.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
+            Không tìm thấy sự kiện nào phù hợp.
+          </div>
+        ) : (
+          <ConcertTable concerts={concertsList} onToggleActive={handleToggleActive} />
+        )}
       </div>
+
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title="Ngưng kích hoạt sự kiện"
+        message="Bạn có chắc chắn muốn ngưng kích hoạt (hủy) sự kiện này? Thao tác này không thể hoàn tác và sự kiện sẽ không còn hiển thị đối với khách hàng nữa."
+        confirmText="Ngưng kích hoạt"
+        cancelText="Hủy"
+        onConfirm={confirmCancel}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setConfirmConcertId(null);
+        }}
+        variant="danger"
+      />
     </AdminLayout>
   );
 }
