@@ -24,6 +24,24 @@ export default function SettingsScreen() {
   const [notifications, setNotifications] = useState(true);
   const [haptics, setHaptics] = useState(true);
   const [autoSync, setAutoSync] = useState(true);
+  const [userName, setUserName] = useState('Staff Member');
+  const [userRole, setUserRole] = useState('Gate Operator');
+
+  React.useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const userStr = await AsyncStorage.getItem('auth_user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          setUserName(user.fullName || user.email || 'Staff Member');
+          setUserRole(user.role || 'Gate Operator');
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    loadUser();
+  }, []);
 
   const handleLogout = async () => {
     Alert.alert('Logout', 'Are you sure you want to log out?', [
@@ -82,8 +100,8 @@ export default function SettingsScreen() {
                 <User color={COLORS.primary} size={20} />
               </View>
               <View style={styles.profileInfo}>
-                <Text style={styles.userName}>Staff Member</Text>
-                <Text style={styles.userRole}>Gate A2 Operator</Text>
+                <Text style={styles.userName}>{userName}</Text>
+                <Text style={styles.userRole}>{userRole}</Text>
               </View>
             </View>
             <View style={styles.divider} />

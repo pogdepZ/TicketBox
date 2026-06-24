@@ -9,18 +9,11 @@ import {
   Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { ChevronLeft, Wifi, UploadCloud } from 'lucide-react-native';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
 import type { SyncHistoryRecord } from '../types';
-
-const MOCK_HISTORY: SyncHistoryRecord[] = [
-  { id: 'sync-001', syncedAt: '2026-06-07T20:05:00.000Z', recordCount: 3, status: 'SUCCESS' },
-  { id: 'sync-002', syncedAt: '2026-06-07T19:50:00.000Z', recordCount: 5, status: 'SUCCESS' },
-  { id: 'sync-003', syncedAt: '2026-06-07T19:30:00.000Z', recordCount: 2, status: 'FAILED', errorMessage: 'Server timeout' },
-  { id: 'sync-004', syncedAt: '2026-06-07T19:15:00.000Z', recordCount: 8, status: 'PARTIAL', errorMessage: '1 conflict' },
-  { id: 'sync-005', syncedAt: '2026-06-07T19:00:00.000Z', recordCount: 12, status: 'SUCCESS' },
-];
+import { queueService } from '../services/queue';
 
 const syncStatusConfig: Record<string, { color: string; bg: string; label: string }> = {
   SUCCESS: { color: COLORS.success, bg: COLORS.success + '1A', label: 'Synced' },
@@ -29,11 +22,51 @@ const syncStatusConfig: Record<string, { color: string; bg: string; label: strin
 };
 
 export default function SyncHistoryScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const [syncing, setSyncing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const unsynced = 5; // Mock pending
-  const total = 1240;
+  const [unsynced, setUnsynced] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [history, setHistory] = useState<SyncHistoryRecord[]>([]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let isMounted = true;
+      const loadData = async () => {
+        try {
+          const queue = await queueService.getQueue();
+          const pending = queue.filter(q => q.syncStatus === 'PENDING' || q.syncStatus === 'FAILED').length;
+          
+          const { db } = require('../services/db');
+          const totalRes: any[] = await db.getAllAsync('SELECT COUNT(*) as c FROM ticket_snapshot');
+          const logs: any[] = await db.getAllAsync('SELECT * FROM sync_log ORDER BY syncTime DESC LIMIT 20');
+          
+          if (isMounted) {
+            setUnsynced(pending);
+            setTotal(totalRes[0]?.c || 0);
+            
+            const mappedHistory = logs.map(l => {
+              let st = 'SUCCESS';
+              if (l.failCount > 0 && l.successCount > 0) st = 'PARTIAL';
+              else if (l.failCount > 0 && l.successCount === 0) st = 'FAILED';
+              return {
+                id: l.id,
+                syncedAt: l.syncTime,
+                recordCount: l.totalItems,
+                status: st as 'SUCCESS' | 'FAILED' | 'PARTIAL',
+                errorMessage: l.errorMessage,
+              };
+            });
+            setHistory(mappedHistory);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      loadData();
+      return () => { isMounted = false; };
+    }, [])
+  );
 
   const handleSync = () => {
     setSyncing(true);
@@ -132,7 +165,10 @@ export default function SyncHistoryScreen() {
         </View>
 
         <View style={styles.historyList}>
-          {MOCK_HISTORY.map((ev, i) => {
+          {history.length === 0 ? (
+            <Text style={{color: COLORS.textMuted, textAlign: 'center', marginTop: 20}}>No sync history</Text>
+          ) : 
+            history.map((ev, i) => {
             const cfg = syncStatusConfig[ev.status];
             const time = new Date(ev.syncedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
             
@@ -154,7 +190,8 @@ export default function SyncHistoryScreen() {
                 <Text style={styles.historyTime}>{time}</Text>
               </View>
             );
-          })}
+          })
+          }
         </View>
       </ScrollView>
     </SafeAreaView>

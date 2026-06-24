@@ -10,7 +10,7 @@ import {
   Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -22,10 +22,7 @@ import type { RootStackParamList, TicketInfo, ScanStatus, OfflineQueueItem } fro
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Scanner'>;
 
-const MOCK_CONCERT = {
-  id: 'a35ba9c7-89e4-425c-9d00-8016ac4afc3d',
-  name: 'Neon Frequencies', // Updated name to match design
-};
+// MOCK_CONCERT removed
 
 // --- Mock Status ---
 const STATUS_CONFIG = {
@@ -42,10 +39,37 @@ export default function ScannerScreen() {
   const [scanning, setScanning] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   
-  // Stats
-  const [checkedIn] = useState(847);
-  const total = 1240;
-  const pct = Math.round((checkedIn / total) * 100);
+  const [concert, setConcert] = useState({ id: '', name: 'No Active Concert' });
+  const [checkedIn, setCheckedIn] = useState(0);
+  const [total, setTotal] = useState(0);
+  const pct = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let isMounted = true;
+      const loadData = async () => {
+        try {
+          const { db } = require('../services/db');
+          const cache: any[] = await db.getAllAsync('SELECT id, name FROM concert_cache LIMIT 1');
+          if (cache && cache.length > 0 && isMounted) {
+            setConcert({ id: cache[0].id, name: cache[0].name });
+          }
+
+          const totalRes: any[] = await db.getAllAsync('SELECT COUNT(*) as c FROM ticket_snapshot');
+          const checkedRes: any[] = await db.getAllAsync('SELECT COUNT(*) as c FROM ticket_snapshot WHERE status IN ("USED", "TEMP_ACCEPTED")');
+          
+          if (isMounted) {
+            setTotal(totalRes[0]?.c || 0);
+            setCheckedIn(checkedRes[0]?.c || 0);
+          }
+        } catch (e) {
+          console.error('Failed to load stats', e);
+        }
+      };
+      loadData();
+      return () => { isMounted = false; };
+    }, [])
+  );
 
   // Animations
   const scanAnim = useRef(new Animated.Value(0)).current;
@@ -88,7 +112,7 @@ export default function ScannerScreen() {
       const payload = {
         qrCodeData: qrData,
         staffId,
-        concertId: MOCK_CONCERT.id,
+        concertId: concert.id,
         deviceId,
         clientEventId: `scan-${Date.now()}`,
       };
@@ -119,7 +143,7 @@ export default function ScannerScreen() {
               const payload = parts[1];
               const signature = parts[2];
               
-              const concertCache = await db.getAllAsync<{ publicKey: string }>('SELECT publicKey FROM concert_cache LIMIT 1');
+              const concertCache: any[] = await db.getAllAsync('SELECT publicKey FROM concert_cache LIMIT 1');
               if (concertCache && concertCache.length > 0) {
                 const publicKey = concertCache[0].publicKey;
                 
@@ -146,7 +170,7 @@ export default function ScannerScreen() {
                ticketCode: extractedTicketCode,
                guestName: 'Unknown',
                ticketType: '---',
-               concertName: MOCK_CONCERT.name,
+               concertName: concert.name,
                checkedInAt: checkedAt,
                status: 'NOT_FOUND',
              };
@@ -158,7 +182,7 @@ export default function ScannerScreen() {
           let localTicket = null;
           try {
             const { db } = require('../services/db');
-            const tickets = await db.getAllAsync<{ id: string, ticketCode: string, status: string, guestName: string, ticketType: string }>(
+            const tickets: any[] = await db.getAllAsync(
               'SELECT * FROM ticket_snapshot WHERE ticketCode = ?',
               [extractedTicketCode]
             );
@@ -173,7 +197,7 @@ export default function ScannerScreen() {
                ticketCode: extractedTicketCode,
                guestName: 'Unknown',
                ticketType: '---',
-               concertName: MOCK_CONCERT.name,
+               concertName: concert.name,
                checkedInAt: checkedAt,
                status: 'NOT_FOUND',
              };
@@ -188,7 +212,7 @@ export default function ScannerScreen() {
                ticketCode: extractedTicketCode,
                guestName: localTicket.guestName,
                ticketType: localTicket.ticketType,
-               concertName: MOCK_CONCERT.name,
+               concertName: concert.name,
                checkedInAt: checkedAt,
                status: 'DUPLICATE',
              };
@@ -207,7 +231,7 @@ export default function ScannerScreen() {
             ticketId: localTicket.id,
             ticketCode: extractedTicketCode,
             qrCodeData: qrData,
-            concertId: MOCK_CONCERT.id,
+            concertId: concert.id,
             staffId,
             sourceDeviceId: deviceId,
             checkedAt,
@@ -225,7 +249,7 @@ export default function ScannerScreen() {
             ticketCode: extractedTicketCode,
             guestName: localTicket.guestName,
             ticketType: localTicket.ticketType,
-            concertName: MOCK_CONCERT.name,
+            concertName: concert.name,
             checkedInAt: checkedAt,
             status: 'TEMP_ACCEPTED',
           };
@@ -268,7 +292,7 @@ export default function ScannerScreen() {
       <View style={styles.topBar}>
         <View>
           <Text style={styles.liveTag}>LIVE · JUN 22</Text>
-          <Text style={styles.concertName}>{MOCK_CONCERT.name}</Text>
+          <Text style={styles.concertName}>{concert.name}</Text>
         </View>
         <View style={styles.statusPill}>
           <Animated.View style={[styles.statusDot, { opacity: pulseAnim, backgroundColor: isOffline ? COLORS.error : COLORS.primary }]} />
@@ -329,29 +353,8 @@ export default function ScannerScreen() {
         </View>
       </View>
 
-      {/* Actions */}
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity
-          style={styles.primaryActionBtn}
-          activeOpacity={0.8}
-          onPress={() => handleScan('TKB-2026-VIP-001')} // Mock trigger for simulator
-          disabled={scanning}
-        >
-          {scanning ? (
-             <Text style={styles.primaryActionTextBlack}>Scanning...</Text>
-          ) : (
-            <>
-              <Zap color="#000" size={18} strokeWidth={2.5} style={{ marginRight: 8 }} />
-              <Text style={styles.primaryActionTextBlack}>Scan QR Code</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.secondaryActionBtn} activeOpacity={0.8}>
-          <Search color={COLORS.textMuted} size={16} style={{ marginRight: 8 }} />
-          <Text style={styles.secondaryActionText}>Manual Lookup</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Spacer to push bottom nav down */}
+      <View style={{ flex: 1 }} />
 
       {/* Bottom Nav */}
       <View style={styles.bottomNav}>
@@ -503,7 +506,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   centerIcon: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
   },

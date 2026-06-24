@@ -7,10 +7,11 @@ import {
   StatusBar,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { CloudOff, ChevronLeft, RefreshCw } from 'lucide-react-native';
+import { CloudOff, ChevronLeft, RefreshCw, Trash2 } from 'lucide-react-native';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
 import { queueService } from '../services/queue';
 import { apiService } from '../services/api';
@@ -42,6 +43,24 @@ export default function OfflineQueueScreen() {
     synced: queue.filter((i) => i.syncStatus === 'SYNCED').length,
   };
 
+  const handleClearQueue = () => {
+    Alert.alert(
+      "Clear Queue",
+      "Are you sure you want to clear all offline scans? Unsynced data will be lost.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Clear", 
+          style: "destructive", 
+          onPress: async () => {
+            await queueService.clearQueue();
+            await loadQueue();
+          }
+        }
+      ]
+    );
+  };
+
   const unsyncedCount = counts.pending + counts.failed;
   const displayed = filter === 'unsynced' ? queue.filter(q => q.syncStatus !== 'SYNCED') : queue;
 
@@ -69,8 +88,14 @@ export default function OfflineQueueScreen() {
           db = require('../services/db').db;
         } catch (e) {}
 
+        let successCount = 0;
+        let failCount = 0;
+
         for (const res of response.data.results) {
           const item = toSync.find((i) => i.ticketId === res.ticketId);
+          if (res.status === 'SYNCED' || res.status === 'CONFLICT') successCount++;
+          else failCount++;
+
           if (item) {
             await queueService.updateItemStatus(item.id, res.status);
             if ((res.status === 'SYNCED' || res.status === 'CONFLICT') && db) {
@@ -80,6 +105,17 @@ export default function OfflineQueueScreen() {
                 console.error("Failed to update snapshot after sync", e);
               }
             }
+          }
+        }
+
+        if (db) {
+          try {
+            await db.runAsync(
+              'INSERT INTO sync_log (id, batchId, syncTime, totalItems, successCount, failCount, errorMessage) VALUES (?, ?, ?, ?, ?, ?, ?)',
+              [`sync-${Date.now()}`, `batch-${Date.now()}`, new Date().toISOString(), toSync.length, successCount, failCount, null]
+            );
+          } catch (e) {
+            console.error('Failed to insert sync_log', e);
           }
         }
       } else {
@@ -104,7 +140,7 @@ export default function OfflineQueueScreen() {
     const isRejected = item.syncStatus === 'REJECTED';
     const time = new Date(item.checkedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-    let statusColor = COLORS.warning;
+    let statusColor: string = COLORS.warning;
     let statusLabel = 'PENDING';
     if (isSynced) { statusColor = COLORS.success; statusLabel = 'SYNCED'; }
     if (isFailed) { statusColor = COLORS.error; statusLabel = 'FAILED'; }
@@ -146,6 +182,11 @@ export default function OfflineQueueScreen() {
           <ChevronLeft color={COLORS.textMuted} size={20} />
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
+        {queue.length > 0 && (
+          <TouchableOpacity onPress={handleClearQueue} style={{ marginLeft: 'auto' }}>
+            <Trash2 color={COLORS.error} size={20} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.titleContainer}>
