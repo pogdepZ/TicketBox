@@ -215,7 +215,7 @@ export class AiBioProcessor extends WorkerHost {
           this.config.timeoutMs,
         );
 
-        const rawText = response.response.text().trim();
+        const rawText = (response as any).response.text().trim();
         this.logger.log(`Gemini raw AI bio response: ${rawText}`);
 
         const cleanedText = this.cleanGeminiJsonResponse(rawText);

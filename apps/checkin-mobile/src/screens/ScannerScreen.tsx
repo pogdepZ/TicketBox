@@ -164,34 +164,32 @@ export default function ScannerScreen() {
              console.error("Offline verify error", e);
           }
 
-          if (!isValid) {
-             const notFoundTicket: TicketInfo = {
-               ticketId: 'unknown',
-               ticketCode: extractedTicketCode,
-               guestName: 'Unknown',
-               ticketType: '---',
-               concertName: concert.name,
-               checkedInAt: checkedAt,
-               status: 'NOT_FOUND',
-             };
-             navigation.navigate('Result', { ticket: notFoundTicket, isOffline: true });
-             setTimeout(() => setScanning(false), 2000);
-             return;
-          }
-
           let localTicket = null;
+          let localGuest = null;
           try {
             const { db } = require('../services/db');
-            const tickets: any[] = await db.getAllAsync(
-              'SELECT * FROM ticket_snapshot WHERE ticketCode = ?',
-              [extractedTicketCode]
-            );
-            if (tickets && tickets.length > 0) {
-              localTicket = tickets[0];
+            if (isValid) {
+              const tickets: any[] = await db.getAllAsync(
+                'SELECT * FROM ticket_snapshot WHERE ticketCode = ?',
+                [extractedTicketCode]
+              );
+              if (tickets && tickets.length > 0) {
+                localTicket = tickets[0];
+              }
+            } else {
+              // If not valid JWT, could be a Guest Code
+              const guests: any[] = await db.getAllAsync(
+                'SELECT * FROM guest_snapshot WHERE guestCode = ?',
+                [extractedTicketCode]
+              );
+              if (guests && guests.length > 0) {
+                localGuest = guests[0];
+                isValid = true; // Mark as valid guest code
+              }
             }
           } catch (e) {}
 
-          if (!localTicket) {
+          if (!isValid || (!localTicket && !localGuest)) {
              const notFoundTicket: TicketInfo = {
                ticketId: 'unknown',
                ticketCode: extractedTicketCode,
@@ -199,62 +197,114 @@ export default function ScannerScreen() {
                ticketType: '---',
                concertName: concert.name,
                checkedInAt: checkedAt,
-               status: 'NOT_FOUND',
+               status: isValid ? 'NOT_FOUND' : 'INVALID_GUEST',
              };
              navigation.navigate('Result', { ticket: notFoundTicket, isOffline: true });
              setTimeout(() => setScanning(false), 2000);
              return;
           }
 
-          if (localTicket.status === 'USED' || localTicket.status === 'TEMP_ACCEPTED') {
-             const duplicateTicket: TicketInfo = {
-               ticketId: localTicket.id,
-               ticketCode: extractedTicketCode,
-               guestName: localTicket.guestName,
-               ticketType: localTicket.ticketType,
-               concertName: concert.name,
-               checkedInAt: checkedAt,
-               status: 'DUPLICATE',
-             };
-             navigation.navigate('Result', { ticket: duplicateTicket, isOffline: true });
-             setTimeout(() => setScanning(false), 2000);
-             return;
+          if (localTicket) {
+            if (localTicket.status === 'USED' || localTicket.status === 'TEMP_ACCEPTED') {
+               const duplicateTicket: TicketInfo = {
+                 ticketId: localTicket.id,
+                 ticketCode: extractedTicketCode,
+                 guestName: localTicket.guestName,
+                 ticketType: localTicket.ticketType,
+                 seat: localTicket.seat || undefined,
+                 concertName: concert.name,
+                 checkedInAt: checkedAt,
+                 status: 'DUPLICATE',
+               };
+               navigation.navigate('Result', { ticket: duplicateTicket, isOffline: true });
+               setTimeout(() => setScanning(false), 2000);
+               return;
+            }
+
+            try {
+               const { db } = require('../services/db');
+               await db.runAsync('UPDATE ticket_snapshot SET status = ? WHERE ticketCode = ?', ['TEMP_ACCEPTED', extractedTicketCode]);
+            } catch (e) {}
+
+            const offlineItem: OfflineQueueItem = {
+              id: `q-${Date.now()}`,
+              ticketId: localTicket.id,
+              ticketCode: extractedTicketCode,
+              qrCodeData: qrData,
+              concertId: concert.id,
+              staffId,
+              sourceDeviceId: deviceId,
+              checkedAt,
+              syncStatus: 'PENDING',
+              syncAttempts: 0,
+              lastSyncError: null,
+              serverCheckinId: null,
+              createdAt: checkedAt,
+            };
+
+            await queueService.enqueue(offlineItem);
+
+            const displayTicket: TicketInfo = {
+              ticketId: localTicket.id,
+              ticketCode: extractedTicketCode,
+              guestName: localTicket.guestName,
+              ticketType: localTicket.ticketType,
+              seat: localTicket.seat || undefined,
+              concertName: concert.name,
+              checkedInAt: checkedAt,
+              status: 'TEMP_ACCEPTED',
+            };
+            navigation.navigate('Result', { ticket: displayTicket, isOffline: true });
+          } else if (localGuest) {
+            if (localGuest.status === 'CHECKED_IN' || localGuest.status === 'TEMP_ACCEPTED') {
+               const duplicateTicket: TicketInfo = {
+                 ticketId: localGuest.id,
+                 ticketCode: extractedTicketCode,
+                 guestName: localGuest.fullName,
+                 ticketType: 'GUEST',
+                 concertName: concert.name,
+                 checkedInAt: checkedAt,
+                 status: 'DUPLICATE_GUEST',
+               };
+               navigation.navigate('Result', { ticket: duplicateTicket, isOffline: true });
+               setTimeout(() => setScanning(false), 2000);
+               return;
+            }
+
+            try {
+               const { db } = require('../services/db');
+               await db.runAsync('UPDATE guest_snapshot SET status = ? WHERE guestCode = ?', ['TEMP_ACCEPTED', extractedTicketCode]);
+            } catch (e) {}
+
+            const offlineItem: OfflineQueueItem = {
+              id: `q-${Date.now()}`,
+              ticketId: localGuest.id,
+              ticketCode: extractedTicketCode,
+              qrCodeData: qrData,
+              concertId: concert.id,
+              staffId,
+              sourceDeviceId: deviceId,
+              checkedAt,
+              syncStatus: 'PENDING',
+              syncAttempts: 0,
+              lastSyncError: null,
+              serverCheckinId: null,
+              createdAt: checkedAt,
+            };
+
+            await queueService.enqueue(offlineItem);
+
+            const displayTicket: TicketInfo = {
+              ticketId: localGuest.id,
+              ticketCode: extractedTicketCode,
+              guestName: localGuest.fullName,
+              ticketType: 'GUEST',
+              concertName: concert.name,
+              checkedInAt: checkedAt,
+              status: 'ACCEPTED_GUEST',
+            };
+            navigation.navigate('Result', { ticket: displayTicket, isOffline: true });
           }
-
-          try {
-             const { db } = require('../services/db');
-             await db.runAsync('UPDATE ticket_snapshot SET status = ? WHERE ticketCode = ?', ['TEMP_ACCEPTED', extractedTicketCode]);
-          } catch (e) {}
-
-          const offlineItem: OfflineQueueItem = {
-            id: `q-${Date.now()}`,
-            ticketId: localTicket.id,
-            ticketCode: extractedTicketCode,
-            qrCodeData: qrData,
-            concertId: concert.id,
-            staffId,
-            sourceDeviceId: deviceId,
-            checkedAt,
-            syncStatus: 'PENDING',
-            syncAttempts: 0,
-            lastSyncError: null,
-            serverCheckinId: null,
-            createdAt: checkedAt,
-          };
-
-          await queueService.enqueue(offlineItem);
-
-          const displayTicket: TicketInfo = {
-            ticketId: localTicket.id,
-            ticketCode: extractedTicketCode,
-            guestName: localTicket.guestName,
-            ticketType: localTicket.ticketType,
-            concertName: concert.name,
-            checkedInAt: checkedAt,
-            status: 'TEMP_ACCEPTED',
-          };
-
-          navigation.navigate('Result', { ticket: displayTicket, isOffline: true });
         } else {
           Alert.alert('Lỗi quét vé', response.message || 'Lỗi không xác định');
         }

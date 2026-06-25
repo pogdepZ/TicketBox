@@ -59,6 +59,30 @@ const STATUS_CONFIG: Record<ScanStatus, { label: string; sublabel: string; color
     border: COLORS.error + '40',
     icon: XCircle,
   },
+  ACCEPTED_GUEST: {
+    label: 'GUEST ALLOWED',
+    sublabel: 'Allow entry (Guest List)',
+    color: COLORS.success,
+    bg: COLORS.success + '1A',
+    border: COLORS.success + '40',
+    icon: CheckCircle2,
+  },
+  DUPLICATE_GUEST: {
+    label: 'GUEST USED',
+    sublabel: 'Deny entry — guest already checked in',
+    color: COLORS.warning,
+    bg: COLORS.warning + '1A',
+    border: COLORS.warning + '40',
+    icon: AlertTriangle,
+  },
+  INVALID_GUEST: {
+    label: 'INVALID GUEST',
+    sublabel: 'Deny entry — not on guest list',
+    color: COLORS.error,
+    bg: COLORS.error + '1A',
+    border: COLORS.error + '40',
+    icon: XCircle,
+  },
 };
 
 // Helper for Mock Avatar
@@ -150,7 +174,7 @@ export default function ResultScreen() {
             </View>
             <View style={styles.seatInfo}>
               <Text style={styles.seatLabel}>Seat</Text>
-              <Text style={styles.seatValue}>A-14</Text> 
+              <Text style={styles.seatValue}>{ticket.seat || 'N/A'}</Text> 
             </View>
             <ChevronRight color={COLORS.textMuted} size={16} style={{ marginLeft: 4 }} />
           </TouchableOpacity>

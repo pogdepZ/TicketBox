@@ -11,7 +11,7 @@ export interface ApiResponse<T = unknown> {
 }
 
 /** Check-in scan result status */
-export type ScanStatus = 'SUCCESS' | 'DUPLICATE' | 'NOT_FOUND' | 'WRONG_EVENT' | 'TEMP_ACCEPTED';
+export type ScanStatus = 'SUCCESS' | 'DUPLICATE' | 'NOT_FOUND' | 'WRONG_EVENT' | 'TEMP_ACCEPTED' | 'ACCEPTED_GUEST' | 'DUPLICATE_GUEST' | 'INVALID_GUEST';
 
 /** Sync status for offline queue items */
 export type SyncStatus = 'PENDING' | 'SYNCED' | 'FAILED' | 'CONFLICT' | 'REJECTED';
@@ -25,6 +25,7 @@ export interface TicketInfo {
   guestName: string;
   ticketType: string;
   ticketCode: string;
+  seat?: string;
   concertName: string;
   checkedInAt: string;
   status: ScanStatus;
