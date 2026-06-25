@@ -5,29 +5,80 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-} from '@nestjs/common';
-import { createHash, randomUUID } from 'crypto';
-import { CreateConcertDto } from './dto/create-concert.dto';
-import { UpdateConcertDto } from './dto/update-concert.dto';
-import { CreateTicketTypeDto } from './dto/create-ticket-type.dto';
-import { UpdateTicketTypeDto } from './dto/update-ticket-type.dto';
-import { PrismaService } from '../../common/prisma/prisma.service';
+} from "@nestjs/common";
+import { createHash, randomUUID } from "crypto";
+import { CreateConcertDto } from "./dto/create-concert.dto";
+import { UpdateConcertDto } from "./dto/update-concert.dto";
+import { CreateTicketTypeDto } from "./dto/create-ticket-type.dto";
+import { UpdateTicketTypeDto } from "./dto/update-ticket-type.dto";
+import { PrismaService } from "../../common/prisma/prisma.service";
 import {
   Concert,
   ConcertStatus as PrismaConcertStatus,
   Prisma,
   ReservationStatus,
-} from '../../generated/prisma';
-import { QueryConcertDto } from './dto/query-concert.dto';
-import { ConcertResponseDto } from './dto/concert-response.dto';
-import { toPrismaConcertStatus } from './types/concert-status.type';
-import { CancelConcertDto } from './dto/cancel-concert.dto';
-import { RedisService } from '../../common/redis/redis.service';
-import { S3Service } from '../../common/s3/s3.service';
+} from "../../generated/prisma";
+import { QueryConcertDto } from "./dto/query-concert.dto";
+import { ConcertResponseDto } from "./dto/concert-response.dto";
+import { toPrismaConcertStatus } from "./types/concert-status.type";
+import { CancelConcertDto } from "./dto/cancel-concert.dto";
+import { RedisService } from "../../common/redis/redis.service";
+import { S3Service } from "../../common/s3/s3.service";
+import { UploadedFileDto } from "./dto/uploaded-file.dto";
 
 const CONCERT_CACHE_TTL_SECONDS = 300;
-const CONCERT_LIST_CACHE_KEY = 'cache:concert:list';
-const CONCERT_DETAIL_CACHE_KEY_PREFIX = 'cache:concert';
+const CONCERT_LIST_CACHE_KEY = "cache:concert:list";
+const CONCERT_DETAIL_CACHE_KEY_PREFIX = "cache:concert";
+const MAX_SEAT_MAP_SVG_BYTES = 1024 * 1024;
+const SVG_ALLOWED_TAGS = new Set([
+  "svg",
+  "g",
+  "path",
+  "rect",
+  "circle",
+  "ellipse",
+  "line",
+  "polyline",
+  "polygon",
+  "text",
+  "tspan",
+  "title",
+  "desc",
+]);
+const SVG_ALLOWED_ATTRIBUTES = new Set([
+  "id",
+  "class",
+  "viewBox",
+  "xmlns",
+  "x",
+  "y",
+  "x1",
+  "y1",
+  "x2",
+  "y2",
+  "cx",
+  "cy",
+  "r",
+  "rx",
+  "ry",
+  "d",
+  "points",
+  "width",
+  "height",
+  "fill",
+  "stroke",
+  "stroke-width",
+  "opacity",
+  "transform",
+  "font-size",
+  "text-anchor",
+  "data-zone-code",
+  "data-zone-name",
+  "data-ticket-name",
+  "data-total-quantity",
+  "data-price",
+  "data-max-per-user",
+]);
 
 type PaginatedConcerts = {
   items: ConcertResponseDto[];
@@ -37,6 +88,29 @@ type PaginatedConcerts = {
     total: number;
     totalPages: number;
   };
+};
+
+type ParsedSeatMapTicketType = {
+  name: string;
+  price: number;
+  totalQuantity: number;
+  maxPerUser: number;
+  zoneCode: string;
+  svgElementId: string;
+};
+
+type SanitizedSeatMapSvg = {
+  svg: string;
+  ticketTypes: ParsedSeatMapTicketType[];
+};
+
+type ConcertTicketTypeInput = {
+  name: string;
+  price: number;
+  totalQuantity: number;
+  maxPerUser?: number;
+  zoneCode?: string;
+  svgElementId?: string;
 };
 
 @Injectable()
@@ -57,13 +131,14 @@ export class ConcertService {
       return undefined;
     }
 
-    const isRawSvg = seatMapSvgOrUrl.trim().startsWith('<') && seatMapSvgOrUrl.includes('svg');
+    const isRawSvg =
+      seatMapSvgOrUrl.trim().startsWith("<") && seatMapSvgOrUrl.includes("svg");
     if (isRawSvg) {
       const s3Key = `concerts/${concertId}/seat-maps/map.svg`;
       return this.s3Service.uploadFile(
         s3Key,
-        Buffer.from(seatMapSvgOrUrl, 'utf-8'),
-        'image/svg+xml',
+        Buffer.from(seatMapSvgOrUrl, "utf-8"),
+        "image/svg+xml",
       );
     }
 
@@ -73,15 +148,33 @@ export class ConcertService {
   async create(
     createConcertDto: CreateConcertDto,
     createdById?: string,
+    seatMapSvgFile?: UploadedFileDto,
   ): Promise<ConcertResponseDto> {
-    const eventDate = this.parseDate(createConcertDto.eventDate, 'eventDate');
+    const eventDate = this.parseDate(createConcertDto.eventDate, "eventDate");
     this.validateEventDateInFuture(eventDate);
 
     const concertId = randomUUID();
+    const sanitizedSeatMap = seatMapSvgFile
+      ? this.validateSanitizeAndParseSeatMapSvg(seatMapSvgFile)
+      : undefined;
     let seatMapSvgUrl = undefined;
-    if (createConcertDto.seatMapSvg) {
-      seatMapSvgUrl = await this.uploadSeatMapSvgIfRaw(concertId, createConcertDto.seatMapSvg);
+    if (sanitizedSeatMap) {
+      seatMapSvgUrl = await this.uploadSeatMapSvgIfRaw(
+        concertId,
+        sanitizedSeatMap.svg,
+      );
+    } else if (createConcertDto.seatMapSvg) {
+      const sanitizedRawSvg = createConcertDto.seatMapSvg.trim().startsWith("<")
+        ? this.validateSanitizeAndParseSeatMapSvg(createConcertDto.seatMapSvg)
+            .svg
+        : createConcertDto.seatMapSvg;
+      seatMapSvgUrl = await this.uploadSeatMapSvgIfRaw(
+        concertId,
+        sanitizedRawSvg,
+      );
     }
+    const ticketTypes: ConcertTicketTypeInput[] =
+      sanitizedSeatMap?.ticketTypes ?? createConcertDto.ticketTypes ?? [];
 
     const concert = await this.prismaService.$transaction(async (tx) => {
       const createdConcert = await tx.concert.create({
@@ -100,10 +193,11 @@ export class ConcertService {
         },
       });
 
-      if (createConcertDto.ticketTypes && createConcertDto.ticketTypes.length > 0) {
-        for (let i = 0; i < createConcertDto.ticketTypes.length; i++) {
-          const tt = createConcertDto.ticketTypes[i];
-          const zoneCode = tt.name.replace(/\s+/g, '-').toLowerCase();
+      if (ticketTypes.length > 0) {
+        for (let i = 0; i < ticketTypes.length; i++) {
+          const tt = ticketTypes[i];
+          const zoneCode =
+            tt.zoneCode ?? tt.name.replace(/\s+/g, "-").toLowerCase();
 
           // 1. Create SeatZone
           const zone = await tx.seatZone.create({
@@ -111,7 +205,10 @@ export class ConcertService {
               concertId,
               code: zoneCode,
               name: tt.name.trim(),
-              color: ['#e5484d', '#e0a82e', '#3d6f8f', '#123c3a', '#64748b'][i % 5],
+              color: ["#e5484d", "#e0a82e", "#3d6f8f", "#123c3a", "#64748b"][
+                i % 5
+              ],
+              svgElementId: tt.svgElementId,
             },
           });
 
@@ -125,7 +222,7 @@ export class ConcertService {
               totalQuantity: tt.totalQuantity,
               remaining: tt.totalQuantity,
               maxPerUser: tt.maxPerUser ?? 4,
-              status: 'ACTIVE',
+              status: "ACTIVE",
             },
           });
         }
@@ -147,6 +244,186 @@ export class ConcertService {
     await this.invalidateConcertCache(concert!.id);
     // TODO: emit audit log event: concert.created.
     return this.toResponse(concert!);
+  }
+
+  private validateSanitizeAndParseSeatMapSvg(
+    input: UploadedFileDto | string,
+  ): SanitizedSeatMapSvg {
+    const rawSvg =
+      typeof input === "string" ? input : this.readSvgUpload(input);
+
+    if (!rawSvg.trim().startsWith("<svg") || !rawSvg.includes("</svg>")) {
+      throw new BadRequestException(
+        "Seat map must be a valid inline SVG document",
+      );
+    }
+
+    if (
+      /(<\s*(script|iframe|object|embed|foreignObject|image|use)\b)|on[a-z]+\s*=|javascript:|data:text\/html/i.test(
+        rawSvg,
+      )
+    ) {
+      throw new BadRequestException("Seat map SVG contains unsafe content");
+    }
+
+    const ticketTypes = this.parseTicketTypesFromSvg(rawSvg);
+    const sanitizedSvg = this.sanitizeSeatMapSvg(rawSvg);
+
+    return { svg: sanitizedSvg, ticketTypes };
+  }
+
+  private readSvgUpload(file: UploadedFileDto): string {
+    if (!file) {
+      throw new BadRequestException("SVG file is required");
+    }
+
+    if (file.size > MAX_SEAT_MAP_SVG_BYTES) {
+      throw new BadRequestException("Seat map SVG must not exceed 1 MB");
+    }
+
+    if (
+      file.mimetype !== "image/svg+xml" &&
+      !file.originalname.toLowerCase().endsWith(".svg")
+    ) {
+      throw new BadRequestException(
+        "Only .svg files are accepted for seat map upload",
+      );
+    }
+
+    return file.buffer.toString("utf-8");
+  }
+
+  private parseTicketTypesFromSvg(svg: string): ParsedSeatMapTicketType[] {
+    const zones = new Map<string, ParsedSeatMapTicketType>();
+    const tagRegex = /<([a-zA-Z][\w:-]*)([^>]*)>/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = tagRegex.exec(svg)) !== null) {
+      const attrs = this.parseSvgAttributes(match[2]);
+      const zoneCode = attrs["data-zone-code"];
+      const totalQuantity = Number(attrs["data-total-quantity"]);
+      const price = Number(attrs["data-price"]);
+
+      if (!zoneCode && !attrs["data-ticket-name"] && !attrs["data-zone-name"]) {
+        continue;
+      }
+
+      if (
+        !zoneCode ||
+        !Number.isInteger(totalQuantity) ||
+        totalQuantity < 1 ||
+        Number.isNaN(price) ||
+        price < 0
+      ) {
+        throw new BadRequestException(
+          "Each SVG ticket zone must include data-zone-code, data-total-quantity and data-price",
+        );
+      }
+
+      if (zones.has(zoneCode)) {
+        throw new BadRequestException(
+          `Duplicate SVG data-zone-code: ${zoneCode}`,
+        );
+      }
+
+      zones.set(zoneCode, {
+        zoneCode: this.normalizeZoneCode(zoneCode),
+        name: (
+          attrs["data-ticket-name"] ??
+          attrs["data-zone-name"] ??
+          zoneCode
+        ).trim(),
+        price,
+        totalQuantity,
+        maxPerUser: this.parseSvgPositiveInteger(
+          attrs["data-max-per-user"] ?? "4",
+          "data-max-per-user",
+        ),
+        svgElementId: attrs.id ?? zoneCode,
+      });
+    }
+
+    if (zones.size === 0) {
+      throw new BadRequestException(
+        "SVG must contain at least one ticket zone with data-* ticket metadata",
+      );
+    }
+
+    return [...zones.values()];
+  }
+
+  private sanitizeSeatMapSvg(svg: string): string {
+    return svg.replace(
+      /<\/?([a-zA-Z][\w:-]*)([^>]*)>/g,
+      (full, tagName: string, attrText: string) => {
+        if (full.startsWith("</")) {
+          return SVG_ALLOWED_TAGS.has(tagName) ? full : "";
+        }
+
+        if (!SVG_ALLOWED_TAGS.has(tagName)) {
+          return "";
+        }
+
+        const attrs = this.parseSvgAttributes(attrText);
+        const safeAttrs = Object.entries(attrs)
+          .filter(
+            ([name, value]) =>
+              SVG_ALLOWED_ATTRIBUTES.has(name) &&
+              !/^on/i.test(name) &&
+              !/javascript:|data:text\/html/i.test(value),
+          )
+          .map(([name, value]) => `${name}="${this.escapeSvgAttribute(value)}"`)
+          .join(" ");
+
+        const selfClosing = full.endsWith("/>") ? " /" : "";
+        return safeAttrs
+          ? `<${tagName} ${safeAttrs}${selfClosing}>`
+          : `<${tagName}${selfClosing}>`;
+      },
+    );
+  }
+
+  private parseSvgAttributes(attributeText: string): Record<string, string> {
+    const attrs: Record<string, string> = {};
+    const attrRegex = /([:\w-]+)\s*=\s*("([^"]*)"|'([^']*)')/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = attrRegex.exec(attributeText)) !== null) {
+      attrs[match[1]] = match[3] ?? match[4] ?? "";
+    }
+
+    return attrs;
+  }
+
+  private parseSvgPositiveInteger(
+    value: string,
+    attributeName: string,
+  ): number {
+    const parsed = Number(value);
+
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      throw new BadRequestException(
+        `${attributeName} must be a positive integer`,
+      );
+    }
+
+    return parsed;
+  }
+
+  private normalizeZoneCode(zoneCode: string): string {
+    return zoneCode
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, "-")
+      .slice(0, 50);
+  }
+
+  private escapeSvgAttribute(value: string): string {
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
   async findAll(query: QueryConcertDto): Promise<PaginatedConcerts> {
@@ -178,7 +455,7 @@ export class ConcertService {
         skip,
         take: limit,
         // Upcoming concerts are more useful first for ticket browsing and operations.
-        orderBy: [{ eventDate: 'asc' }, { createdAt: 'desc' }],
+        orderBy: [{ eventDate: "asc" }, { createdAt: "desc" }],
       }),
       this.prismaService.concert.count({ where }),
     ]);
@@ -207,14 +484,14 @@ export class ConcertService {
       include: {
         seatZones: {
           include: {
-            ticketTypes: true
-          }
-        }
-      }
+            ticketTypes: true,
+          },
+        },
+      },
     });
 
     if (!concert) {
-      throw new NotFoundException('Concert not found');
+      throw new NotFoundException("Concert not found");
     }
 
     const response = this.toResponse(concert);
@@ -252,7 +529,10 @@ export class ConcertService {
     this.assertCanUpdate(concert, updateConcertDto);
 
     if (updateConcertDto.seatMapSvg !== undefined) {
-      updateConcertDto.seatMapSvg = await this.uploadSeatMapSvgIfRaw(id, updateConcertDto.seatMapSvg);
+      updateConcertDto.seatMapSvg = await this.uploadSeatMapSvgIfRaw(
+        id,
+        updateConcertDto.seatMapSvg,
+      );
     }
 
     const data = this.buildUpdateData(concert, updateConcertDto);
@@ -270,7 +550,7 @@ export class ConcertService {
     const concert = await this.findConcertOrThrow(id);
 
     if (concert.status !== PrismaConcertStatus.DRAFT) {
-      throw new ConflictException('Only draft concerts can be published');
+      throw new ConflictException("Only draft concerts can be published");
     }
 
     this.validatePublishable(concert);
@@ -293,7 +573,7 @@ export class ConcertService {
     const concert = await this.findConcertOrThrow(id);
 
     if (concert.status === PrismaConcertStatus.COMPLETED) {
-      throw new ConflictException('Completed concerts cannot be cancelled');
+      throw new ConflictException("Completed concerts cannot be cancelled");
     }
 
     if (concert.status === PrismaConcertStatus.CANCELLED) {
@@ -315,11 +595,13 @@ export class ConcertService {
     const concert = await this.findConcertOrThrow(id);
 
     if (concert.status !== PrismaConcertStatus.PUBLISHED) {
-      throw new ConflictException('Only published concerts can be completed');
+      throw new ConflictException("Only published concerts can be completed");
     }
 
     if (concert.eventDate.getTime() > Date.now()) {
-      throw new BadRequestException('Concert can only be completed after eventDate');
+      throw new BadRequestException(
+        "Concert can only be completed after eventDate",
+      );
     }
 
     const updatedConcert = await this.prismaService.concert.update({
@@ -338,7 +620,7 @@ export class ConcertService {
     });
 
     if (!concert) {
-      throw new NotFoundException('Concert not found');
+      throw new NotFoundException("Concert not found");
     }
 
     return concert;
@@ -346,25 +628,25 @@ export class ConcertService {
 
   private validateEventDateInFuture(eventDate: Date): void {
     if (Number.isNaN(eventDate.getTime())) {
-      throw new BadRequestException('eventDate must be a valid date');
+      throw new BadRequestException("eventDate must be a valid date");
     }
 
     if (eventDate.getTime() <= Date.now()) {
-      throw new BadRequestException('eventDate must be greater than now');
+      throw new BadRequestException("eventDate must be greater than now");
     }
   }
 
   private validatePublishable(concert: Concert): void {
     if (!concert.name.trim()) {
-      throw new BadRequestException('Concert name is required');
+      throw new BadRequestException("Concert name is required");
     }
 
     if (!concert.venueName.trim()) {
-      throw new BadRequestException('Concert venueName is required');
+      throw new BadRequestException("Concert venueName is required");
     }
 
     if (!concert.venueAddress.trim()) {
-      throw new BadRequestException('Concert venueAddress is required');
+      throw new BadRequestException("Concert venueAddress is required");
     }
 
     this.validateEventDateInFuture(concert.eventDate);
@@ -382,22 +664,22 @@ export class ConcertService {
     if (keyword) {
       andConditions.push({
         OR: [
-          { name: { contains: keyword, mode: 'insensitive' } },
-          { artistName: { contains: keyword, mode: 'insensitive' } },
-          { venueName: { contains: keyword, mode: 'insensitive' } },
+          { name: { contains: keyword, mode: "insensitive" } },
+          { artistName: { contains: keyword, mode: "insensitive" } },
+          { venueName: { contains: keyword, mode: "insensitive" } },
         ],
       });
     }
 
     if (query.fromDate || query.toDate) {
-      const eventDate: Prisma.DateTimeFilter<'Concert'> = {};
+      const eventDate: Prisma.DateTimeFilter<"Concert"> = {};
 
       if (query.fromDate) {
-        eventDate.gte = this.parseDate(query.fromDate, 'fromDate');
+        eventDate.gte = this.parseDate(query.fromDate, "fromDate");
       }
 
       if (query.toDate) {
-        eventDate.lte = this.parseDate(query.toDate, 'toDate');
+        eventDate.lte = this.parseDate(query.toDate, "toDate");
       }
 
       andConditions.push({ eventDate });
@@ -416,7 +698,7 @@ export class ConcertService {
       concert.status === PrismaConcertStatus.COMPLETED
     ) {
       throw new ForbiddenException(
-        'Cancelled or completed concerts cannot be updated',
+        "Cancelled or completed concerts cannot be updated",
       );
     }
 
@@ -425,10 +707,10 @@ export class ConcertService {
     }
 
     const safePublishedFields: Array<keyof UpdateConcertDto> = [
-      'description',
-      'posterUrl',
-      'seatMapSvg',
-      'artistBio',
+      "description",
+      "posterUrl",
+      "seatMapSvg",
+      "artistBio",
     ];
     const updatedFields = Object.keys(dto) as Array<keyof UpdateConcertDto>;
     const invalidField = updatedFields.find(
@@ -466,7 +748,7 @@ export class ConcertService {
       }
 
       if (dto.eventDate !== undefined) {
-        const eventDate = this.parseDate(dto.eventDate, 'eventDate');
+        const eventDate = this.parseDate(dto.eventDate, "eventDate");
         this.validateEventDateInFuture(eventDate);
         data.eventDate = eventDate;
       }
@@ -515,9 +797,9 @@ export class ConcertService {
       toDate: query.toDate ?? null,
     };
 
-    const hash = createHash('sha1')
+    const hash = createHash("sha1")
       .update(JSON.stringify(normalizedQuery))
-      .digest('hex');
+      .digest("hex");
 
     return `${CONCERT_LIST_CACHE_KEY}:${hash}`;
   }
@@ -550,17 +832,17 @@ export class ConcertService {
         this.redisService.del(this.buildConcertDetailCacheKey(concertId)),
       ]);
     } catch (error) {
-      this.logger.warn(`Failed to invalidate concert cache for ${concertId}`, error);
+      this.logger.warn(
+        `Failed to invalidate concert cache for ${concertId}`,
+        error,
+      );
     }
   }
 
-  async createTicketType(
-    concertId: string,
-    dto: CreateTicketTypeDto,
-  ) {
+  async createTicketType(concertId: string, dto: CreateTicketTypeDto) {
     await this.findConcertOrThrow(concertId);
 
-    const zoneCode = dto.name.replace(/\s+/g, '-').toLowerCase();
+    const zoneCode = dto.name.replace(/\s+/g, "-").toLowerCase();
 
     const ticketType = await this.prismaService.$transaction(async (tx) => {
       // 1. Find or create SeatZone
@@ -576,7 +858,9 @@ export class ConcertService {
             concertId,
             code: zoneCode,
             name: dto.name.trim(),
-            color: ['#e5484d', '#e0a82e', '#3d6f8f', '#123c3a', '#64748b'][zonesCount % 5],
+            color: ["#e5484d", "#e0a82e", "#3d6f8f", "#123c3a", "#64748b"][
+              zonesCount % 5
+            ],
           },
         });
       }
@@ -593,7 +877,7 @@ export class ConcertService {
           maxPerUser: dto.maxPerUser,
           saleStartAt: dto.saleStartAt ? new Date(dto.saleStartAt) : null,
           saleEndAt: dto.saleEndAt ? new Date(dto.saleEndAt) : null,
-          status: 'ACTIVE',
+          status: "ACTIVE",
         },
       });
     });
@@ -614,20 +898,25 @@ export class ConcertService {
     });
 
     if (!ticketType) {
-      throw new NotFoundException('Ticket type not found');
+      throw new NotFoundException("Ticket type not found");
     }
 
-    const diff = dto.totalQuantity !== undefined ? dto.totalQuantity - ticketType.totalQuantity : 0;
+    const diff =
+      dto.totalQuantity !== undefined
+        ? dto.totalQuantity - ticketType.totalQuantity
+        : 0;
     const newRemaining = ticketType.remaining + diff;
     if (newRemaining < 0) {
-      throw new BadRequestException('Cannot reduce total quantity below currently sold tickets');
+      throw new BadRequestException(
+        "Cannot reduce total quantity below currently sold tickets",
+      );
     }
 
     const updated = await this.prismaService.$transaction(async (tx) => {
       // 1. Update SeatZone if name changed
       if (dto.name && ticketType.seatZoneId) {
         try {
-          const newCode = dto.name.replace(/\s+/g, '-').toLowerCase();
+          const newCode = dto.name.replace(/\s+/g, "-").toLowerCase();
           await tx.seatZone.update({
             where: { id: ticketType.seatZoneId },
             data: {
@@ -654,8 +943,18 @@ export class ConcertService {
           totalQuantity: dto.totalQuantity,
           remaining: dto.totalQuantity !== undefined ? newRemaining : undefined,
           maxPerUser: dto.maxPerUser,
-          saleStartAt: dto.saleStartAt !== undefined ? (dto.saleStartAt ? new Date(dto.saleStartAt) : null) : undefined,
-          saleEndAt: dto.saleEndAt !== undefined ? (dto.saleEndAt ? new Date(dto.saleEndAt) : null) : undefined,
+          saleStartAt:
+            dto.saleStartAt !== undefined
+              ? dto.saleStartAt
+                ? new Date(dto.saleStartAt)
+                : null
+              : undefined,
+          saleEndAt:
+            dto.saleEndAt !== undefined
+              ? dto.saleEndAt
+                ? new Date(dto.saleEndAt)
+                : null
+              : undefined,
         },
       });
     });
@@ -672,7 +971,7 @@ export class ConcertService {
     });
 
     if (!ticketType) {
-      throw new NotFoundException('Ticket type not found');
+      throw new NotFoundException("Ticket type not found");
     }
 
     const ticketsCount = await this.prismaService.ticket.count({
@@ -680,7 +979,9 @@ export class ConcertService {
     });
 
     if (ticketsCount > 0) {
-      throw new BadRequestException('Cannot delete ticket type that already has purchased tickets');
+      throw new BadRequestException(
+        "Cannot delete ticket type that already has purchased tickets",
+      );
     }
 
     await this.prismaService.$transaction(async (tx) => {
