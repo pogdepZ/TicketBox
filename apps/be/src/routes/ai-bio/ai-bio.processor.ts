@@ -38,10 +38,8 @@ export class AiBioProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
     private readonly s3Service: S3Service,
-    @Inject(geminiConfig
-    .KEY)
-    private readonly config: ConfigType<typeof geminiConfig
-  >,
+    @Inject(geminiConfig.KEY)
+    private readonly config: ConfigType<typeof geminiConfig>,
     @Inject(s3Config.KEY)
     private readonly s3Configuration: ConfigType<typeof s3Config>,
   ) {
@@ -124,13 +122,8 @@ export class AiBioProcessor extends WorkerHost {
       this.logger.error(`Failed to process AI Bio for asset ${assetId}`, error);
 
       try {
-        await this.prisma.artistAsset.update({
+        await this.prisma.artistAsset.delete({
           where: { id: assetId },
-          data: {
-            status: "FAILED",
-            errorMessage:
-              error instanceof Error ? error.message : String(error),
-          },
         });
 
         await this.prisma.concert.update({
