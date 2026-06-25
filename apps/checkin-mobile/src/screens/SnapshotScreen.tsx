@@ -15,6 +15,7 @@ import { ChevronLeft, Database, DownloadCloud } from 'lucide-react-native';
 import { db } from '../services/db';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
 import { apiService } from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SnapshotResponse } from '../types';
 
 export default function SnapshotScreen() {
@@ -57,7 +58,11 @@ export default function SnapshotScreen() {
           onPress: async () => {
             setLoading(true);
             try {
-              const concertId = '202dedd0-18dc-4d48-a652-d0ee8aa1f441'; 
+              const storedConcert = await AsyncStorage.getItem('selected_concert');
+              if (!storedConcert) {
+                throw new Error('No concert selected');
+              }
+              const concertId = JSON.parse(storedConcert).id;
               const res = await apiService.get<SnapshotResponse>(`/checkin/events/${concertId}/snapshot`);
               
               if (!res.success || !res.data) {
@@ -73,10 +78,11 @@ export default function SnapshotScreen() {
               `);
 
               const cachedAt = new Date().toISOString();
+              const concertObj = JSON.parse(storedConcert);
 
               await db.runAsync(
                 'INSERT INTO concert_cache (id, name, eventDate, venueName, cachedAt, publicKey, version) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [concertId, 'Neon Frequencies', '2026-06-22', 'The Warehouse', cachedAt, publicKey, version]
+                [concertId, concertObj.name || '', concertObj.eventDate || '', concertObj.venueName || '', cachedAt, publicKey, version]
               );
 
               for (const t of tickets) {
@@ -101,9 +107,9 @@ export default function SnapshotScreen() {
               console.log('---------------------------------');
 
               Alert.alert('Success', 'Snapshot downloaded successfully.');
-            } catch (e) {
+            } catch (e: any) {
               console.error(e);
-              Alert.alert('Error', 'Failed to save snapshot to local database.');
+              Alert.alert('Error', e.message || 'Failed to save snapshot to local database.');
             } finally {
               setLoading(false);
             }

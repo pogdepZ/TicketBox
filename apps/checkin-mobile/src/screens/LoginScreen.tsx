@@ -71,7 +71,7 @@ export default function LoginScreen() {
         // Set token for future API calls
         apiService.setToken(accessToken);
 
-        navigation.reset({ index: 0, routes: [{ name: 'Scanner' }] });
+        navigation.reset({ index: 0, routes: [{ name: 'EventSelector' }] });
       } else {
         Alert.alert('Đăng nhập thất bại', response.message || 'Email hoặc mật khẩu không đúng');
       }
@@ -94,7 +94,6 @@ export default function LoginScreen() {
         <View style={styles.topBar}>
           <View>
             <Text style={styles.kicker}>TICKETBOX GATE</Text>
-            <Text style={styles.shiftText}>Ca tối · Cổng A2</Text>
           </View>
           <View style={styles.networkBadge}>
             <View

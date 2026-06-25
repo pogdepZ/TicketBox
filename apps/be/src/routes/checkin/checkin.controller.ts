@@ -33,4 +33,10 @@ export class CheckinController {
   async getSnapshot(@Param('concertId') concertId: string) {
     return this.checkinService.getSnapshot(concertId);
   }
+
+  @Get('concerts')
+  @Roles('checker', 'admin')
+  async getConcerts() {
+    return this.checkinService.getConcerts();
+  }
 }

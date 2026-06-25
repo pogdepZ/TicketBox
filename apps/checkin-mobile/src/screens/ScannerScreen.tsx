@@ -51,12 +51,12 @@ export default function ScannerScreen() {
       let isMounted = true;
       const loadData = async () => {
         try {
-          const { db } = require('../services/db');
-          const cache: any[] = await db.getAllAsync('SELECT id, name FROM concert_cache LIMIT 1');
-          if (cache && cache.length > 0 && isMounted) {
-            setConcert({ id: cache[0].id, name: cache[0].name });
+          const storedConcert = await AsyncStorage.getItem('selected_concert');
+          if (storedConcert && isMounted) {
+            setConcert(JSON.parse(storedConcert));
           }
 
+          const { db } = require('../services/db');
           const totalRes: any[] = await db.getAllAsync('SELECT COUNT(*) as c FROM ticket_snapshot');
           const checkedRes: any[] = await db.getAllAsync('SELECT COUNT(*) as c FROM ticket_snapshot WHERE status IN ("USED", "TEMP_ACCEPTED")');
           
@@ -391,8 +391,10 @@ export default function ScannerScreen() {
       {/* Top bar */}
       <View style={styles.topBar}>
         <View>
-          <Text style={styles.liveTag}>LIVE · JUN 22</Text>
-          <Text style={styles.concertName}>{concert.name}</Text>
+          <Text style={styles.liveTag}>LIVE · {new Date().toDateString().split(' ').slice(1, 3).join(' ').toUpperCase()}</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('EventSelector')}>
+            <Text style={[styles.concertName, { textDecorationLine: 'underline' }]}>{concert.name} ▾</Text>
+          </TouchableOpacity>
         </View>
         <View style={styles.statusPill}>
           <Animated.View style={[styles.statusDot, { opacity: pulseAnim, backgroundColor: isOffline ? COLORS.error : COLORS.primary }]} />

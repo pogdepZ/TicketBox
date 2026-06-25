@@ -312,4 +312,25 @@ export class CheckinService {
       })),
     };
   }
+
+  async getConcerts() {
+    const concerts = await this.prisma.concert.findMany({
+      where: {
+        status: {
+          in: ['PUBLISHED'],
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        eventDate: true,
+        venueName: true,
+        posterUrl: true,
+      },
+      orderBy: {
+        eventDate: 'asc',
+      },
+    });
+    return concerts;
+  }
 }

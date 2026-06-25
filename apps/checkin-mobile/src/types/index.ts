@@ -117,9 +117,19 @@ export interface SnapshotResponse {
   }[];
 }
 
+/** Concert */
+export interface Concert {
+  id: string;
+  name: string;
+  eventDate: string;
+  venueName: string;
+  posterUrl: string | null;
+}
+
 /** Navigation params */
 export type RootStackParamList = {
   Login: undefined;
+  EventSelector: undefined;
   Scanner: undefined;
   Result: { ticket: TicketInfo; isOffline: boolean };
   OfflineQueue: undefined;
