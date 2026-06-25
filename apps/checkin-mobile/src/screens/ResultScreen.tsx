@@ -59,6 +59,14 @@ const STATUS_CONFIG: Record<ScanStatus, { label: string; sublabel: string; color
     border: COLORS.error + '40',
     icon: XCircle,
   },
+  WRONG_ZONE: {
+    label: 'WRONG ZONE',
+    sublabel: 'Deny entry — wrong gate/zone',
+    color: COLORS.error,
+    bg: COLORS.error + '1A',
+    border: COLORS.error + '40',
+    icon: XCircle,
+  },
   ACCEPTED_GUEST: {
     label: 'GUEST ALLOWED',
     sublabel: 'Allow entry (Guest List)',

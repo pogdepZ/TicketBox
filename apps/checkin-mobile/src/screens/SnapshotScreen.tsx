@@ -81,15 +81,15 @@ export default function SnapshotScreen() {
 
               for (const t of tickets) {
                 await db.runAsync(
-                  'INSERT INTO ticket_snapshot (id, ticketCode, concertId, status, guestName, ticketType, seat, syncedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                  [t.id, t.ticketCode, concertId, t.status, t.guestName, t.ticketType, t.seat || null, cachedAt]
+                  'INSERT INTO ticket_snapshot (id, ticketCode, concertId, status, guestName, ticketType, seat, allowedGates, syncedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                  [t.id, t.ticketCode, concertId, t.status, t.guestName, t.ticketType, t.seat || null, JSON.stringify(t.allowedGates || []), cachedAt]
                 );
               }
 
               for (const g of guests) {
                 await db.runAsync(
-                  'INSERT INTO guest_snapshot (id, guestCode, concertId, fullName, email, status, syncedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                  [g.id, g.guestCode, concertId, g.fullName, g.email || '', g.status, cachedAt]
+                  'INSERT INTO guest_snapshot (id, guestCode, concertId, fullName, email, status, allowedGates, syncedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                  [g.id, g.guestCode, concertId, g.fullName, g.email || '', g.status, JSON.stringify(g.allowedGates || []), cachedAt]
                 );
               }
 

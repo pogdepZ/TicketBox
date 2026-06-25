@@ -31,6 +31,7 @@ const STATUS_CONFIG = {
   DUPLICATE: { label: 'ALREADY USED', dot: COLORS.warning, bg: COLORS.warning + '1A', border: COLORS.warning + '40', color: COLORS.warning },
   NOT_FOUND: { label: 'INVALID', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
   WRONG_EVENT: { label: 'INVALID', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
+  WRONG_ZONE: { label: 'WRONG ZONE', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
 };
 
 export default function ScannerScreen() {
@@ -40,6 +41,7 @@ export default function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   
   const [concert, setConcert] = useState({ id: '', name: 'No Active Concert' });
+  const [selectedGate, setSelectedGate] = useState<string | null>(null);
   const [checkedIn, setCheckedIn] = useState(0);
   const [total, setTotal] = useState(0);
   const pct = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
@@ -115,6 +117,7 @@ export default function ScannerScreen() {
         concertId: concert.id,
         deviceId,
         clientEventId: `scan-${Date.now()}`,
+        gate: selectedGate || undefined,
       };
 
       const response = await apiService.post<TicketInfo>('/checkin/scan', payload);
@@ -205,6 +208,29 @@ export default function ScannerScreen() {
           }
 
           if (localTicket) {
+            let allowedGates: string[] = [];
+            try {
+              if (localTicket.allowedGates) {
+                allowedGates = JSON.parse(localTicket.allowedGates);
+              }
+            } catch (e) {}
+
+            if (selectedGate && allowedGates.length > 0 && !allowedGates.includes(selectedGate)) {
+               const wrongZoneTicket: TicketInfo = {
+                 ticketId: localTicket.id,
+                 ticketCode: extractedTicketCode,
+                 guestName: localTicket.guestName,
+                 ticketType: localTicket.ticketType,
+                 seat: localTicket.seat || undefined,
+                 concertName: concert.name,
+                 checkedInAt: checkedAt,
+                 status: 'WRONG_ZONE',
+               };
+               navigation.navigate('Result', { ticket: wrongZoneTicket, isOffline: true });
+               setTimeout(() => setScanning(false), 2000);
+               return;
+            }
+
             if (localTicket.status === 'USED' || localTicket.status === 'TEMP_ACCEPTED') {
                const duplicateTicket: TicketInfo = {
                  ticketId: localTicket.id,
@@ -240,6 +266,7 @@ export default function ScannerScreen() {
               lastSyncError: null,
               serverCheckinId: null,
               createdAt: checkedAt,
+              gate: selectedGate || undefined,
             };
 
             await queueService.enqueue(offlineItem);
@@ -256,6 +283,28 @@ export default function ScannerScreen() {
             };
             navigation.navigate('Result', { ticket: displayTicket, isOffline: true });
           } else if (localGuest) {
+            let allowedGates: string[] = [];
+            try {
+              if (localGuest.allowedGates) {
+                allowedGates = JSON.parse(localGuest.allowedGates);
+              }
+            } catch (e) {}
+
+            if (selectedGate && allowedGates.length > 0 && !allowedGates.includes(selectedGate)) {
+               const wrongZoneTicket: TicketInfo = {
+                 ticketId: localGuest.id,
+                 ticketCode: extractedTicketCode,
+                 guestName: localGuest.fullName,
+                 ticketType: 'GUEST',
+                 concertName: concert.name,
+                 checkedInAt: checkedAt,
+                 status: 'WRONG_ZONE',
+               };
+               navigation.navigate('Result', { ticket: wrongZoneTicket, isOffline: true });
+               setTimeout(() => setScanning(false), 2000);
+               return;
+            }
+
             if (localGuest.status === 'CHECKED_IN' || localGuest.status === 'TEMP_ACCEPTED') {
                const duplicateTicket: TicketInfo = {
                  ticketId: localGuest.id,
@@ -290,6 +339,7 @@ export default function ScannerScreen() {
               lastSyncError: null,
               serverCheckinId: null,
               createdAt: checkedAt,
+              gate: selectedGate || undefined,
             };
 
             await queueService.enqueue(offlineItem);
@@ -371,6 +421,28 @@ export default function ScannerScreen() {
       {/* Progress bar */}
       <View style={styles.progressBarBg}>
         <View style={[styles.progressBarFill, { width: `${pct}%` }]} />
+      </View>
+
+      {/* Gate Selector */}
+      <View style={styles.gateSelectorContainer}>
+        <TouchableOpacity 
+          style={styles.gateSelectorBtn} 
+          onPress={() => {
+            Alert.alert(
+              'Select Gate',
+              'Choose your assigned gate for checking tickets',
+              [
+                { text: 'Gate A', onPress: () => setSelectedGate('Gate A') },
+                { text: 'Gate B', onPress: () => setSelectedGate('Gate B') },
+                { text: 'All Gates (Admin)', onPress: () => setSelectedGate(null) }
+              ]
+            );
+          }}
+        >
+          <Text style={styles.gateSelectorText}>
+            📍 Current Gate: <Text style={{ color: COLORS.primary, fontWeight: '700' }}>{selectedGate || 'All Gates'}</Text>
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Viewfinder */}
@@ -511,8 +583,28 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderRadius: 2,
   },
-  viewfinderWrapper: {
+  gateSelectorContainer: {
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.md,
+  },
+  gateSelectorBtn: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gateSelectorText: {
+    color: COLORS.text,
+    fontSize: FONT_SIZES.md,
+  },
+  viewfinderWrapper: {
+    flex: 1,
+    paddingHorizontal: SPACING.xl,
     marginBottom: SPACING.lg,
   },
   viewfinderContainer: {

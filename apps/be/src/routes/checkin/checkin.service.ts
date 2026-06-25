@@ -59,7 +59,12 @@ export class CheckinService {
         let checkinResult: 'ACCEPTED' | 'DUPLICATE' | 'REJECTED' = 'REJECTED';
         let returnStatus = 'REJECTED';
 
-        if (currentTicket.status === 'USED') {
+        const ticketGateCheck = ticket.ticketType?.allowedGates || [];
+        
+        if (dto.gate && ticketGateCheck.length > 0 && !ticketGateCheck.includes(dto.gate)) {
+          checkinResult = 'REJECTED';
+          returnStatus = 'WRONG_ZONE';
+        } else if (currentTicket.status === 'USED') {
           checkinResult = 'DUPLICATE';
           returnStatus = 'DUPLICATE';
         } else if (currentTicket.status !== 'ACTIVE') {
@@ -136,7 +141,12 @@ export class CheckinService {
         let checkinResult: 'ACCEPTED' | 'DUPLICATE' | 'REJECTED' = 'REJECTED';
         let returnStatus = 'REJECTED';
 
-        if (currentGuest.status === 'CHECKED_IN') {
+        const guestGateCheck = currentGuest.allowedGates || [];
+        
+        if (dto.gate && guestGateCheck.length > 0 && !guestGateCheck.includes(dto.gate)) {
+          checkinResult = 'REJECTED';
+          returnStatus = 'WRONG_ZONE';
+        } else if (currentGuest.status === 'CHECKED_IN') {
           checkinResult = 'DUPLICATE';
           returnStatus = 'DUPLICATE_GUEST';
         } else if (currentGuest.status !== 'ACTIVE') {
@@ -290,6 +300,7 @@ export class CheckinService {
         guestName: t.owner?.fullName || 'Khách Hàng',
         ticketType: t.ticketType?.name || '---',
         seat: t.seatNumber || null,
+        allowedGates: t.ticketType?.allowedGates || [],
       })),
       guests: guests.map((g) => ({
         id: g.id,
@@ -297,6 +308,7 @@ export class CheckinService {
         fullName: g.fullName,
         email: g.email || null,
         status: g.status,
+        allowedGates: g.allowedGates || [],
       })),
     };
   }

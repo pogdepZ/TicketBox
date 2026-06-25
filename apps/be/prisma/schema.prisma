@@ -313,6 +313,8 @@ model TicketType {
   saleStartAt DateTime? @map("sale_start_at") @db.Timestamptz(6)
   saleEndAt   DateTime? @map("sale_end_at") @db.Timestamptz(6)
 
+  allowedGates String[] @default([]) @map("allowed_gates")
+
   status TicketTypeStatus @default(ACTIVE)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -689,6 +691,8 @@ model GuestList {
   phone     String? @db.VarChar(20)
   guestType String? @map("guest_type") @db.VarChar(50)
   guestCode String  @map("guest_code") @db.VarChar(50)
+
+  allowedGates String[] @default([]) @map("allowed_gates")
 
   status GuestStatus @default(ACTIVE)
 

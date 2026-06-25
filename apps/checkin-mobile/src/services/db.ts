@@ -7,7 +7,7 @@ export const initDb = () => {
   const { user_version: currentDbVersion } = db.getFirstSync<{ user_version: number }>('PRAGMA user_version') || { user_version: 0 };
 
   // Mục tiêu version của code hiện tại
-  const TARGET_DB_VERSION = 8;
+  const TARGET_DB_VERSION = 9;
 
   if (currentDbVersion >= TARGET_DB_VERSION) {
     // Đã ở version mới nhất, không cần migrate
@@ -48,6 +48,7 @@ export const initDb = () => {
           guestName TEXT,
           ticketType TEXT,
           seat TEXT,
+          allowedGates TEXT,
           syncedAt TEXT NOT NULL
         );
         
@@ -58,6 +59,7 @@ export const initDb = () => {
           fullName TEXT NOT NULL,
           email TEXT,
           status TEXT NOT NULL,
+          allowedGates TEXT,
           syncedAt TEXT NOT NULL
         );
         
