@@ -4,39 +4,39 @@
  */
 
 export const COLORS = {
-  primary: '#12B981',
-  primaryLight: '#7DD3BC',
-  primaryDark: '#047857',
+  primary: '#34d399', // emerald-400
+  primaryLight: '#6ee7b7', // emerald-300
+  primaryDark: '#059669', // emerald-600
 
-  success: '#22C55E',
-  successLight: '#86EFAC',
-  successDark: '#15803D',
+  success: '#34d399', // emerald-400
+  successLight: '#6ee7b7',
+  successDark: '#059669',
 
-  error: '#F43F5E',
-  errorLight: '#FDA4AF',
-  errorDark: '#BE123C',
+  error: '#f87171', // red-400
+  errorLight: '#fca5a5',
+  errorDark: '#dc2626',
 
-  warning: '#F59E0B',
-  warningLight: '#FCD34D',
-  warningDark: '#B45309',
+  warning: '#fbbf24', // amber-400
+  warningLight: '#fcd34d',
+  warningDark: '#d97706',
 
-  info: '#38BDF8',
+  info: '#38bdf8', // sky-400
 
-  background: '#09110F',
-  backgroundSecondary: '#0E1916',
-  surface: '#14211E',
-  surfaceLight: '#1B2C28',
-  surfaceRaised: '#233832',
+  background: '#080808', // pure dark
+  backgroundSecondary: '#141414', // secondary dark
+  surface: '#18181b', // zinc-900 / card
+  surfaceLight: '#27272a', // zinc-800
+  surfaceRaised: '#27272a',
 
-  text: '#F4FBF8',
-  textSecondary: '#B7C9C2',
-  textMuted: '#789189',
+  text: '#ffffff', // pure white foreground
+  textSecondary: '#d4d4d8', // zinc-300
+  textMuted: '#a1a1aa', // zinc-400
 
-  border: '#243A35',
-  borderLight: '#36544D',
+  border: 'rgba(255, 255, 255, 0.15)', // transparent border
+  borderLight: 'rgba(255, 255, 255, 0.08)',
 
-  online: '#22C55E',
-  offline: '#F43F5E',
+  online: '#34d399',
+  offline: '#f87171',
 } as const;
 
 export const FONT_SIZES = {

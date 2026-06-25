@@ -32,20 +32,7 @@ const navigationTheme = {
 };
 
 const screenOptions = {
-  headerStyle: {
-    backgroundColor: COLORS.backgroundSecondary,
-  },
-  headerTintColor: COLORS.text,
-  headerTitleStyle: {
-    fontWeight: '600' as const,
-    fontSize: FONT_SIZES.lg,
-  },
-  headerShadowVisible: false,
-  headerBackTitle: '',
-  headerTitleAlign: 'left' as const,
-  headerTitleContainerStyle: {
-    paddingLeft: SPACING.xs,
-  },
+  headerShown: false,
   contentStyle: {
     backgroundColor: COLORS.background,
   },

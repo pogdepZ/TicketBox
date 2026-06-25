@@ -1,18 +1,43 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
 import { ScanCheckinDto } from './dto/scan-checkin.dto';
 import { SyncCheckinDto } from './dto/sync-checkin.dto';
+import * as jwt from 'jsonwebtoken';
 
 @Injectable()
 export class CheckinService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(CheckinService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private config: ConfigService,
+  ) {}
 
   async scan(dto: ScanCheckinDto) {
     const { qrCodeData, staffId, concertId, deviceId, clientEventId } = dto;
 
-    // 1. Resolve ticket by qrCodeData (assuming ticketCode for now)
+    let extractedTicketCode = qrCodeData;
+    const ticketSecret = this.config.get<string>('JWT_TICKET_SECRET', 'ticket-secret');
+
+    // 1. Verify JWS and extract ticket_code
+    try {
+      const decoded = jwt.verify(qrCodeData, ticketSecret) as any;
+      if (decoded && decoded.ticket_code) {
+        extractedTicketCode = decoded.ticket_code;
+      }
+    } catch (e: any) {
+      this.logger.warn(`Failed to verify JWT for checkin: ${e.message}`);
+      return {
+        ticketId: 'unknown',
+        status: 'INVALID_TICKET',
+        checkedInAt: new Date().toISOString(),
+      };
+    }
+
+    // 2. Resolve ticket
     const ticket = await this.prisma.ticket.findUnique({
-      where: { ticketCode: qrCodeData },
+      where: { ticketCode: extractedTicketCode },
       include: {
         order: true,
       },
@@ -20,8 +45,8 @@ export class CheckinService {
     
     if (!ticket || ticket.order.concertId !== concertId) {
       return {
-        ticketId: 'unknown',
-        status: 'NOT_FOUND',
+        ticketId: ticket ? ticket.id : 'unknown',
+        status: 'INVALID_CONCERT',
         checkedInAt: new Date().toISOString(),
       };
     }
@@ -41,13 +66,13 @@ export class CheckinService {
 
       if (currentTicket.status === 'USED') {
         checkinResult = 'DUPLICATE';
-        returnStatus = 'DUPLICATE';
+        returnStatus = 'ALREADY_CHECKED_IN';
       } else if (currentTicket.status !== 'ACTIVE') {
         checkinResult = 'REJECTED';
-        returnStatus = 'NOT_FOUND'; // Or a specific status like INVALID
+        returnStatus = 'INVALID_TICKET';
       } else {
         checkinResult = 'ACCEPTED';
-        returnStatus = 'SUCCESS';
+        returnStatus = 'ACCEPTED';
         
         // Update ticket
         await tx.ticket.update({
@@ -61,6 +86,7 @@ export class CheckinService {
         });
       }
 
+      const checkedInAt = new Date();
       // Record the checkin event
       await tx.checkinEvent.create({
         data: {
@@ -70,14 +96,14 @@ export class CheckinService {
           clientEventId: clientEventId || `scan-${Date.now()}`,
           mode: 'ONLINE',
           result: checkinResult,
-          scannedAtClient: new Date(),
+          scannedAtClient: checkedInAt,
         },
       });
 
       return {
         ticketId: ticket.id,
         status: returnStatus,
-        checkedInAt: new Date().toISOString(),
+        checkedInAt: checkedInAt.toISOString(),
         guestName: 'Guest (Resolved)', // Normally resolved from ticket.owner
         ticketType: 'Resolved Type',
         ticketCode: ticket.ticketCode,
@@ -92,17 +118,48 @@ export class CheckinService {
     // Process each item
     for (const item of dto.items) {
       try {
+        // Idempotency check: see if this exact event was already processed
+        if (item.clientEventId) {
+          const existingEvent = await this.prisma.checkinEvent.findUnique({
+            where: {
+              deviceId_clientEventId: {
+                deviceId: item.sourceDeviceId,
+                clientEventId: item.clientEventId,
+              },
+            },
+          });
+
+          if (existingEvent) {
+            results.push({
+              ticketId: item.ticketId,
+              status: 'SYNCED', // Already synced previously
+              serverId: existingEvent.id,
+              originalStatus: existingEvent.result,
+            });
+            continue;
+          }
+        }
+
         const result = await this.scan({
           qrCodeData: item.qrCodeData,
           staffId: item.staffId,
           concertId: item.concertId,
           deviceId: item.sourceDeviceId,
-          clientEventId: `sync-${item.ticketId}-${item.checkedAt}`,
+          clientEventId: item.clientEventId, // Use provided event ID
         });
+
+        let syncStatus = 'FAILED';
+        if (result.status === 'ACCEPTED') {
+          syncStatus = 'SYNCED';
+        } else if (result.status === 'ALREADY_CHECKED_IN') {
+          syncStatus = 'CONFLICT';
+        } else {
+          syncStatus = 'REJECTED';
+        }
 
         results.push({
           ticketId: item.ticketId,
-          status: result.status === 'SUCCESS' || result.status === 'DUPLICATE' ? 'SYNCED' : 'FAILED',
+          status: syncStatus,
           serverId: `server-${Date.now()}`,
           originalStatus: result.status,
         });
@@ -118,5 +175,51 @@ export class CheckinService {
     }
 
     return { results };
+  }
+
+  async getSnapshot(concertId: string) {
+    const tickets = await this.prisma.ticket.findMany({
+      where: {
+        concertId,
+        status: {
+          in: ['ACTIVE', 'USED'],
+        },
+      },
+      include: {
+        ticketType: true,
+        owner: true,
+      },
+    });
+
+    const guests = await this.prisma.guestList.findMany({
+      where: {
+        concertId,
+        status: {
+          in: ['ACTIVE', 'CHECKED_IN'],
+        },
+      },
+    });
+
+    const ticketSecret = this.config.get<string>('JWT_TICKET_SECRET', 'ticket-secret');
+    const version = Date.now().toString();
+
+    return {
+      version,
+      publicKey: ticketSecret,
+      tickets: tickets.map((t) => ({
+        id: t.id,
+        ticketCode: t.ticketCode,
+        status: t.status,
+        guestName: t.owner?.fullName || 'Khách Hàng',
+        ticketType: t.ticketType?.name || '---',
+      })),
+      guests: guests.map((g) => ({
+        id: g.id,
+        guestCode: g.guestCode,
+        fullName: g.fullName,
+        email: g.email || null,
+        status: g.status,
+      })),
+    };
   }
 }

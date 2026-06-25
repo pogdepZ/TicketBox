@@ -115,7 +115,7 @@ export default function LoginScreen() {
               <Text style={styles.logoMark}>TB</Text>
             </View>
             <View style={styles.eventPill}>
-              <Text style={styles.eventPillText}>SKY TOUR 2026</Text>
+              <Text style={styles.eventPillText}>STAFF PORTAL</Text>
             </View>
           </View>
           <Text style={styles.logoTitle}>Mở ca check-in</Text>
@@ -157,23 +157,6 @@ export default function LoginScreen() {
             loading={loading}
             style={{ marginTop: SPACING.lg }}
           />
-        </View>
-
-        <View style={styles.shiftPanel}>
-          <View style={styles.shiftMetric}>
-            <Text style={styles.shiftMetricValue}>A2</Text>
-            <Text style={styles.shiftMetricLabel}>Cổng</Text>
-          </View>
-          <View style={styles.shiftDivider} />
-          <View style={styles.shiftMetric}>
-            <Text style={styles.shiftMetricValue}>19:00</Text>
-            <Text style={styles.shiftMetricLabel}>Mở cửa</Text>
-          </View>
-          <View style={styles.shiftDivider} />
-          <View style={styles.shiftMetric}>
-            <Text style={styles.shiftMetricValue}>0</Text>
-            <Text style={styles.shiftMetricLabel}>Chưa sync</Text>
-          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -1,9 +1,4 @@
-/**
- * SettingsScreen
- * - Display basic settings/info
- */
-
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,25 +6,48 @@ import {
   Alert,
   StatusBar,
   ScrollView,
+  TouchableOpacity,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { ChevronLeft, LogOut, Database, User, Bell, Smartphone, Cloud, Info } from 'lucide-react-native';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
-import { Button } from '../components';
 import type { RootStackParamList } from '../types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
 
 export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const [notifications, setNotifications] = useState(true);
+  const [haptics, setHaptics] = useState(true);
+  const [autoSync, setAutoSync] = useState(true);
+  const [userName, setUserName] = useState('Staff Member');
+  const [userRole, setUserRole] = useState('Gate Operator');
+
+  React.useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const userStr = await AsyncStorage.getItem('auth_user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          setUserName(user.fullName || user.email || 'Staff Member');
+          setUserRole(user.role || 'Gate Operator');
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    loadUser();
+  }, []);
 
   const handleLogout = async () => {
-    Alert.alert('Đăng xuất', 'Bạn có chắc muốn đăng xuất?', [
-      { text: 'Hủy', style: 'cancel' },
+    Alert.alert('Logout', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Đăng xuất',
+        text: 'Logout',
         style: 'destructive',
         onPress: async () => {
           await AsyncStorage.multiRemove(['auth_token', 'auth_user']);
@@ -48,76 +66,116 @@ export default function SettingsScreen() {
         console.log(`${key}:`, value);
       });
       console.log('--------------------------');
-      Alert.alert('Log thành công', 'Mở Terminal/Console của Expo để xem chi tiết dữ liệu nhé!');
+      Alert.alert('Storage Dumped', 'Check terminal logs.');
     } catch (error) {
       console.error('Error reading AsyncStorage:', error);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>NV</Text>
-          </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.userName}>Nhân viên soát vé</Text>
-            <Text style={styles.userRole}>Đang trực cổng check-in</Text>
-          </View>
-          <View style={styles.profileBadge}>
-            <Text style={styles.profileBadgeText}>A2</Text>
-          </View>
-        </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <ChevronLeft color={COLORS.textMuted} size={20} />
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
+      </View>
 
+      <View style={styles.titleContainer}>
+        <Text style={styles.subtitle}>CONFIGURATION</Text>
+        <Text style={styles.title}>Settings</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        
+        {/* Account Settings */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin</Text>
-          <SettingRow label="Phiên bản" value="1.0.0" />
-          <SettingRow label="Device ID" value="device-A" />
-          <SettingRow label="Server" value="localhost:3000" />
-          <SettingRow label="Concert hiện tại" value="Sky Tour 2026" />
+          <Text style={styles.sectionTitle}>Account</Text>
+          <View style={styles.card}>
+            <View style={styles.profileRow}>
+              <View style={styles.avatar}>
+                <User color={COLORS.primary} size={20} />
+              </View>
+              <View style={styles.profileInfo}>
+                <Text style={styles.userName}>{userName}</Text>
+                <Text style={styles.userRole}>{userRole}</Text>
+              </View>
+            </View>
+            <View style={styles.divider} />
+            <TouchableOpacity style={styles.actionRow} onPress={handleLogout}>
+              <LogOut color={COLORS.error} size={18} style={{ marginRight: 12 }} />
+              <Text style={styles.actionTextError}>Sign Out</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
+        {/* App Settings */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Dữ liệu</Text>
-          <SettingRow label="Offline Queue" value="5 items" />
-          <SettingRow label="Cache concert" value="1 concert" />
-          <SettingRow label="Sync lần cuối" value="07/06/2026 20:00" />
+          <Text style={styles.sectionTitle}>Preferences</Text>
+          <View style={styles.card}>
+            <SettingToggle 
+              icon={<Bell color={COLORS.textMuted} size={18} />} 
+              label="Push Notifications" 
+              value={notifications} 
+              onValueChange={setNotifications} 
+            />
+            <View style={styles.divider} />
+            <SettingToggle 
+              icon={<Smartphone color={COLORS.textMuted} size={18} />} 
+              label="Haptic Feedback" 
+              value={haptics} 
+              onValueChange={setHaptics} 
+            />
+            <View style={styles.divider} />
+            <SettingToggle 
+              icon={<Cloud color={COLORS.textMuted} size={18} />} 
+              label="Background Auto-Sync" 
+              value={autoSync} 
+              onValueChange={setAutoSync} 
+            />
+          </View>
         </View>
 
-        <View style={{ marginTop: SPACING.xxxl }}>
-          <Button
-            title="📥 Tải dữ liệu Offline (Snapshot)"
-            onPress={() => navigation.navigate('Snapshot')}
-            variant="primary"
-            style={{ marginBottom: SPACING.md }}
-          />
-          <Button
-            title="🔍 In dữ liệu lưu trữ (Console)"
-            onPress={debugStorage}
-            variant="secondary"
-            style={{ marginBottom: SPACING.md }}
-          />
-          <Button
-            title="Đăng xuất"
-            onPress={handleLogout}
-            variant="ghost"
-            style={{ borderWidth: 1, borderColor: COLORS.error }}
-            textStyle={{ color: COLORS.error }}
-          />
+        {/* Database / Debug */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>System Data</Text>
+          <View style={styles.card}>
+            <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('Snapshot')}>
+              <Database color={COLORS.info} size={18} style={{ marginRight: 12 }} />
+              <View>
+                <Text style={styles.actionText}>Download Offline Snapshot</Text>
+                <Text style={styles.actionSubtext}>Update local database for offline scanning</Text>
+              </View>
+            </TouchableOpacity>
+            <View style={styles.divider} />
+            <TouchableOpacity style={styles.actionRow} onPress={debugStorage}>
+              <Info color={COLORS.textMuted} size={18} style={{ marginRight: 12 }} />
+              <Text style={styles.actionText}>Dump Storage (Debug)</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function SettingRow({ label, value }: { label: string; value: string }) {
+function SettingToggle({ icon, label, value, onValueChange }: { icon: React.ReactNode, label: string, value: boolean, onValueChange: (v: boolean) => void }) {
   return (
-    <View style={styles.settingRow}>
-      <Text style={styles.settingLabel}>{label}</Text>
-      <Text style={styles.settingValue}>{value}</Text>
+    <View style={styles.settingToggleRow}>
+      <View style={styles.settingToggleLeft}>
+        {icon}
+        <Text style={styles.settingToggleLabel}>{label}</Text>
+      </View>
+      <Switch 
+        value={value} 
+        onValueChange={onValueChange} 
+        trackColor={{ false: COLORS.surfaceLight, true: COLORS.primary }}
+        thumbColor="#FFFFFF"
+      />
     </View>
   );
 }
@@ -127,84 +185,128 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  content: {
-    paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING.lg,
-    paddingBottom: SPACING.xxxl,
-  },
-  profileCard: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.lg,
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.lg,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backText: {
+    color: COLORS.textMuted,
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  titleContainer: {
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.md,
+  },
+  subtitle: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    letterSpacing: 1.5,
+    marginBottom: 2,
+    fontFamily: 'monospace',
+  },
+  title: {
+    color: COLORS.text,
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  content: {
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.xxxl,
+  },
+  section: {
+    marginBottom: SPACING.xl,
+  },
+  sectionTitle: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  card: {
     backgroundColor: COLORS.backgroundSecondary,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginLeft: 46, // align with text
+  },
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
   },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: COLORS.primaryDark,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING.md,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.primary + '1A',
     borderWidth: 1,
-    borderColor: COLORS.primary,
-  },
-  avatarText: {
-    color: COLORS.text,
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '900',
+    borderColor: COLORS.primary + '33',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
   },
   profileInfo: {
     flex: 1,
   },
   userName: {
     color: COLORS.text,
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
   },
   userRole: {
-    color: COLORS.primaryLight,
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-    marginTop: SPACING.xs,
-  },
-  profileBadge: {
-    width: 42,
-    height: 34,
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: COLORS.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  profileBadgeText: {
-    color: COLORS.text,
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '900',
-  },
-  section: {
-    paddingTop: SPACING.xl,
-  },
-  sectionTitle: {
     color: COLORS.textMuted,
-    fontSize: FONT_SIZES.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: SPACING.md,
+    fontSize: 12,
+    marginTop: 2,
   },
-  settingRow: {
+  actionRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    padding: 16,
   },
-  settingLabel: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.md,
-    flex: 1,
+  actionTextError: {
+    color: COLORS.error,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  actionText: {
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  actionSubtext: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  settingToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  settingToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  settingToggleLabel: {
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: '500',
+    marginLeft: 12,
   },
 });
