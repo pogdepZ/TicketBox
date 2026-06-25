@@ -33,17 +33,22 @@ export class ConcertController {
   @Post()
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermissions("concert:create")
-  @UseInterceptors(FileInterceptor("file"))
   create(
     @Body() createConcertDto: CreateConcertDto,
-    @UploadedFile() seatMapSvgFile?: UploadedFileDto,
     @CurrentUser() user?: AuthUser,
   ) {
-    return this.concertService.create(
-      createConcertDto,
-      user?.id,
-      seatMapSvgFile,
-    );
+    return this.concertService.create(createConcertDto, user?.id);
+  }
+
+  @Post(":id/seat-map-svg")
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermissions("ticket_type:manage")
+  @UseInterceptors(FileInterceptor("file"))
+  uploadSeatMapSvg(
+    @Param("id") id: string,
+    @UploadedFile() seatMapSvgFile?: UploadedFileDto,
+  ) {
+    return this.concertService.uploadSeatMapSvg(id, seatMapSvgFile);
   }
 
   @Get()

@@ -33,7 +33,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { ConfirmModal } from "@/components/confirm-modal";
-import { DatePicker, TimePicker, DateTimePicker } from "@/components/date-time-picker";
+import {
+  DatePicker,
+  TimePicker,
+  DateTimePicker,
+} from "@/components/date-time-picker";
 
 interface AdminConcertDetailPageProps {
   params: Promise<{
@@ -68,7 +72,6 @@ export default function AdminConcertDetailPage({
   const [editVenueName, setEditVenueName] = useState("");
   const [editVenueAddress, setEditVenueAddress] = useState("");
   const [editPosterUrl, setEditPosterUrl] = useState("");
-  const [editSeatMapSvg, setEditSeatMapSvg] = useState("");
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
 
@@ -96,8 +99,9 @@ export default function AdminConcertDetailPage({
   const [guestError, setGuestError] = useState("");
   const [importResult, setImportResult] = useState<any>(null);
 
-  const isPublished = concert?.status === 'PUBLISHED';
-  const isCancelledOrCompleted = concert?.status === 'CANCELLED' || concert?.status === 'COMPLETED';
+  const isPublished = concert?.status === "PUBLISHED";
+  const isCancelledOrCompleted =
+    concert?.status === "CANCELLED" || concert?.status === "COMPLETED";
   const isBasicInfoReadOnly = isPublished || isCancelledOrCompleted;
 
   async function refreshTicketTypes() {
@@ -145,7 +149,6 @@ export default function AdminConcertDetailPage({
         setEditVenueName(concertData.venue || "");
         setEditVenueAddress(concertData.city || "");
         setEditPosterUrl(concertData.image || "");
-        setEditSeatMapSvg(concertData.seatMapSvgUrl || "");
 
         if (concertData.date) {
           const d = new Date(concertData.date);
@@ -276,7 +279,6 @@ export default function AdminConcertDetailPage({
         payload = {
           description: editDescription.trim() || undefined,
           posterUrl: editPosterUrl.trim() || undefined,
-          seatMapSvg: editSeatMapSvg.trim() || undefined,
         };
       } else {
         const parsedDate = new Date(`${editEventDate}T${editEventTime}`);
@@ -288,7 +290,6 @@ export default function AdminConcertDetailPage({
           venueAddress: editVenueAddress.trim(),
           eventDate: parsedDate.toISOString(),
           posterUrl: editPosterUrl.trim() || undefined,
-          seatMapSvg: editSeatMapSvg.trim() || undefined,
         };
       }
 
@@ -564,22 +565,24 @@ export default function AdminConcertDetailPage({
                 <h1 className="text-3xl font-black text-foreground">
                   {concert.title}
                 </h1>
-                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
-                  concert.status === 'PUBLISHED' 
-                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                    : concert.status === 'DRAFT'
-                    ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                    : concert.status === 'CANCELLED'
-                    ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
-                    : 'bg-zinc-500/10 text-zinc-500 border border-zinc-500/20'
-                }`}>
-                  {concert.status === 'PUBLISHED' 
-                    ? 'Đã xuất bản' 
-                    : concert.status === 'DRAFT' 
-                    ? 'Bản nháp' 
-                    : concert.status === 'CANCELLED'
-                    ? 'Đã hủy'
-                    : 'Đã hoàn thành'}
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                    concert.status === "PUBLISHED"
+                      ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                      : concert.status === "DRAFT"
+                        ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                        : concert.status === "CANCELLED"
+                          ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                          : "bg-zinc-500/10 text-zinc-500 border border-zinc-500/20"
+                  }`}
+                >
+                  {concert.status === "PUBLISHED"
+                    ? "Đã xuất bản"
+                    : concert.status === "DRAFT"
+                      ? "Bản nháp"
+                      : concert.status === "CANCELLED"
+                        ? "Đã hủy"
+                        : "Đã hoàn thành"}
                 </span>
               </div>
               <p className="text-muted-foreground mt-1">
@@ -785,25 +788,6 @@ export default function AdminConcertDetailPage({
                 </div>
               </div>
 
-              <div className="border-t border-border pt-6">
-                <h3 className="mb-2 text-base font-black text-foreground">
-                  Sơ đồ chỗ ngồi (Tùy chọn)
-                </h3>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Bạn có thể dán đoạn mã SVG thiết kế sơ đồ ghế vào ô dưới đây
-                  (ví dụ: &lt;svg&gt;...&lt;/svg&gt;).
-                </p>
-                <div>
-                  <textarea
-                    placeholder="Dán mã SVG sơ đồ ghế tại đây..."
-                    value={editSeatMapSvg}
-                    onChange={(e) => setEditSeatMapSvg(e.target.value)}
-                    rows={3}
-                    className="w-full font-mono text-xs rounded-2xl border border-border bg-background px-4 py-3 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15"
-                  />
-                </div>
-              </div>
-
               {editError && (
                 <div className="flex gap-2 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive font-semibold">
                   <AlertCircle className="size-5 flex-shrink-0 mt-0.5" />
@@ -818,7 +802,9 @@ export default function AdminConcertDetailPage({
                     disabled={editLoading}
                     className="rounded-full bg-primary px-8 py-3 font-bold text-primary-foreground transition hover:bg-primary/90 active:translate-y-px disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    {editLoading && <RefreshCw className="size-4 animate-spin" />}
+                    {editLoading && (
+                      <RefreshCw className="size-4 animate-spin" />
+                    )}
                     Lưu thay đổi
                   </button>
                 )}
@@ -954,9 +940,51 @@ export default function AdminConcertDetailPage({
 
             {/* List */}
             <div className="lg:col-span-2 rounded-[2rem] border border-border bg-card p-6 shadow-sm overflow-hidden">
-              <h2 className="text-xl font-black text-foreground mb-6">
-                Các hạng vé hiện có
-              </h2>
+              <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-black text-foreground">
+                    Các hạng vé hiện có
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {concert?.seatMapSvgUrl
+                      ? "Hạng vé được đồng bộ từ sơ đồ SVG đã tải lên."
+                      : "Chưa có sơ đồ SVG, bạn có thể cấu hình hạng vé thủ công."}
+                  </p>
+                </div>
+                {concert?.seatMapSvgUrl && (
+                  <a
+                    href={concert.seatMapSvgUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full border border-border px-4 py-2 text-sm font-bold text-foreground transition hover:border-primary/50 hover:text-primary"
+                  >
+                    Mở SVG
+                  </a>
+                )}
+              </div>
+
+              {concert?.seatMapSvgUrl && (
+                <div className="mb-6 overflow-hidden rounded-3xl border border-border bg-muted/30 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-foreground">
+                        Preview sơ đồ ghế SVG
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Dùng để đối chiếu các zone và số ghế đã import.
+                      </p>
+                    </div>
+                    <FileText className="size-5 text-muted-foreground" />
+                  </div>
+                  <div className="max-h-[420px] overflow-auto rounded-2xl bg-background p-3">
+                    <img
+                      src={concert.seatMapSvgUrl}
+                      alt={`Sơ đồ ghế ${concert.title || "sự kiện"}`}
+                      className="mx-auto max-h-[380px] w-full object-contain"
+                    />
+                  </div>
+                </div>
+              )}
 
               {ticketTypes.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">

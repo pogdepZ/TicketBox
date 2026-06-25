@@ -78,6 +78,7 @@ const SVG_ALLOWED_ATTRIBUTES = new Set([
   "data-total-quantity",
   "data-price",
   "data-max-per-user",
+  "data-seat-number",
 ]);
 
 type PaginatedConcerts = {
@@ -97,11 +98,19 @@ type ParsedSeatMapTicketType = {
   maxPerUser: number;
   zoneCode: string;
   svgElementId: string;
+  seatNumbers: string[];
+};
+
+type ParsedSeatMapSeat = {
+  zoneCode: string;
+  seatNumber: string;
+  svgElementId?: string;
 };
 
 type SanitizedSeatMapSvg = {
   svg: string;
   ticketTypes: ParsedSeatMapTicketType[];
+  seats: ParsedSeatMapSeat[];
 };
 
 type ConcertTicketTypeInput = {
@@ -148,22 +157,13 @@ export class ConcertService {
   async create(
     createConcertDto: CreateConcertDto,
     createdById?: string,
-    seatMapSvgFile?: UploadedFileDto,
   ): Promise<ConcertResponseDto> {
     const eventDate = this.parseDate(createConcertDto.eventDate, "eventDate");
     this.validateEventDateInFuture(eventDate);
 
     const concertId = randomUUID();
-    const sanitizedSeatMap = seatMapSvgFile
-      ? this.validateSanitizeAndParseSeatMapSvg(seatMapSvgFile)
-      : undefined;
     let seatMapSvgUrl = undefined;
-    if (sanitizedSeatMap) {
-      seatMapSvgUrl = await this.uploadSeatMapSvgIfRaw(
-        concertId,
-        sanitizedSeatMap.svg,
-      );
-    } else if (createConcertDto.seatMapSvg) {
+    if (createConcertDto.seatMapSvg) {
       const sanitizedRawSvg = createConcertDto.seatMapSvg.trim().startsWith("<")
         ? this.validateSanitizeAndParseSeatMapSvg(createConcertDto.seatMapSvg)
             .svg
@@ -174,7 +174,7 @@ export class ConcertService {
       );
     }
     const ticketTypes: ConcertTicketTypeInput[] =
-      sanitizedSeatMap?.ticketTypes ?? createConcertDto.ticketTypes ?? [];
+      createConcertDto.ticketTypes ?? [];
 
     const concert = await this.prismaService.$transaction(async (tx) => {
       const createdConcert = await tx.concert.create({
@@ -246,6 +246,93 @@ export class ConcertService {
     return this.toResponse(concert!);
   }
 
+  async uploadSeatMapSvg(
+    concertId: string,
+    seatMapSvgFile?: UploadedFileDto,
+  ): Promise<ConcertResponseDto> {
+    if (!seatMapSvgFile) {
+      throw new BadRequestException("Seat map SVG file is required");
+    }
+
+    const concert = await this.findConcertOrThrow(concertId);
+
+    if (concert.status !== PrismaConcertStatus.DRAFT) {
+      throw new ConflictException(
+        "Seat map SVG can only be uploaded for draft concerts",
+      );
+    }
+
+    const parsedSeatMap =
+      this.validateSanitizeAndParseSeatMapSvg(seatMapSvgFile);
+    const seatMapSvgUrl = await this.uploadSeatMapSvgIfRaw(
+      concertId,
+      parsedSeatMap.svg,
+    );
+
+    const updatedConcert = await this.prismaService.$transaction(async (tx) => {
+      const [ticketsCount, reservationsCount] = await Promise.all([
+        tx.ticket.count({ where: { concertId } }),
+        tx.reservation.count({ where: { concertId } }),
+      ]);
+
+      if (ticketsCount > 0 || reservationsCount > 0) {
+        throw new ConflictException(
+          "Cannot replace seat map after tickets or reservations exist",
+        );
+      }
+
+      await tx.ticketType.deleteMany({ where: { concertId } });
+      await tx.seatZone.deleteMany({ where: { concertId } });
+
+      await tx.concert.update({
+        where: { id: concertId },
+        data: { seatMapSvgUrl },
+      });
+
+      for (let i = 0; i < parsedSeatMap.ticketTypes.length; i++) {
+        const tt = parsedSeatMap.ticketTypes[i];
+        const zone = await tx.seatZone.create({
+          data: {
+            concertId,
+            code: tt.zoneCode,
+            name: tt.name,
+            color: ["#e5484d", "#e0a82e", "#3d6f8f", "#123c3a", "#64748b"][
+              i % 5
+            ],
+            svgElementId: tt.svgElementId,
+          },
+        });
+
+        await tx.ticketType.create({
+          data: {
+            concertId,
+            seatZoneId: zone.id,
+            name: tt.name,
+            price: tt.price,
+            totalQuantity: tt.totalQuantity,
+            remaining: tt.totalQuantity,
+            maxPerUser: tt.maxPerUser,
+            status: "ACTIVE",
+          },
+        });
+      }
+
+      return tx.concert.findUnique({
+        where: { id: concertId },
+        include: {
+          seatZones: {
+            include: {
+              ticketTypes: true,
+            },
+          },
+        },
+      });
+    });
+
+    await this.invalidateConcertCache(concertId);
+    return this.toResponse(updatedConcert!);
+  }
+
   private validateSanitizeAndParseSeatMapSvg(
     input: UploadedFileDto | string,
   ): SanitizedSeatMapSvg {
@@ -266,10 +353,10 @@ export class ConcertService {
       throw new BadRequestException("Seat map SVG contains unsafe content");
     }
 
-    const ticketTypes = this.parseTicketTypesFromSvg(rawSvg);
+    const parsedSeatMap = this.parseTicketTypesFromSvg(rawSvg);
     const sanitizedSvg = this.sanitizeSeatMapSvg(rawSvg);
 
-    return { svg: sanitizedSvg, ticketTypes };
+    return { svg: sanitizedSvg, ...parsedSeatMap };
   }
 
   private readSvgUpload(file: UploadedFileDto): string {
@@ -293,30 +380,79 @@ export class ConcertService {
     return file.buffer.toString("utf-8");
   }
 
-  private parseTicketTypesFromSvg(svg: string): ParsedSeatMapTicketType[] {
-    const zones = new Map<string, ParsedSeatMapTicketType>();
+  private parseTicketTypesFromSvg(svg: string): {
+    ticketTypes: ParsedSeatMapTicketType[];
+    seats: ParsedSeatMapSeat[];
+  } {
+    const zones = new Map<
+      string,
+      Omit<ParsedSeatMapTicketType, "totalQuantity" | "seatNumbers"> & {
+        declaredTotalQuantity?: number;
+      }
+    >();
+    const seatsByZone = new Map<string, ParsedSeatMapSeat[]>();
+    const seenSeats = new Set<string>();
     const tagRegex = /<([a-zA-Z][\w:-]*)([^>]*)>/g;
     let match: RegExpExecArray | null;
 
     while ((match = tagRegex.exec(svg)) !== null) {
       const attrs = this.parseSvgAttributes(match[2]);
-      const zoneCode = attrs["data-zone-code"];
-      const totalQuantity = Number(attrs["data-total-quantity"]);
-      const price = Number(attrs["data-price"]);
+      const rawZoneCode = attrs["data-zone-code"];
+      const zoneCode = rawZoneCode
+        ? this.normalizeZoneCode(rawZoneCode)
+        : undefined;
+      const seatNumber = attrs["data-seat-number"]?.trim();
 
-      if (!zoneCode && !attrs["data-ticket-name"] && !attrs["data-zone-name"]) {
+      if (
+        !zoneCode &&
+        !seatNumber &&
+        !attrs["data-ticket-name"] &&
+        !attrs["data-zone-name"]
+      ) {
         continue;
       }
 
+      if (seatNumber) {
+        if (!zoneCode) {
+          throw new BadRequestException(
+            "Each SVG seat must include data-zone-code and data-seat-number",
+          );
+        }
+
+        const seatKey = `${zoneCode}:${seatNumber}`;
+        if (seenSeats.has(seatKey)) {
+          throw new BadRequestException(
+            `Duplicate SVG seat number ${seatNumber} in zone ${zoneCode}`,
+          );
+        }
+
+        seenSeats.add(seatKey);
+        const seat: ParsedSeatMapSeat = {
+          zoneCode,
+          seatNumber,
+          svgElementId: attrs.id,
+        };
+        seatsByZone.set(zoneCode, [...(seatsByZone.get(zoneCode) ?? []), seat]);
+        continue;
+      }
+
+      const totalQuantity = attrs["data-total-quantity"]
+        ? Number(attrs["data-total-quantity"])
+        : undefined;
+      const price = Number(attrs["data-price"]);
+
+      if (!zoneCode || Number.isNaN(price) || price < 0) {
+        throw new BadRequestException(
+          "Each SVG ticket zone must include data-zone-code and data-price",
+        );
+      }
+
       if (
-        !zoneCode ||
-        !Number.isInteger(totalQuantity) ||
-        totalQuantity < 1 ||
-        Number.isNaN(price) ||
-        price < 0
+        totalQuantity !== undefined &&
+        (!Number.isInteger(totalQuantity) || totalQuantity < 1)
       ) {
         throw new BadRequestException(
-          "Each SVG ticket zone must include data-zone-code, data-total-quantity and data-price",
+          "data-total-quantity must be a positive integer",
         );
       }
 
@@ -327,19 +463,19 @@ export class ConcertService {
       }
 
       zones.set(zoneCode, {
-        zoneCode: this.normalizeZoneCode(zoneCode),
+        zoneCode,
         name: (
           attrs["data-ticket-name"] ??
           attrs["data-zone-name"] ??
-          zoneCode
+          rawZoneCode
         ).trim(),
         price,
-        totalQuantity,
         maxPerUser: this.parseSvgPositiveInteger(
           attrs["data-max-per-user"] ?? "4",
           "data-max-per-user",
         ),
         svgElementId: attrs.id ?? zoneCode,
+        declaredTotalQuantity: totalQuantity,
       });
     }
 
@@ -349,7 +485,49 @@ export class ConcertService {
       );
     }
 
-    return [...zones.values()];
+    if (seenSeats.size === 0) {
+      throw new BadRequestException(
+        "SVG must contain seats with data-zone-code and data-seat-number",
+      );
+    }
+
+    const ticketTypes = [...zones.values()].map((zone) => {
+      const seats = seatsByZone.get(zone.zoneCode) ?? [];
+      if (seats.length === 0) {
+        throw new BadRequestException(
+          `SVG zone ${zone.zoneCode} must contain at least one seat`,
+        );
+      }
+
+      if (
+        zone.declaredTotalQuantity !== undefined &&
+        zone.declaredTotalQuantity !== seats.length
+      ) {
+        throw new BadRequestException(
+          `SVG zone ${zone.zoneCode} data-total-quantity does not match seat count`,
+        );
+      }
+
+      const { declaredTotalQuantity: _declaredTotalQuantity, ...ticketType } =
+        zone;
+
+      return {
+        ...ticketType,
+        totalQuantity: seats.length,
+        seatNumbers: seats.map((seat) => seat.seatNumber),
+      };
+    });
+
+    const unknownSeatZone = [...seatsByZone.keys()].find(
+      (zoneCode) => !zones.has(zoneCode),
+    );
+    if (unknownSeatZone) {
+      throw new BadRequestException(
+        `SVG seat references unknown zone ${unknownSeatZone}`,
+      );
+    }
+
+    return { ticketTypes, seats: [...seatsByZone.values()].flat() };
   }
 
   private sanitizeSeatMapSvg(svg: string): string {
