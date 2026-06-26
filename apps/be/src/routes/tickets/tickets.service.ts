@@ -234,7 +234,7 @@ export class TicketsService {
         ...(!isAdmin ? { ownerUserId: requestingUser.id } : {}),
       },
       include: {
-        ticketType: { select: { name: true } },
+        ticketType: { select: { name: true, price: true } },
       },
     });
   }

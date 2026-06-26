@@ -4,13 +4,12 @@ import { useEffect, useState } from 'react';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { ETicketCard } from '@/components/eticket-card';
-import { getStoredMockOrders, StoredMockOrder } from '@/lib/mock-reservation';
-import { getProfile } from '@/lib/api';
+import { getProfile, getUserOrders } from '@/lib/api';
 import Link from 'next/link';
 import { Ticket, ArrowRight, UserCheck } from 'lucide-react';
 
 export default function MyTicketsPage() {
-  const [orders, setOrders] = useState<StoredMockOrder[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -21,8 +20,8 @@ export default function MyTicketsPage() {
         if (token) {
           const profile = await getProfile();
           setSession(profile);
-          const storedOrders = getStoredMockOrders();
-          setOrders(storedOrders);
+          const realOrders = await getUserOrders();
+          setOrders(realOrders);
         }
       } catch (err: any) {
         if (err?.statusCode !== 401) {
@@ -74,15 +73,20 @@ export default function MyTicketsPage() {
     );
   }
 
-  const allTickets = orders.flatMap(order => 
-    order.tickets.map(ticket => ({
-      ...ticket,
-      concertTitle: order.concertTitle,
-      concertVenue: order.concertVenue,
-      orderNumber: order.orderNumber,
-      paidAt: order.paidAt,
-    }))
-  );
+  const allTickets = orders
+    .filter(order => order.status === 'PAID')
+    .flatMap(order => {
+      const tickets = order.tickets || [];
+      const orderId = order.id || (order as any).orderId || '';
+      const orderNumber = order.orderNumber || (orderId ? orderId.substring(0, 8).toUpperCase() : 'UNKNOWN');
+      return tickets.map((ticket: any) => ({
+        ...ticket,
+        concertTitle: order.concertTitle,
+        concertVenue: order.concertVenue || "Nhà hát Hòa Bình, TP. Hồ Chí Minh",
+        orderNumber: orderNumber,
+        paidAt: order.paidAt || new Date().toISOString(),
+      }));
+    });
 
   return (
     <main className="min-h-screen bg-background flex flex-col">

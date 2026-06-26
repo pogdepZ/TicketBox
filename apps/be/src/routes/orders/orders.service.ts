@@ -7,21 +7,21 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-} from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { RedisService } from '../../common/redis/redis.service';
-import { IdempotencyService } from './idempotency.service';
-import { TicketInventoryService } from './ticket-inventory.service';
-import { OrderTransactionHelper } from './order-transaction.helper';
-import { CreateOrderDto } from './dto/create-order.dto';
+} from "@nestjs/common";
+import { PrismaService } from "../../common/prisma/prisma.service";
+import { RedisService } from "../../common/redis/redis.service";
+import { IdempotencyService } from "./idempotency.service";
+import { TicketInventoryService } from "./ticket-inventory.service";
+import { OrderTransactionHelper } from "./order-transaction.helper";
+import { CreateOrderDto } from "./dto/create-order.dto";
 import {
   OrderDetailResponseDto,
   OrderItemResponseDto,
   OrderResponseDto,
   decimalToString,
-} from './dto/order-response.dto';
-import { AuthUser } from '../auth/dto/user-response.dto';
-import { TicketsService } from '../tickets/tickets.service';
+} from "./dto/order-response.dto";
+import { AuthUser } from "../auth/dto/user-response.dto";
+import { TicketsService } from "../tickets/tickets.service";
 import {
   IdempotencyStatus,
   Order,
@@ -29,11 +29,11 @@ import {
   OrderStatus,
   ReservationStatus,
   TicketType,
-} from '../../generated/prisma';
+} from "../../generated/prisma";
 import {
   getPaymentGraceUntil,
   RESERVATION_TTL_MINUTES,
-} from './order-expiration.constants';
+} from "./order-expiration.constants";
 
 /** Rate limit: tối đa 5 lần tạo order / 300 giây mỗi user */
 const RATE_LIMIT_CAPACITY = 5;
@@ -63,8 +63,8 @@ export class OrdersService {
     idempotencyKey: string | undefined,
   ): Promise<OrderResponseDto> {
     // Bước 1: bắt buộc Idempotency-Key
-    if (!idempotencyKey || idempotencyKey.trim() === '') {
-      throw new BadRequestException('Idempotency-Key is required');
+    if (!idempotencyKey || idempotencyKey.trim() === "") {
+      throw new BadRequestException("Idempotency-Key is required");
     }
 
     const requestHash = this.idempotency.computeRequestHash(user.id, dto);
@@ -92,27 +92,43 @@ export class OrdersService {
 
     // Bước 4: Đánh dấu PROCESSING (chặn concurrent duplicate với cùng key)
     try {
-      await this.idempotency.markProcessing(idempotencyKey, requestHash, user.id);
+      await this.idempotency.markProcessing(
+        idempotencyKey,
+        requestHash,
+        user.id,
+      );
     } catch {
       // Unique constraint violation: request đang được xử lý
       throw new ConflictException({
-        message: 'Request is already being processed',
+        message: "Request is already being processed",
         key: idempotencyKey,
       });
     }
 
     try {
-      const responseBody = await this.runCreateOrderTransaction(user, dto, idempotencyKey);
+      const responseBody = await this.runCreateOrderTransaction(
+        user,
+        dto,
+        idempotencyKey,
+      );
 
       // Sau khi DB transaction thành công, set thêm Redis key cho từng ghế
       const redisTTL = RESERVATION_TTL_MINUTES * 60; // 10 * 60 = 600s
-      const normalizedSeats = dto.seatNumbers.map((s) => s.trim().toUpperCase());
+      const normalizedSeats = dto.seatNumbers.map((s) =>
+        s.trim().toUpperCase(),
+      );
       for (const seatNumber of normalizedSeats) {
         const key = `hold:seat:${dto.concertId}:${seatNumber}`;
         try {
-          await this.redis.setJson(key, responseBody.reservationId || responseBody.orderId, redisTTL);
+          await this.redis.setJson(
+            key,
+            responseBody.reservationId || responseBody.orderId,
+            redisTTL,
+          );
         } catch (err) {
-          this.logger.warn(`Failed to set Redis lock for seat ${seatNumber}: ${(err as any).message}`);
+          this.logger.warn(
+            `Failed to set Redis lock for seat ${seatNumber}: ${(err as any).message}`,
+          );
         }
       }
 
@@ -146,7 +162,10 @@ export class OrdersService {
 
     return this.prisma.$transaction(async (tx) => {
       // ── Bước 5: Lock TicketType rows FOR UPDATE ──
-      const ticketTypes = await this.inventory.lockTicketTypes(tx as any, ticketTypeIds);
+      const ticketTypes = await this.inventory.lockTicketTypes(
+        tx as any,
+        ticketTypeIds,
+      );
 
       // ── Bước 6: Validate concert PUBLISHED ──
       const concert = await tx.concert.findUnique({
@@ -154,11 +173,11 @@ export class OrdersService {
         select: { id: true, status: true },
       });
 
-      if (!concert || concert.status !== 'PUBLISHED') {
+      if (!concert || concert.status !== "PUBLISHED") {
         throw new ConflictException({
-          message: 'Concert is not available',
+          message: "Trạng thái sự kiện không hợp lệ",
           concertId: dto.concertId,
-          status: concert?.status ?? 'NOT_FOUND',
+          status: concert?.status ?? "NOT_FOUND",
         });
       }
 
@@ -171,7 +190,7 @@ export class OrdersService {
       const tt = ticketTypes.find((t) => t.id === dto.ticketTypeId);
       if (!tt) {
         throw new BadRequestException({
-          message: 'Invalid ticket type',
+          message: "Invalid ticket type",
           ticketTypeId: dto.ticketTypeId,
         });
       }
@@ -194,28 +213,34 @@ export class OrdersService {
         where: {
           concertId: dto.concertId,
           seatNumber: { in: normalizedSeats },
-          status: { in: ['ACTIVE', 'USED'] },
+          status: { in: ["ACTIVE", "USED"] },
         },
         select: { seatNumber: true },
       });
-      const soldSeats = soldTickets.map((t) => t.seatNumber).filter(Boolean) as string[];
+      const soldSeats = soldTickets
+        .map((t) => t.seatNumber)
+        .filter(Boolean) as string[];
 
       // Check if seats are held (using reservation_seats table)
       const heldSeats = await tx.reservationSeat.findMany({
         where: {
           concertId: dto.concertId,
           seatNumber: { in: normalizedSeats },
-          status: 'HELD',
+          status: "HELD",
           expiresAt: { gt: now },
         },
         select: { seatNumber: true },
       });
-      const heldSeatNumbers = heldSeats.map((s) => s.seatNumber).filter(Boolean) as string[];
+      const heldSeatNumbers = heldSeats
+        .map((s) => s.seatNumber)
+        .filter(Boolean) as string[];
 
-      const conflictSeats = Array.from(new Set([...soldSeats, ...heldSeatNumbers]));
+      const conflictSeats = Array.from(
+        new Set([...soldSeats, ...heldSeatNumbers]),
+      );
       if (conflictSeats.length > 0) {
         throw new ConflictException({
-          message: 'Some seats are already sold or held',
+          message: "Some seats are already sold or held",
           conflictSeats,
         });
       }
@@ -252,7 +277,7 @@ export class OrdersService {
           concertId: dto.concertId,
           ticketTypeId: dto.ticketTypeId,
           seatNumber,
-          status: 'HELD',
+          status: "HELD",
           expiresAt,
         })),
       });
@@ -309,7 +334,7 @@ export class OrdersService {
         reservationId: reservation.id,
         status: order.status,
         totalAmount: decimalToString(totalAmount),
-        currency: 'VND',
+        currency: "VND",
         expiresAt: expiresAt.toISOString(),
         items,
       };
@@ -324,7 +349,10 @@ export class OrdersService {
     orderId: string,
     requestingUser: AuthUser,
   ): Promise<OrderDetailResponseDto> {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        orderId,
+      );
     const order = await this.prisma.order.findUnique({
       where: isUuid ? { id: orderId } : { paymentRef: orderId },
       include: {
@@ -332,29 +360,63 @@ export class OrdersService {
           include: { ticketType: { select: { name: true } } },
         },
         concert: {
-          select: { name: true, eventDate: true }
+          select: { name: true, eventDate: true },
         },
         reservation: {
           include: {
             reservationSeats: {
-              select: { seatNumber: true }
-            }
-          }
-        }
+              select: { seatNumber: true },
+            },
+          },
+        },
       },
     });
 
-    const isAdmin = requestingUser.roles.some((r) => r.name === 'admin');
+    const isAdmin = requestingUser.roles.some((r) => r.name === "admin");
 
     // Trả 404 để tránh leak existence (nếu không phải owner và không phải admin)
     if (!order || (!isAdmin && order.userId !== requestingUser.id)) {
-      throw new NotFoundException('Order not found');
+      throw new NotFoundException("Order not found");
     }
 
     // Query tickets via ticketsService to ensure we use the tickets module
-    await this.ticketsService.getTicketsForOrder(order.id, requestingUser);
+    const tickets = await this.ticketsService.getTicketsForOrder(order.id, requestingUser);
 
-    return this.buildDetailResponse(order as any);
+    return this.buildDetailResponse(order as any, tickets);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET /orders
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async getUserOrders(user: AuthUser): Promise<OrderDetailResponseDto[]> {
+    const orders = await this.prisma.order.findMany({
+      where: { userId: user.id },
+      include: {
+        items: {
+          include: { ticketType: { select: { name: true } } },
+        },
+        concert: {
+          select: { name: true, eventDate: true },
+        },
+        reservation: {
+          include: {
+            reservationSeats: {
+              select: { seatNumber: true },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const result: OrderDetailResponseDto[] = [];
+    for (const order of orders) {
+      const tickets = await this.ticketsService.getTicketsForOrder(order.id, user);
+      result.push(this.buildDetailResponse(order as any, tickets));
+    }
+
+    return result;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -365,14 +427,17 @@ export class OrdersService {
     orderId: string,
     userId: string,
   ): Promise<OrderDetailResponseDto> {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        orderId,
+      );
     const order = await this.prisma.order.findUnique({
       where: isUuid ? { id: orderId } : { paymentRef: orderId },
       include: { items: true },
     });
 
     if (!order || order.userId !== userId) {
-      throw new NotFoundException('Order not found');
+      throw new NotFoundException("Order not found");
     }
 
     if (order.status !== OrderStatus.PENDING_PAYMENT) {
@@ -398,7 +463,9 @@ export class OrdersService {
         try {
           await this.redis.del(key);
         } catch (err) {
-          this.logger.warn(`Failed to delete Redis key on order cancellation: ${(err as any).message}`);
+          this.logger.warn(
+            `Failed to delete Redis key on order cancellation: ${(err as any).message}`,
+          );
         }
       }
     }
@@ -410,9 +477,9 @@ export class OrdersService {
         concert: { select: { name: true, eventDate: true } },
         reservation: {
           include: {
-            reservationSeats: { select: { seatNumber: true } }
-          }
-        }
+            reservationSeats: { select: { seatNumber: true } },
+          },
+        },
       },
     });
 
@@ -429,18 +496,30 @@ export class OrdersService {
       concert: { name: string; eventDate: Date };
       reservation: { reservationSeats: { seatNumber: string }[] };
     },
+    tickets: any[] = [],
   ): OrderDetailResponseDto {
     const items: OrderItemResponseDto[] = order.items.map((item) => ({
       ticketTypeId: item.ticketTypeId,
       name: item.ticketType.name,
       quantity: item.quantity,
       unitPrice: decimalToString(item.unitPrice),
-      lineTotal: decimalToString(
-        Number(item.unitPrice) * item.quantity,
-      ),
+      lineTotal: decimalToString(Number(item.unitPrice) * item.quantity),
     }));
 
-    const selectedSeats = order.reservation?.reservationSeats?.map((s) => s.seatNumber) ?? [];
+    const selectedSeats =
+      order.reservation?.reservationSeats?.map((s) => s.seatNumber) ?? [];
+
+    const mappedTickets = tickets.map((t) => ({
+      id: t.id,
+      ticketCode: t.ticketCode,
+      ticketTypeId: t.ticketTypeId,
+      seatNumber: t.seatNumber,
+      qrPayload: t.qrPayload,
+      status: t.status,
+      createdAt: t.createdAt.toISOString(),
+      seatZone: t.ticketType?.name || 'Standard',
+      price: t.ticketType?.price ? Number(t.ticketType.price) : 0,
+    }));
 
     return {
       orderId: order.id,
@@ -449,7 +528,7 @@ export class OrdersService {
       reservationId: order.reservationId,
       status: order.status,
       totalAmount: decimalToString(order.totalAmount),
-      currency: 'VND',
+      currency: "VND",
       expiresAt: order.expiresAt.toISOString(),
       createdAt: order.createdAt.toISOString(),
       paymentMethod: order.paymentMethod,
@@ -458,6 +537,7 @@ export class OrdersService {
       concertDate: order.concert.eventDate.toISOString(),
       selectedSeats,
       items,
+      tickets: mappedTickets,
     };
   }
 }

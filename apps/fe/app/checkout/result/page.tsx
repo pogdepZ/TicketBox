@@ -1,11 +1,12 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import Link from 'next/link';
-import { CheckCircle2, XCircle, Home, Calendar, CreditCard, Ticket } from 'lucide-react';
+import { CheckCircle2, XCircle, Home, Ticket } from 'lucide-react';
+import { fetchApi, getFriendlyErrorMessage, addLocalNotification } from '@/lib/api';
 
 function CheckoutResultContent() {
   const searchParams = useSearchParams();
@@ -33,10 +34,70 @@ function CheckoutResultContent() {
   const transactionNo = provider === 'MOMO' ? momoTransactionNo : vnpTransactionNo;
   const amountStr = provider === 'MOMO' ? momoAmountStr : vnpAmountStr;
   const payDateStr = provider === 'MOMO' ? momoPayDateStr : vnpPayDateStr;
-  const isSuccess =
-    provider === 'MOMO'
-      ? momoResultCode === '0'
-      : responseCode === '00' || transactionStatus === '00';
+
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [backendSuccess, setBackendSuccess] = useState<boolean>(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function verifyPayment() {
+      if (!txnRef) {
+        setLoading(false);
+        setErrorMsg('Không tìm thấy thông tin mã đơn hàng để xác thực.');
+        return;
+      }
+
+      try {
+        const queryStr = searchParams.toString();
+        const providerPath = provider.toLowerCase();
+        
+        // Gọi API backend webhook GET
+        const res = await fetchApi(`/payments/webhooks/${providerPath}?${queryStr}`);
+        
+        if (!active) return;
+
+        const success = res?.orderStatus === 'PAID' || res?.paymentStatus === 'PAID';
+
+        if (success) {
+          setBackendSuccess(true);
+          const sessionKey = `notified-order-${txnRef}`;
+          const alreadyNotified = typeof window !== 'undefined' && window.sessionStorage.getItem(sessionKey);
+          if (!alreadyNotified) {
+            addLocalNotification(
+              'Thanh toán thành công!',
+              `Đơn đặt vé #${txnRef?.substring(0, 8).toUpperCase()} của bạn đã được thanh toán thành công.`
+            );
+            if (typeof window !== 'undefined') {
+              window.sessionStorage.setItem(sessionKey, 'true');
+            }
+          }
+        } else {
+          setBackendSuccess(false);
+          if (responseCode === '24' || searchParams.get('status') === 'failed' || momoResultCode === '49') {
+            setErrorMsg('Giao dịch đã bị hủy bởi người dùng.');
+          } else {
+            setErrorMsg('Thanh toán thất bại từ cổng thanh toán hoặc chữ ký không hợp lệ.');
+          }
+        }
+      } catch (err: any) {
+        if (!active) return;
+        setBackendSuccess(false);
+        setErrorMsg(getFriendlyErrorMessage(err));
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    verifyPayment();
+
+    return () => {
+      active = false;
+    };
+  }, [provider, txnRef, searchParams]);
 
   // Format amount
   const rawAmount = amountStr ? Number(amountStr) : 0;
@@ -59,11 +120,29 @@ function CheckoutResultContent() {
     return `${day}/${month}/${year} ${hour}:${minute}:${second}`;
   };
 
+  if (loading) {
+    return (
+      <section className="mx-auto max-w-2xl px-4 py-24">
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto mb-6 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+            <h2 className="mb-2 text-2xl font-black text-foreground animate-pulse">Đang xác thực giao dịch</h2>
+            <p className="text-muted-foreground font-medium max-w-md mx-auto">
+              Vui lòng không đóng hoặc tải lại trang. Chúng tôi đang kiểm tra kết quả thanh toán từ cổng {provider}...
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const displaySuccess = backendSuccess;
+
   return (
     <section className="mx-auto max-w-2xl px-4 py-16">
       <div className="mb-8 text-center">
         <div className="mb-6 flex justify-center">
-          {isSuccess ? (
+          {displaySuccess ? (
             <div className="rounded-full bg-emerald-500/10 p-4 text-emerald-500 shadow-xl shadow-emerald-500/10 animate-bounce">
               <CheckCircle2 className="size-16" />
             </div>
@@ -74,12 +153,12 @@ function CheckoutResultContent() {
           )}
         </div>
         <h1 className="mb-3 text-3xl font-black tracking-tight text-foreground md:text-4xl">
-          {isSuccess ? 'Thanh toán thành công' : 'Thanh toán thất bại'}
+          {displaySuccess ? 'Thanh toán thành công' : 'Thanh toán thất bại'}
         </h1>
         <p className="mx-auto max-w-md text-muted-foreground">
-          {isSuccess
-            ? 'Đơn hàng của bạn đã được thanh toán thành công. Hệ thống đang tiến hành phát hành vé.'
-            : 'Đã xảy ra lỗi trong quá trình xử lý giao dịch. Vui lòng kiểm tra lại số dư thẻ hoặc thử lại.'}
+          {displaySuccess
+            ? 'Đơn hàng của bạn đã được thanh toán thành công. Hệ thống đã xác thực và tiến hành phát hành vé.'
+            : errorMsg || 'Đã xảy ra lỗi trong quá trình xử lý giao dịch hoặc chữ ký xác thực không hợp lệ.'}
         </p>
       </div>
 
@@ -146,7 +225,7 @@ function CheckoutResultContent() {
       </div>
 
       {/* Next steps advice */}
-      {isSuccess && (
+      {displaySuccess && (
         <div className="mb-8 rounded-[2rem] border border-border bg-muted/40 p-6 md:p-8">
           <h3 className="mb-3 text-lg font-black text-foreground">Lưu ý tiếp theo</h3>
           <ul className="list-inside list-disc space-y-2 text-muted-foreground text-sm">
@@ -166,7 +245,7 @@ function CheckoutResultContent() {
           <Home className="size-5" />
           Trang chủ
         </Link>
-        {isSuccess ? (
+        {displaySuccess ? (
           <Link
             href={`/success?orderId=${txnRef}`}
             className="flex items-center justify-center gap-2 rounded-full bg-primary px-8 py-3.5 font-bold text-primary-foreground transition hover:bg-primary/95 active:translate-y-px shadow-lg shadow-primary/10"

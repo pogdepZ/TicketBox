@@ -7,6 +7,7 @@ import { OrderSummary } from '@/components/checkout/OrderSummary';
 import { VenueMapOverview } from '@/components/seat-map/VenueMapOverview';
 import { ZoneSeatMap } from '@/components/seat-map/ZoneSeatMap';
 import { createDraftReservation } from '@/lib/mock-reservation';
+import { createOrder, getFriendlyErrorMessage } from '@/lib/api';
 
 interface SeatMapProps {
   concertId: string;
@@ -94,20 +95,56 @@ export function SeatMap({ concertId, concertTitle, zones, seats }: SeatMapProps)
     );
   }
 
-  const primaryLabel = step === 'overview' ? 'Tiếp tục chọn ghế' : 'Tiếp tục thanh toán';
-  const primaryDisabled = step === 'overview' ? !activeSelectedZone : selectedSeats.length === 0;
-  const primaryAction = step === 'overview' ? handleContinueToSeats : () => {
-    if (!activeSelectedZone || selectedSeats.length === 0) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const primaryLabel = isSubmitting 
+    ? 'Đang giữ ghế...' 
+    : (step === 'overview' ? 'Tiếp tục chọn ghế' : 'Tiếp tục thanh toán');
+
+  const primaryDisabled = isSubmitting || (step === 'overview' ? !activeSelectedZone : selectedSeats.length === 0);
+
+  const primaryAction = step === 'overview' ? handleContinueToSeats : async () => {
+    if (!activeSelectedZone || selectedSeats.length === 0 || isSubmitting) {
       return;
     }
 
-    createDraftReservation({
-      concertId,
-      concertTitle,
-      selectedZone: activeSelectedZone,
-      selectedSeats,
-    });
-    router.push('/checkout');
+    setIsSubmitting(true);
+    try {
+      const idempotencyKey = typeof window !== 'undefined' && window.crypto?.randomUUID 
+        ? window.crypto.randomUUID() 
+        : `idempotency-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+      const orderResponse = await createOrder({
+        concertId,
+        ticketTypeId: activeSelectedZone.ticketTypeId || activeSelectedZone.id,
+        seatNumbers: selectedSeats.map((s) => s.label),
+      }, idempotencyKey);
+
+      const orderId = orderResponse.orderId || orderResponse.data?.orderId || orderResponse.id;
+      if (!orderId) {
+        throw new Error('Không nhận được Mã đơn hàng từ hệ thống.');
+      }
+
+      createDraftReservation({
+        concertId,
+        concertTitle,
+        selectedZone: activeSelectedZone,
+        selectedSeats,
+      });
+      router.push(`/checkout?orderId=${orderId}`);
+    } catch (err: any) {
+      window.dispatchEvent(
+        new CustomEvent('ticketbox-toast', {
+          detail: {
+            title: 'Không thể giữ ghế',
+            message: getFriendlyErrorMessage(err),
+            type: 'error',
+          },
+        })
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const summary = (

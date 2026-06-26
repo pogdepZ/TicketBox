@@ -63,7 +63,9 @@ export function VenueMapOverview({ zones, selectedZone, onSelectZone }: VenueMap
             {zones.map((zone) => {
               const isSelected = selectedZone?.id === zone.id;
               const isSoldOut = zone.status === 'sold-out';
-              const labelPosition = zoneLabelPositions[zone.id];
+              const visualCode = (zone.code || zone.id || 'economy').toLowerCase();
+              const labelPosition = zoneLabelPositions[visualCode] || zoneLabelPositions.economy;
+              const pathD = zonePaths[visualCode] || zonePaths.economy;
 
               return (
                 <g
@@ -74,7 +76,7 @@ export function VenueMapOverview({ zones, selectedZone, onSelectZone }: VenueMap
                 >
                   <title>{zone.name}</title>
                   <path
-                    d={zonePaths[zone.id]}
+                    d={pathD}
                     fill={zone.color}
                     fillOpacity={isSelected ? 0.58 : 0.24}
                     stroke={zone.color}
@@ -83,26 +85,30 @@ export function VenueMapOverview({ zones, selectedZone, onSelectZone }: VenueMap
                     filter={isSelected ? 'url(#selectedZoneGlow)' : undefined}
                     className="transition-all"
                   />
-                  <text
-                    x={labelPosition.x}
-                    y={labelPosition.y}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    pointerEvents="none"
-                    className="fill-white text-base font-bold"
-                  >
-                    {zone.name}
-                  </text>
-                  <text
-                    x={labelPosition.x}
-                    y={labelPosition.priceY}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    pointerEvents="none"
-                    className="fill-white/80 text-xs"
-                  >
-                    {Number(zone.price).toLocaleString('vi-VN')}đ · {isSoldOut ? 'Hết vé' : `Còn ${zone.remaining}`}
-                  </text>
+                  {labelPosition && (
+                    <>
+                      <text
+                        x={labelPosition.x}
+                        y={labelPosition.y}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        pointerEvents="none"
+                        className="fill-white text-base font-bold"
+                      >
+                        {zone.name}
+                      </text>
+                      <text
+                        x={labelPosition.x}
+                        y={labelPosition.priceY}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        pointerEvents="none"
+                        className="fill-white/80 text-xs"
+                      >
+                        {Number(zone.price).toLocaleString('vi-VN')}đ · {isSoldOut ? 'Hết vé' : `Còn ${zone.remaining}`}
+                      </text>
+                    </>
+                  )}
                 </g>
               );
             })}

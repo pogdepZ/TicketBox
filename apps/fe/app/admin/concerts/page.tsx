@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AdminLayout } from '@/components/admin-layout';
 import { ConcertTable } from '@/components/concert-table';
-import { getConcerts, cancelConcert, publishConcert } from '@/lib/api';
+import { getConcerts, cancelConcert, publishConcert, getFriendlyErrorMessage } from '@/lib/api';
 import Link from 'next/link';
 import { Plus, Search, RefreshCw } from 'lucide-react';
 import { ConfirmModal } from '@/components/confirm-modal';
@@ -64,7 +64,7 @@ export default function AdminConcertsPage() {
           new CustomEvent('ticketbox-toast', {
             detail: {
               title: 'Kích hoạt thất bại',
-              message: err?.message || 'Không thể thay đổi trạng thái sự kiện.',
+              message: getFriendlyErrorMessage(err),
               type: 'error',
             },
           })
@@ -96,7 +96,7 @@ export default function AdminConcertsPage() {
         new CustomEvent('ticketbox-toast', {
           detail: {
             title: 'Ngưng kích hoạt thất bại',
-            message: err?.message || 'Không thể thay đổi trạng thái sự kiện.',
+            message: getFriendlyErrorMessage(err),
             type: 'error',
           },
         })

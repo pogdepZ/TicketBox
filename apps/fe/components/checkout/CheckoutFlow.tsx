@@ -89,15 +89,16 @@ export function CheckoutFlow() {
 
   useEffect(() => {
     if (!existingOrderId) return;
+    const orderIdStr = existingOrderId;
 
     async function fetchExistingOrder() {
       setIsLoadingOrder(true);
       setError('');
       try {
-        const order = await getOrderById(existingOrderId);
+        const order = await getOrderById(orderIdStr);
         if (order) {
           if (order.status === 'PAID') {
-            router.replace(`/success?orderId=${encodeURIComponent(existingOrderId)}`);
+            router.replace(`/success?orderId=${encodeURIComponent(orderIdStr)}`);
             return;
           }
 

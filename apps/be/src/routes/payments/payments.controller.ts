@@ -153,6 +153,8 @@ export class PaymentsController {
       return {
         RspCode: result.processed ? '00' : '99',
         Message: result.processed ? 'Confirm Success' : 'Confirm Fail',
+        orderStatus: result.orderStatus,
+        paymentStatus: result.paymentStatus,
       };
     }
 
