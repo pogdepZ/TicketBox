@@ -6,7 +6,7 @@
  * - Role mặc định: CHECKIN_STAFF
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -16,15 +16,15 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
-import { Button } from '../components';
-import { apiService } from '../services/api';
-import type { RootStackParamList } from '../types';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from "../constants/theme";
+import { Button } from "../components";
+import { AUTH_STORAGE_KEYS, apiService } from "../services/api";
+import type { RootStackParamList } from "../types";
 
 // Simulated network check
 const useNetworkStatus = () => {
@@ -37,47 +37,64 @@ const useNetworkStatus = () => {
   return isOnline;
 };
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Login">;
 
 export default function LoginScreen() {
   const navigation = useNavigation<NavigationProp>();
   const isOnline = useNetworkStatus();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
+      Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin");
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await apiService.post<{ accessToken: string; user: any }>('/auth/login', {
+      const response = await apiService.post<{
+        accessToken: string;
+        refreshToken?: string;
+        user: any;
+      }>("/auth/login", {
         email: email.trim(),
         password: password.trim(),
       });
 
       if (response.success && response.data) {
-        const { accessToken, user } = response.data;
+        const { accessToken, refreshToken, user } = response.data;
 
         // Save to AsyncStorage
-        await AsyncStorage.setItem('auth_token', accessToken);
-        await AsyncStorage.setItem('auth_user', JSON.stringify(user));
-        
+        await AsyncStorage.setItem(AUTH_STORAGE_KEYS.accessToken, accessToken);
+        await AsyncStorage.setItem(
+          AUTH_STORAGE_KEYS.user,
+          JSON.stringify(user),
+        );
+        if (refreshToken) {
+          await AsyncStorage.setItem(
+            AUTH_STORAGE_KEYS.refreshToken,
+            refreshToken,
+          );
+        }
+
         // Set token for future API calls
         apiService.setToken(accessToken);
+        apiService.setRefreshToken(refreshToken || null);
 
-        navigation.reset({ index: 0, routes: [{ name: 'Scanner' }] });
+        navigation.reset({ index: 0, routes: [{ name: "Scanner" }] });
       } else {
-        Alert.alert('Đăng nhập thất bại', response.message || 'Email hoặc mật khẩu không đúng');
+        Alert.alert(
+          "Đăng nhập thất bại",
+          response.message || "Email hoặc mật khẩu không đúng",
+        );
       }
     } catch (error) {
-      console.error('Login error detailed:', error);
-      Alert.alert('Lỗi', 'Không thể kết nối tới server');
+      console.error("Login error detailed:", error);
+      Alert.alert("Lỗi", "Không thể kết nối tới server");
     } finally {
       setLoading(false);
     }
@@ -88,7 +105,7 @@ export default function LoginScreen() {
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboard}
       >
         <View style={styles.topBar}>
@@ -104,7 +121,7 @@ export default function LoginScreen() {
               ]}
             />
             <Text style={styles.networkText}>
-              {isOnline ? 'Online' : 'Offline'}
+              {isOnline ? "Online" : "Offline"}
             </Text>
           </View>
         </View>
@@ -175,14 +192,14 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.xxl,
   },
   topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   kicker: {
     color: COLORS.primaryLight,
     fontSize: FONT_SIZES.xs,
-    fontWeight: '800',
+    fontWeight: "800",
     letterSpacing: 1.1,
   },
   shiftText: {
@@ -191,8 +208,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   networkBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.surface,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
@@ -215,9 +232,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xxl,
   },
   logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: SPACING.xl,
   },
   logoIcon: {
@@ -225,21 +242,21 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: BORDER_RADIUS.md,
     backgroundColor: COLORS.primaryDark,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: COLORS.primary,
   },
   logoMark: {
     color: COLORS.text,
     fontSize: FONT_SIZES.xl,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0.5,
   },
   eventPill: {
-    backgroundColor: COLORS.primary + '14',
+    backgroundColor: COLORS.primary + "14",
     borderWidth: 1,
-    borderColor: COLORS.primary + '55',
+    borderColor: COLORS.primary + "55",
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.round,
@@ -247,12 +264,12 @@ const styles = StyleSheet.create({
   eventPillText: {
     color: COLORS.primaryLight,
     fontSize: FONT_SIZES.xs,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 0.8,
   },
   logoTitle: {
     fontSize: FONT_SIZES.title,
-    fontWeight: '800',
+    fontWeight: "800",
     color: COLORS.text,
     letterSpacing: 0,
   },
@@ -264,7 +281,7 @@ const styles = StyleSheet.create({
     maxWidth: 340,
   },
   form: {
-    width: '100%',
+    width: "100%",
     gap: SPACING.md,
   },
   inputBlock: {
@@ -274,7 +291,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: FONT_SIZES.sm,
     marginLeft: SPACING.xs,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   input: {
     backgroundColor: COLORS.surface,
@@ -287,23 +304,23 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   shiftPanel: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.backgroundSecondary,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: BORDER_RADIUS.md,
-    marginTop: 'auto',
+    marginTop: "auto",
     paddingVertical: SPACING.lg,
   },
   shiftMetric: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
   shiftMetricValue: {
     color: COLORS.text,
     fontSize: FONT_SIZES.xl,
-    fontWeight: '900',
+    fontWeight: "900",
   },
   shiftMetricLabel: {
     color: COLORS.textMuted,

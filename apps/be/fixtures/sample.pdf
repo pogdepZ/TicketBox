@@ -1,5 +1,4 @@
-%PDF-1.5
-%µ½ó
+%PDF-1.4
 1 0 obj
 << /Type /Catalog /Pages 2 0 R >>
 endobj
@@ -7,16 +6,41 @@ endobj
 << /Type /Pages /Kids [3 0 R] /Count 1 >>
 endobj
 3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 488 >>
+stream
+BT
+/F1 12 Tf
+72 712 Td
+(Artist Name: Son Tung M-TP) Tj
+0 -18 Td
+(Genre: V-Pop, Dance-Pop) Tj
+0 -18 Td
+(Biography: Son Tung M-TP is a famous Vietnamese singer-songwriter and actor.) Tj
+0 -18 Td
+(Born in Thai Binh in 1994, he is one of the most successful artists in Vietnam.) Tj
+0 -18 Td
+(He released hit songs like "Chay Ngay Di", "Hay Trao Cho Anh", and "Chung Ta Cua Tuong Lai".) Tj
+0 -18 Td
+(His music styles combine modern electronic music with traditional Vietnamese elements.) Tj
+ET
+endstream
 endobj
 xref
-0 4
+0 6
 0000000000 65535 f 
-0000000015 00000 n 
-0000000060 00000 n 
-0000000111 00000 n 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
 trailer
-<< /Size 4 /Root 1 0 R >>
+<< /Size 6 /Root 1 0 R >>
 startxref
-190
+850
 %%EOF

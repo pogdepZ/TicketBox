@@ -18,6 +18,69 @@ export class ApiError extends Error {
   }
 }
 
+let refreshAccessTokenPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  if (!refreshAccessTokenPromise) {
+    refreshAccessTokenPromise = (async () => {
+      const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+
+      if (!refreshRes.ok) {
+        return null;
+      }
+
+      const refreshJson = await refreshRes.json().catch(() => ({}));
+      const newAccessToken = refreshJson?.data?.accessToken;
+
+      if (typeof newAccessToken !== "string" || !newAccessToken) {
+        return null;
+      }
+
+      window.localStorage.setItem("access_token", newAccessToken);
+      window.dispatchEvent(new CustomEvent("ticketbox-auth-change"));
+
+      return newAccessToken;
+    })()
+      .catch((refreshError) => {
+        console.error("Silent token refresh failed:", refreshError);
+        return null;
+      })
+      .finally(() => {
+        refreshAccessTokenPromise = null;
+      });
+  }
+
+  return refreshAccessTokenPromise;
+}
+
+function clearLocalAuthSession() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem("access_token");
+  window.dispatchEvent(new CustomEvent("ticketbox-auth-change"));
+  window.dispatchEvent(
+    new CustomEvent("ticketbox-toast", {
+      detail: {
+        title: "Phiên làm việc hết hạn",
+        message: "Vui lòng đăng nhập lại để tiếp tục sử dụng dịch vụ.",
+        type: "error",
+      },
+    }),
+  );
+}
+
 export function getFriendlyErrorMessage(error: any): string {
   const translateSingleMessage = (msg: string): string => {
     if (!msg || typeof msg !== "string") return "";
@@ -148,7 +211,10 @@ export function getFriendlyErrorMessage(error: any): string {
     }
 
     // 4.5. Payment & Verification
-    if (msgLower.includes("invalid vnpay signature") || msgLower.includes("invalid signature")) {
+    if (
+      msgLower.includes("invalid vnpay signature") ||
+      msgLower.includes("invalid signature")
+    ) {
       return "Chữ ký xác thực thanh toán không hợp lệ.";
     }
     if (msgLower.includes("invalid momo signature")) {
@@ -157,7 +223,10 @@ export function getFriendlyErrorMessage(error: any): string {
     if (msgLower.includes("unknown payment provider")) {
       return "Cổng thanh toán không được hỗ trợ.";
     }
-    if (msgLower.includes("order status is invalid") || msgLower.includes("payment status is invalid")) {
+    if (
+      msgLower.includes("order status is invalid") ||
+      msgLower.includes("payment status is invalid")
+    ) {
       return "Trạng thái đơn đặt vé không hợp lệ để thanh toán.";
     }
 
@@ -361,78 +430,55 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     const message = errorData.message || "API Request failed";
     const statusCode = errorData.metadata?.statusCode || response.status;
 
-    if (
+    const canAttemptRefresh =
       statusCode === 401 &&
       typeof window !== "undefined" &&
-      endpoint !== "/auth/refresh"
-    ) {
+      endpoint !== "/auth/refresh" &&
+      endpoint !== "/auth/login" &&
+      endpoint !== "/auth/register";
+
+    if (canAttemptRefresh) {
       const oldToken = window.localStorage.getItem("access_token");
       if (oldToken) {
-        try {
-          // Attempt to fetch a new access token using the refresh cookie
-          const refreshUrl = `${API_BASE_URL}/auth/refresh`;
-          const refreshRes = await fetch(refreshUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+        const newAccessToken = await refreshAccessToken();
+        if (newAccessToken) {
+          const retryHeaders = new Headers(options.headers);
+          if (
+            !retryHeaders.has("Content-Type") &&
+            !(options.body instanceof FormData)
+          ) {
+            retryHeaders.set("Content-Type", "application/json");
+          }
+          retryHeaders.set("Authorization", `Bearer ${newAccessToken}`);
+
+          if (typeof window !== "undefined") {
+            retryHeaders.set(
+              "Cache-Control",
+              "no-cache, no-store, must-revalidate",
+            );
+            retryHeaders.set("Pragma", "no-cache");
+            retryHeaders.set("Expires", "0");
+          }
+
+          const retryResponse = await fetch(url, {
+            ...options,
+            headers: retryHeaders,
             credentials: "include",
           });
 
-          if (refreshRes.ok) {
-            const refreshJson = await refreshRes.json();
-            const newAccessToken = refreshJson?.data?.accessToken;
-            if (newAccessToken) {
-              window.localStorage.setItem("access_token", newAccessToken);
-              window.dispatchEvent(new CustomEvent("ticketbox-auth-change"));
-
-              // Retry the original request with the new access token
-              const retryHeaders = new Headers(options.headers);
-              if (
-                !retryHeaders.has("Content-Type") &&
-                !(options.body instanceof FormData)
-              ) {
-                retryHeaders.set("Content-Type", "application/json");
-              }
-              retryHeaders.set("Authorization", `Bearer ${newAccessToken}`);
-
-              const retryResponse = await fetch(url, {
-                ...options,
-                headers: retryHeaders,
-                credentials: "include",
-              });
-
-              if (retryResponse.ok) {
-                const retryJson = await retryResponse.json();
-                return retryJson.data;
-              } else {
-                const retryErrorData = await retryResponse
-                  .json()
-                  .catch(() => ({}));
-                throw new ApiError(
-                  retryErrorData.message ||
-                    "API Request failed after token refresh",
-                  retryErrorData.metadata?.statusCode || retryResponse.status,
-                );
-              }
-            }
+          if (retryResponse.ok) {
+            const retryJson = await retryResponse.json();
+            return retryJson.data;
           }
-        } catch (refreshError) {
-          console.error("Silent token refresh failed:", refreshError);
+
+          const retryErrorData = await retryResponse.json().catch(() => ({}));
+          throw new ApiError(
+            retryErrorData.message || "API Request failed after token refresh",
+            retryErrorData.metadata?.statusCode || retryResponse.status,
+          );
         }
 
-        // If refresh fails, sign out the user locally
-        window.localStorage.removeItem("access_token");
-        window.dispatchEvent(new CustomEvent("ticketbox-auth-change"));
-        window.dispatchEvent(
-          new CustomEvent("ticketbox-toast", {
-            detail: {
-              title: "Phiên làm việc hết hạn",
-              message: "Vui lòng đăng nhập lại để tiếp tục sử dụng dịch vụ.",
-              type: "error",
-            },
-          }),
-        );
+        clearLocalAuthSession();
       }
     }
 
@@ -529,7 +575,9 @@ export async function uploadConcertSeatMapSvg(
   });
 }
 
-export async function uploadConcertPoster(file: File): Promise<{ url: string }> {
+export async function uploadConcertPoster(
+  file: File,
+): Promise<{ url: string }> {
   const formData = new FormData();
   formData.append("file", file);
 
@@ -1287,7 +1335,10 @@ export async function getDashboardAnalytics(): Promise<any> {
   try {
     return await fetchApi("/admin/dashboard/analytics");
   } catch (error) {
-    console.warn("Failed to fetch dashboard analytics, using mock fallback", error);
+    console.warn(
+      "Failed to fetch dashboard analytics, using mock fallback",
+      error,
+    );
     return {
       newUsersLastMonth: 120,
       eventAnalytics: [],
@@ -1295,25 +1346,39 @@ export async function getDashboardAnalytics(): Promise<any> {
   }
 }
 
-export async function getUserAnalyticsAdmin(startDate: string, endDate: string): Promise<any> {
+export async function getUserAnalyticsAdmin(
+  startDate: string,
+  endDate: string,
+): Promise<any> {
   try {
-    return await fetchApi(`/admin/users/analytics?startDate=${startDate}&endDate=${endDate}`);
+    return await fetchApi(
+      `/admin/users/analytics?startDate=${startDate}&endDate=${endDate}`,
+    );
   } catch (error) {
     console.error("Failed to fetch user analytics:", error);
     throw error;
   }
 }
 
-export async function getDashboardRevenueAnalyticsAdmin(startDate: string, endDate: string): Promise<any> {
+export async function getDashboardRevenueAnalyticsAdmin(
+  startDate: string,
+  endDate: string,
+): Promise<any> {
   try {
-    return await fetchApi(`/admin/dashboard/revenue-analytics?startDate=${startDate}&endDate=${endDate}`);
+    return await fetchApi(
+      `/admin/dashboard/revenue-analytics?startDate=${startDate}&endDate=${endDate}`,
+    );
   } catch (error) {
     console.error("Failed to fetch dashboard revenue analytics:", error);
     throw error;
   }
 }
 
-export async function getUsersAdmin(page = 1, limit = 10, search = ""): Promise<any> {
+export async function getUsersAdmin(
+  page = 1,
+  limit = 10,
+  search = "",
+): Promise<any> {
   try {
     let url = `/admin/users?page=${page}&limit=${limit}`;
     if (search.trim()) {
@@ -1326,7 +1391,10 @@ export async function getUsersAdmin(page = 1, limit = 10, search = ""): Promise<
   }
 }
 
-export async function updateUserStatusAdmin(userId: string, status: string): Promise<any> {
+export async function updateUserStatusAdmin(
+  userId: string,
+  status: string,
+): Promise<any> {
   try {
     return await fetchApi(`/admin/users/${userId}/status`, {
       method: "PATCH",
@@ -1338,7 +1406,10 @@ export async function updateUserStatusAdmin(userId: string, status: string): Pro
   }
 }
 
-export async function updateUserRoleAdmin(userId: string, role: string): Promise<any> {
+export async function updateUserRoleAdmin(
+  userId: string,
+  role: string,
+): Promise<any> {
   try {
     return await fetchApi(`/admin/users/${userId}/role`, {
       method: "PATCH",

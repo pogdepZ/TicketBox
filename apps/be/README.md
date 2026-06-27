@@ -76,9 +76,9 @@ Backend dung JWT access token va refresh token cookie.
 Authorization: Bearer <accessToken>
 ```
 
-- Refresh token nam trong httpOnly cookie ten `refreshToken`.
-- Cookie path: `/auth/refresh`.
+- Refresh token nam trong httpOnly cookie ten `refreshToken`; browser tu scope cookie theo route auth dang goi (`/auth` hoac `/api/auth` khi di qua Next rewrite).
 - Khi goi `/auth/refresh`, FE can gui cookie kem request.
+- Native check-in client gui header `X-TicketBox-Client: checkin-mobile` se nhan them `refreshToken` trong body va co the gui lai qua body/header khi refresh.
 - CORS dang bat `credentials: true`, FE nen dung `credentials: "include"` neu goi refresh/logout qua browser.
 
 ## RBAC
@@ -286,7 +286,7 @@ Common errors:
 
 #### `POST /auth/login`
 
-Public. Dang nhap bang email/password. Backend set `refreshToken` httpOnly cookie va tra `accessToken`.
+Public. Dang nhap bang email/password. Backend set `refreshToken` httpOnly cookie va tra `accessToken`. Check-in mobile client gui `X-TicketBox-Client: checkin-mobile` se nhan them `refreshToken` trong response body.
 
 Request body:
 
@@ -342,7 +342,7 @@ Common errors:
 
 #### `POST /auth/refresh`
 
-Public theo route, nhung yeu cau cookie `refreshToken`.
+Public theo route, nhung yeu cau cookie `refreshToken`. Check-in mobile client co the gui refresh token trong body khi kem header `X-TicketBox-Client: checkin-mobile`.
 
 Request:
 
