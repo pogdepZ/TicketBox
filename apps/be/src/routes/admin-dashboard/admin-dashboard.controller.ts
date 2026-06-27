@@ -22,6 +22,22 @@ export class AdminDashboardController {
     return this.dashboardService.getAnalytics();
   }
 
+  @Get("dashboard/revenue-analytics")
+  async getRevenueAnalytics(
+    @Query("startDate") startDateStr: string,
+    @Query("endDate") endDateStr: string,
+  ) {
+    return this.dashboardService.getRevenueAnalytics(startDateStr, endDateStr);
+  }
+
+  @Get("users/analytics")
+  async getUserAnalytics(
+    @Query("startDate") startDateStr: string,
+    @Query("endDate") endDateStr: string,
+  ) {
+    return this.dashboardService.getUserAnalytics(startDateStr, endDateStr);
+  }
+
   @Get("users")
   async getUsers(
     @Query("page") page?: number,

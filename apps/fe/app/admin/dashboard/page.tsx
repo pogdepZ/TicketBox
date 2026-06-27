@@ -1,22 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { AdminLayout } from "@/components/admin-layout";
 import { ConcertTable } from "@/components/concert-table";
 import {
   getRevenueSummary,
   getConcerts,
   getDashboardAnalytics,
+  getDashboardRevenueAnalyticsAdmin,
 } from "@/lib/api";
+import { DateRangePicker, DateRange } from "@/components/date-range-picker";
 import {
   BarChart3,
   Users,
   Calendar,
   TrendingUp,
   RefreshCw,
-  AlertCircle,
-  Percent,
   Activity,
+  LayoutDashboard,
 } from "lucide-react";
 
 function DailySalesChart({ data }: { data: any[] }) {
@@ -28,24 +29,92 @@ function DailySalesChart({ data }: { data: any[] }) {
     );
   }
 
-  const width = 600;
+  const numDays = data.length;
+  const left = 60;
+  const right = 20;
+  const top = 30;
+  const bottom = 40;
+  const minGraphWidth = 700;
+
+  // Thuật toán Spacing động: chia đều cột nếu số ngày <= 12, nếu nhiều hơn thì cho cuộn ngang
+  const dayWidth = numDays <= 12 ? minGraphWidth / numDays : 45;
+  const graphWidth = numDays <= 12 ? minGraphWidth : numDays * dayWidth;
+
+  const barWidth =
+    numDays <= 12 ? Math.max(12, Math.min(24, dayWidth * 0.3)) : 14;
+
+  const width = graphWidth + left + right;
   const height = 260;
-  const top = 20;
-  const right = 45;
-  const bottom = 30;
-  const left = 55;
-  const graphWidth = width - left - right;
   const graphHeight = height - top - bottom;
 
   const maxRevenue = Math.max(...data.map((d) => d.revenue), 1000000);
   const maxTickets = Math.max(...data.map((d) => d.ticketsSold), 10);
+
+  const [hoveredDayIdx, setHoveredDayIdx] = useState<number | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0, showLeft: false });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const getX = (i: number) => left + i * dayWidth + dayWidth / 2;
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const svgEl = e.currentTarget;
+    const rect = svgEl.getBoundingClientRect();
+    const clientX = e.clientX - rect.left;
+
+    const scaleX = width / rect.width;
+    const svgX = clientX * scaleX;
+
+    const xInGraph = svgX - left;
+    const dayIdx = Math.round((xInGraph - dayWidth / 2) / dayWidth);
+
+    if (dayIdx >= 0 && dayIdx < numDays) {
+      setHoveredDayIdx(dayIdx);
+
+      if (containerRef.current) {
+        const cRect = containerRef.current.getBoundingClientRect();
+        const x = e.clientX - cRect.left;
+        const y = e.clientY - cRect.top;
+        const showLeft = x > cRect.width - 190;
+
+        setTooltipPos({
+          x,
+          y: y - 12,
+          showLeft,
+        });
+      }
+    } else {
+      setHoveredDayIdx(null);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredDayIdx(null);
+  };
+
+  const formatDateLabel = (item: any) => {
+    if (item.date) {
+      const parts = item.date.split("-");
+      if (parts.length >= 3) return `${parts[2]}/${parts[1]}`;
+      return item.date;
+    }
+    return item.day;
+  };
+
+  const formatDateTooltip = (item: any) => {
+    if (item.date) {
+      const parts = item.date.split("-");
+      if (parts.length >= 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      return item.date;
+    }
+    return `Ngày ${item.day}`;
+  };
 
   // Build line path for revenue
   let linePath = "";
   let areaPath = "";
 
   data.forEach((d, i) => {
-    const x = left + (i / (data.length - 1)) * graphWidth;
+    const x = getX(i);
     const y = top + graphHeight - (d.revenue / maxRevenue) * graphHeight;
     if (i === 0) {
       linePath = `M ${x} ${y}`;
@@ -60,120 +129,203 @@ function DailySalesChart({ data }: { data: any[] }) {
   });
 
   return (
-    <div className="relative w-full overflow-hidden">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
-        <defs>
-          <linearGradient id="chartRevGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#e5484d" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="#e5484d" stopOpacity="0.00" />
-          </linearGradient>
-        </defs>
+    <div ref={containerRef} className="relative w-full">
+      <div className="w-full overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+        <div
+          style={{
+            height: "260px",
+            width: numDays <= 12 ? "100%" : `${width}px`,
+            minWidth: "100%",
+          }}
+        >
+          <svg
+            viewBox={`0 0 ${width} ${height}`}
+            className="w-full h-full select-none"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
+            <defs>
+              <linearGradient id="chartRevGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#e5484d" stopOpacity="0.25" />
+                <stop offset="100%" stopColor="#e5484d" stopOpacity="0.00" />
+              </linearGradient>
+            </defs>
 
-        {/* Y Axis Grid lines */}
-        {Array.from({ length: 5 }).map((_, idx) => {
-          const y = top + (idx / 4) * graphHeight;
-          const revVal = maxRevenue - (idx / 4) * maxRevenue;
-          return (
-            <g key={idx}>
+            {/* Y Axis Grid lines */}
+            {Array.from({ length: 5 }).map((_, idx) => {
+              const y = top + (idx / 4) * graphHeight;
+              const revVal = maxRevenue - (idx / 4) * maxRevenue;
+              return (
+                <g key={idx}>
+                  <line
+                    x1={left}
+                    y1={y}
+                    x2={left + graphWidth}
+                    y2={y}
+                    stroke="var(--color-border)"
+                    strokeWidth={1}
+                    strokeDasharray="4 4"
+                    opacity={0.5}
+                  />
+                  <text
+                    x={left - 8}
+                    y={y + 4}
+                    textAnchor="end"
+                    className="fill-muted-foreground text-[10px] font-medium"
+                  >
+                    {revVal >= 1000000
+                      ? `${(revVal / 1000000).toFixed(0)}Mđ`
+                      : `${revVal.toLocaleString()}đ`}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* X Axis Date Labels */}
+            {data.map((d, idx) => {
+              const step = Math.max(Math.ceil(numDays / 12), 1);
+              const isLast = idx === numDays - 1;
+              if (idx % step !== 0 && !isLast) return null;
+              if (isLast && idx % step > 0 && idx % step < step * 0.4)
+                return null;
+
+              const x = getX(idx);
+              return (
+                <g key={idx}>
+                  <line
+                    x1={x}
+                    y1={top + graphHeight}
+                    x2={x}
+                    y2={top + graphHeight + 4}
+                    stroke="var(--color-border)"
+                    strokeWidth={1}
+                  />
+                  <text
+                    x={x}
+                    y={top + graphHeight + 18}
+                    textAnchor="middle"
+                    className="fill-muted-foreground text-[9px] font-bold"
+                  >
+                    {formatDateLabel(d)}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Vertical Guide Line on hover */}
+            {hoveredDayIdx !== null && (
               <line
-                x1={left}
-                y1={y}
-                x2={left + graphWidth}
-                y2={y}
-                stroke="var(--color-border)"
-                strokeWidth={1}
-                strokeDasharray="4 4"
+                x1={getX(hoveredDayIdx)}
+                y1={top}
+                x2={getX(hoveredDayIdx)}
+                y2={top + graphHeight}
+                stroke="#3b82f6"
+                strokeWidth={1.5}
+                strokeDasharray="3 3"
+                className="transition-all duration-75"
               />
-              <text
-                x={left - 8}
-                y={y + 4}
-                textAnchor="end"
-                className="fill-muted-foreground text-[10px]"
-              >
-                {revVal >= 1000000
-                  ? `${(revVal / 1000000).toFixed(0)}Mđ`
-                  : `${revVal.toLocaleString()}đ`}
-              </text>
-            </g>
-          );
-        })}
+            )}
 
-        {/* X Axis label for days */}
-        {data
-          .filter((_, idx) => idx % 5 === 0 || idx === data.length - 1)
-          .map((d, idx) => {
-            const originalIdx = data.indexOf(d);
-            const x = left + (originalIdx / (data.length - 1)) * graphWidth;
-            return (
-              <text
-                key={idx}
-                x={x}
-                y={top + graphHeight + 18}
-                textAnchor="middle"
-                className="fill-muted-foreground text-[9px]"
-              >
-                {d.day}
-              </text>
-            );
-          })}
+            {/* Bar chart for tickets sold */}
+            {data.map((d, i) => {
+              const x = getX(i) - barWidth / 2;
+              const barHeight = (d.ticketsSold / maxTickets) * graphHeight;
+              const y = top + graphHeight - barHeight;
+              return (
+                <g key={i}>
+                  {d.ticketsSold > 0 ? (
+                    <rect
+                      x={x}
+                      y={y}
+                      width={barWidth}
+                      height={Math.max(barHeight, 2)}
+                      fill="rgb(6, 182, 212)" // cyan-500
+                      opacity={0.35}
+                      rx={1.5}
+                    />
+                  ) : (
+                    <rect
+                      x={x}
+                      y={top + graphHeight - 1}
+                      width={barWidth}
+                      height={1}
+                      fill="var(--color-border)"
+                      opacity={0.2}
+                    />
+                  )}
+                </g>
+              );
+            })}
 
-        {/* Bar chart for tickets sold */}
-        {data.map((d, i) => {
-          const x = left + (i / (data.length - 1)) * graphWidth;
-          const barHeight = (d.ticketsSold / maxTickets) * graphHeight;
-          const y = top + graphHeight - barHeight;
-          return (
-            <g key={i}>
-              <rect
-                x={x - 4}
-                y={y}
-                width={8}
-                height={barHeight}
-                className="fill-cyan-500/30 hover:fill-cyan-500/50 transition-all cursor-pointer"
-                rx={1}
-              >
-                <title>{`Ngày ${d.day}: Bán ${d.ticketsSold} vé`}</title>
-              </rect>
-            </g>
-          );
-        })}
+            {/* Area fill under Line chart */}
+            {areaPath && <path d={areaPath} fill="url(#chartRevGrad)" />}
 
-        {/* Area fill under Line chart */}
-        {areaPath && <path d={areaPath} fill="url(#chartRevGrad)" />}
+            {/* Line path for revenue */}
+            {linePath && (
+              <path
+                d={linePath}
+                fill="none"
+                stroke="#e5484d"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
 
-        {/* Line path for revenue */}
-        {linePath && (
-          <path
-            d={linePath}
-            fill="none"
-            stroke="#e5484d"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        )}
+            {/* Points on Line chart */}
+            {data.map((d, i) => {
+              const x = getX(i);
+              const y =
+                top + graphHeight - (d.revenue / maxRevenue) * graphHeight;
+              const isHoveredPoint = hoveredDayIdx === i;
+              return (
+                <circle
+                  key={i}
+                  cx={x}
+                  cy={y}
+                  r={isHoveredPoint ? 5.5 : 3.5}
+                  className="fill-card stroke-[#e5484d] stroke-2 transition-all duration-100"
+                />
+              );
+            })}
+          </svg>
+        </div>
+      </div>
 
-        {/* Points on Line chart */}
-        {data
-          .filter((d) => d.revenue > 0)
-          .map((d, i) => {
-            const idx = data.indexOf(d);
-            const x = left + (idx / (data.length - 1)) * graphWidth;
-            const y =
-              top + graphHeight - (d.revenue / maxRevenue) * graphHeight;
-            return (
-              <circle
-                key={i}
-                cx={x}
-                cy={y}
-                r={3.5}
-                className="fill-card stroke-[#e5484d] stroke-2 hover:r-5 cursor-pointer transition-all"
-              >
-                <title>{`Ngày ${d.day}: Doanh thu ${d.revenue.toLocaleString("vi-VN")}đ`}</title>
-              </circle>
-            );
-          })}
-      </svg>
+      {/* Hover Tooltip */}
+      {hoveredDayIdx !== null && (
+        <div
+          style={{
+            left: tooltipPos.showLeft ? "auto" : `${tooltipPos.x + 15}px`,
+            right: tooltipPos.showLeft
+              ? `${containerRef.current ? containerRef.current.clientWidth - tooltipPos.x + 15 : 0}px`
+              : "auto",
+            top: `${tooltipPos.y}px`,
+            transform: "translateY(-100%)",
+          }}
+          className="pointer-events-none absolute z-30 flex flex-col gap-1.5 rounded-xl border border-white/10 bg-slate-950/95 p-3 text-xs shadow-2xl backdrop-blur-md transition-all duration-75"
+        >
+          <p className="font-bold text-white mb-0.5">
+            {formatDateTooltip(data[hoveredDayIdx])}
+          </p>
+          <div className="flex flex-col gap-1 text-[11px]">
+            <div className="flex items-center gap-2 text-slate-300">
+              <span className="size-2 rounded-full bg-[#e5484d] shrink-0" />
+              <span className="font-medium">Doanh thu:</span>
+              <strong className="text-white ml-auto">
+                {data[hoveredDayIdx].revenue.toLocaleString("vi-VN")} đ
+              </strong>
+            </div>
+            <div className="flex items-center gap-2 text-slate-300">
+              <span className="size-2 rounded-full bg-cyan-500 shrink-0" />
+              <span className="font-medium">Vé bán ra:</span>
+              <strong className="text-white ml-auto">
+                {data[hoveredDayIdx].ticketsSold} vé
+              </strong>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -349,6 +501,25 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Khởi tạo khoảng ngày mặc định: 30 ngày qua cho dashboard
+  const getInitialDateRange = () => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 29);
+
+    const format = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+    return { startDate: format(start), endDate: format(end) };
+  };
+
+  const [dateRange, setDateRange] = useState<DateRange>(getInitialDateRange());
+  const [revenueData, setRevenueData] = useState<any[]>([]);
+  const [revenueLoading, setRevenueLoading] = useState(false);
+
   async function loadDashboardData() {
     setLoading(true);
     setError(null);
@@ -371,28 +542,53 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function loadRevenueAnalytics() {
+    setRevenueLoading(true);
+    try {
+      const data = await getDashboardRevenueAnalyticsAdmin(
+        dateRange.startDate,
+        dateRange.endDate,
+      );
+      setRevenueData(data || []);
+    } catch (err) {
+      console.error("Failed to load dashboard revenue analytics:", err);
+    } finally {
+      setRevenueLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadDashboardData();
   }, []);
+
+  useEffect(() => {
+    loadRevenueAnalytics();
+  }, [dateRange.startDate, dateRange.endDate]);
 
   return (
     <AdminLayout>
       <div className="space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="mb-2 text-4xl font-black tracking-tight text-foreground">
-              Báo cáo & Phân tích
+            <h1 className="mb-2 text-4xl font-black tracking-tight text-foreground flex items-center gap-3">
+              <LayoutDashboard className="size-9 text-primary" />
+              Tổng quan
             </h1>
             <p className="text-muted-foreground">
               Tổng quan bán vé, doanh thu và thống kê từ dữ liệu thời gian thực.
             </p>
           </div>
           <button
-            onClick={loadDashboardData}
-            disabled={loading}
+            onClick={() => {
+              loadDashboardData();
+              loadRevenueAnalytics();
+            }}
+            disabled={loading || revenueLoading}
             className="flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary active:scale-95 disabled:opacity-50 cursor-pointer"
           >
-            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`size-4 ${loading || revenueLoading ? "animate-spin" : ""}`}
+            />
             Làm mới
           </button>
         </div>
@@ -469,7 +665,7 @@ export default function AdminDashboardPage() {
                         : `${(stats.lastMonthRevenue || 0).toLocaleString("vi-VN")}đ`}
                     </p>
                   </div>
-                  <BarChart3 className="size-10 text-emerald-500/25" />
+                  <BarChart3 className="size-10 text-primary/25" />
                 </div>
               </div>
 
@@ -483,7 +679,7 @@ export default function AdminDashboardPage() {
                       {(stats.ticketsSold || 0).toLocaleString("vi-VN")}
                     </p>
                   </div>
-                  <TrendingUp className="size-10 text-accent/25" />
+                  <TrendingUp className="size-10 text-primary/25" />
                 </div>
               </div>
             </div>
@@ -491,17 +687,27 @@ export default function AdminDashboardPage() {
             {/* Combined Chart & Distribution */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2 rounded-[2rem] border border-border bg-card p-6 shadow-sm flex flex-col justify-between">
-                <div className="mb-4">
-                  <h3 className="text-lg font-black text-foreground">
-                    Doanh thu & Số lượng vé bán ra tháng trước
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Cột xanh: Số vé bán ra (đơn vị: vé) · Đường đỏ: Doanh thu
-                    (đơn vị: đ)
-                  </p>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                  <div>
+                    <h3 className="text-lg font-black text-foreground">
+                      Doanh thu & Số vé bán hàng ngày
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Cột xanh: Số vé bán ra (đơn vị: vé) · Đường đỏ: Doanh thu
+                      (đơn vị: đ)
+                    </p>
+                  </div>
+                  <DateRangePicker value={dateRange} onChange={setDateRange} />
                 </div>
-                <div className="mt-4">
-                  <DailySalesChart data={stats.dailyRevenueLastMonth || []} />
+                <div className="mt-4 relative min-h-[260px] flex items-center justify-center">
+                  {revenueLoading ? (
+                    <div className="flex items-center gap-2 text-muted-foreground animate-pulse font-bold text-sm">
+                      <RefreshCw className="size-4 animate-spin" />
+                      Đang tải dữ liệu...
+                    </div>
+                  ) : (
+                    <DailySalesChart data={revenueData} />
+                  )}
                 </div>
               </div>
 
@@ -533,34 +739,6 @@ export default function AdminDashboardPage() {
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
-
-            {/* Monthly Sales (Historic) */}
-            <div className="rounded-[2rem] border border-border bg-card p-6 shadow-sm">
-              <h3 className="mb-4 text-lg font-black text-foreground">
-                Tăng trưởng doanh thu 8 tháng qua
-              </h3>
-              <div className="h-44 flex items-end gap-3 px-4 pt-6">
-                {stats.monthlySales?.map((value: number, idx: number) => (
-                  <div
-                    key={idx}
-                    className="flex-1 flex flex-col items-center gap-2 group"
-                  >
-                    <div
-                      className="w-full rounded-t-xl bg-primary/25 group-hover:bg-primary/50 transition-all duration-300"
-                      style={{ height: `${value || 4}%` }}
-                      title={`Doanh thu tương đối: ${value}%`}
-                    />
-                    <span className="text-[10px] text-muted-foreground font-bold">
-                      Tháng {idx + 1}
-                    </span>
-                  </div>
-                )) || (
-                  <div className="text-muted-foreground w-full text-center py-12">
-                    Không có dữ liệu biểu đồ
-                  </div>
-                )}
               </div>
             </div>
 
