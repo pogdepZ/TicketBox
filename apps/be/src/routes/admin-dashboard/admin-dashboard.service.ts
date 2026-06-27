@@ -444,4 +444,144 @@ export class AdminDashboardService {
       role: roleName,
     };
   }
+
+  async getUserAnalytics(startDateStr: string, endDateStr: string) {
+    if (!startDateStr || !endDateStr) {
+      throw new BadRequestException("Vui lòng cung cấp startDate và endDate.");
+    }
+
+    const start = new Date(startDateStr);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(endDateStr);
+    end.setHours(23, 59, 59, 999);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      throw new BadRequestException("Định dạng ngày không hợp lệ.");
+    }
+
+    // Lấy toàn bộ users đăng ký trong khoảng thời gian này
+    const users = await this.prismaService.user.findMany({
+      where: {
+        createdAt: {
+          gte: start,
+          lte: end,
+        },
+      },
+      select: {
+        createdAt: true,
+      },
+    });
+
+    // Tạo danh sách các ngày chạy từ start đến end
+    const dateList: string[] = [];
+    const tempDate = new Date(start);
+    const endLocalDateStr = getLocalDateString(end);
+
+    while (true) {
+      const currentDateStr = getLocalDateString(tempDate);
+      dateList.push(currentDateStr);
+      if (currentDateStr === endLocalDateStr) {
+        break;
+      }
+      tempDate.setDate(tempDate.getDate() + 1);
+    }
+
+    // Đếm số lượng user cho từng ngày
+    const data = dateList.map((dateStr) => {
+      const count = users.filter((user) => {
+        const uDate = getLocalDateString(new Date(user.createdAt));
+        return uDate === dateStr;
+      }).length;
+
+      return {
+        date: dateStr,
+        count,
+      };
+    });
+
+    return data;
+  }
+
+  async getRevenueAnalytics(startDateStr: string, endDateStr: string) {
+    if (!startDateStr || !endDateStr) {
+      throw new BadRequestException("Vui lòng cung cấp startDate và endDate.");
+    }
+
+    const start = new Date(startDateStr);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(endDateStr);
+    end.setHours(23, 59, 59, 999);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      throw new BadRequestException("Định dạng ngày không hợp lệ.");
+    }
+
+    // 1. Lọc đơn hàng PAID trong khoảng thời gian
+    const paidOrders = await this.prismaService.order.findMany({
+      where: {
+        status: "PAID",
+        paidAt: {
+          gte: start,
+          lte: end,
+        },
+      },
+      select: {
+        totalAmount: true,
+        paidAt: true,
+      },
+    });
+
+    // 2. Lọc vé ACTIVE/USED trong khoảng thời gian
+    const tickets = await this.prismaService.ticket.findMany({
+      where: {
+        status: { in: ["ACTIVE", "USED"] },
+        createdAt: {
+          gte: start,
+          lte: end,
+        },
+      },
+      select: {
+        createdAt: true,
+      },
+    });
+
+    // 3. Tạo danh sách các ngày
+    const dateList: string[] = [];
+    const tempDate = new Date(start);
+    const endLocalDateStr = getLocalDateString(end);
+
+    while (true) {
+      const currentDateStr = getLocalDateString(tempDate);
+      dateList.push(currentDateStr);
+      if (currentDateStr === endLocalDateStr) {
+        break;
+      }
+      tempDate.setDate(tempDate.getDate() + 1);
+    }
+
+    // 4. Gom nhóm doanh thu và vé bán theo từng ngày
+    const data = dateList.map((dateStr) => {
+      // Doanh thu từ orders có paidAt trùng ngày
+      const dayOrders = paidOrders.filter((o) => {
+        if (!o.paidAt) return false;
+        return getLocalDateString(new Date(o.paidAt)) === dateStr;
+      });
+      const revenue = dayOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0);
+
+      // Vé bán từ tickets có createdAt trùng ngày
+      const ticketsSold = tickets.filter((t) => {
+        return getLocalDateString(new Date(t.createdAt)) === dateStr;
+      }).length;
+
+      return {
+        date: dateStr,
+        revenue,
+        ticketsSold,
+      };
+    });
+
+    return data;
+  }
 }

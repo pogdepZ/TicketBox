@@ -1225,6 +1225,24 @@ export async function getDashboardAnalytics(): Promise<any> {
   }
 }
 
+export async function getUserAnalyticsAdmin(startDate: string, endDate: string): Promise<any> {
+  try {
+    return await fetchApi(`/admin/users/analytics?startDate=${startDate}&endDate=${endDate}`);
+  } catch (error) {
+    console.error("Failed to fetch user analytics:", error);
+    throw error;
+  }
+}
+
+export async function getDashboardRevenueAnalyticsAdmin(startDate: string, endDate: string): Promise<any> {
+  try {
+    return await fetchApi(`/admin/dashboard/revenue-analytics?startDate=${startDate}&endDate=${endDate}`);
+  } catch (error) {
+    console.error("Failed to fetch dashboard revenue analytics:", error);
+    throw error;
+  }
+}
+
 export async function getUsersAdmin(page = 1, limit = 10, search = ""): Promise<any> {
   try {
     let url = `/admin/users?page=${page}&limit=${limit}`;

@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import { AdminLayout } from "@/components/admin-layout";
-import { getDashboardAnalytics } from "@/lib/api";
+import { getDashboardAnalytics, getUserAnalyticsAdmin } from "@/lib/api";
+import { DateRangePicker, DateRange } from "@/components/date-range-picker";
 import { Users, Percent, Activity, RefreshCw, BarChart3 } from "lucide-react";
 
 function VelocityChart({ data }: { data: any[] }) {
@@ -320,6 +321,186 @@ function VelocityChart({ data }: { data: any[] }) {
   );
 }
 
+function UserAnalyticsChart({ data }: { data: any[] }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="text-muted-foreground text-center py-16">
+        Không có dữ liệu người dùng mới trong khoảng thời gian này
+      </div>
+    );
+  }
+
+  const numDays = data.length;
+  const left = 45;
+  const right = 20;
+  const top = 25;
+  const bottom = 40;
+  const minGraphWidth = 1000;
+
+  // Thuật toán Spacing động: chia đều cột nếu số ngày <= 12
+  const dayWidth = numDays <= 12 ? minGraphWidth / numDays : 45;
+  const graphWidth = numDays <= 12 ? minGraphWidth : numDays * dayWidth;
+
+  const barWidth =
+    numDays <= 12 ? Math.max(16, Math.min(32, dayWidth * 0.4)) : 20;
+
+  const maxCount = Math.max(...data.map((d) => d.count), 5); // Tối thiểu mốc là 5 để làm thước đo đẹp
+
+  const width = graphWidth + left + right;
+  const height = 240;
+  const graphHeight = height - top - bottom;
+
+  const formatDate = (str: string) => {
+    const parts = str.split("-");
+    if (parts.length >= 3) return `${parts[2]}/${parts[1]}`;
+    return str;
+  };
+
+  return (
+    <div className="w-full overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+      <div
+        style={{
+          height: "240px",
+          width: numDays <= 12 ? "100%" : `${width}px`,
+          minWidth: "100%",
+        }}
+      >
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="w-full h-full select-none"
+        >
+          {/* Y Axis Grid lines */}
+          {Array.from({ length: 5 }).map((_, idx) => {
+            const y = top + (idx / 4) * graphHeight;
+            const val = Math.round(maxCount - (idx / 4) * maxCount);
+            return (
+              <g key={idx}>
+                <line
+                  x1={left}
+                  y1={y}
+                  x2={left + graphWidth}
+                  y2={y}
+                  stroke="var(--color-border)"
+                  strokeWidth={1}
+                  strokeDasharray="4 4"
+                  opacity={0.5}
+                />
+                <text
+                  x={left - 8}
+                  y={y + 4}
+                  textAnchor="end"
+                  className="fill-muted-foreground text-[10px] font-medium"
+                >
+                  {val} user
+                </text>
+              </g>
+            );
+          })}
+
+          {/* X Axis line */}
+          <line
+            x1={left}
+            y1={top + graphHeight}
+            x2={left + graphWidth}
+            y2={top + graphHeight}
+            stroke="var(--color-border)"
+            strokeWidth={1.5}
+          />
+
+          {/* X Axis Date Labels */}
+          {data.map((s: any, idx: number) => {
+            const step = Math.max(Math.ceil(numDays / 12), 1);
+            const isLast = idx === numDays - 1;
+            if (idx % step !== 0 && !isLast) return null;
+            if (isLast && idx % step > 0 && idx % step < step * 0.4)
+              return null;
+
+            const x = left + idx * dayWidth + dayWidth / 2;
+            return (
+              <g key={idx}>
+                <line
+                  x1={x}
+                  y1={top + graphHeight}
+                  x2={x}
+                  y2={top + graphHeight + 4}
+                  stroke="var(--color-border)"
+                  strokeWidth={1}
+                />
+                <text
+                  x={x}
+                  y={top + graphHeight + 18}
+                  textAnchor="middle"
+                  className="fill-muted-foreground text-[9px] font-bold"
+                >
+                  {formatDate(s.date)}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Bars */}
+          {data.map((item: any, idx: number) => {
+            const x = left + idx * dayWidth + (dayWidth - barWidth) / 2;
+            const barHeight = (item.count / maxCount) * graphHeight;
+            const y = top + graphHeight - barHeight;
+
+            return (
+              <g
+                key={idx}
+                className="group hover:brightness-110 transition-all duration-150"
+              >
+                {/* Invisible wide bar for easier hover */}
+                <rect
+                  x={x - 4}
+                  y={top}
+                  width={barWidth + 8}
+                  height={graphHeight}
+                  fill="transparent"
+                  className="cursor-pointer"
+                />
+                {item.count > 0 && (
+                  <rect
+                    x={x}
+                    y={y}
+                    width={barWidth}
+                    height={Math.max(barHeight, 2)}
+                    fill="#e5484d" // Đỏ thương hiệu / Neon
+                    rx={2}
+                  >
+                    <title>{`Ngày ${formatDate(item.date)}: ${item.count} người đăng ký mới`}</title>
+                  </rect>
+                )}
+                {item.count === 0 && (
+                  <rect
+                    x={x}
+                    y={top + graphHeight - 1}
+                    width={barWidth}
+                    height={1}
+                    fill="var(--color-border)"
+                    opacity={0.3}
+                    rx={0.5}
+                  />
+                )}
+                {/* Label count on hover */}
+                {item.count > 0 && (
+                  <text
+                    x={x + barWidth / 2}
+                    y={y - 5}
+                    textAnchor="middle"
+                    className="fill-foreground text-[9px] font-black opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    {item.count}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminAnalyticsPage() {
   const [analytics, setAnalytics] = useState<any>(null);
   const [selectedConcertId, setSelectedConcertId] = useState<string | null>(
@@ -327,6 +508,26 @@ export default function AdminAnalyticsPage() {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Khởi tạo khoảng ngày mặc định: 30 ngày qua
+  const getInitialDateRange = () => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 29);
+
+    const format = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+    return { startDate: format(start), endDate: format(end) };
+  };
+
+  const [dateRange, setDateRange] = useState<DateRange>(getInitialDateRange());
+  const [userAnalyticsData, setUserAnalyticsData] = useState<any[]>([]);
+  const [userLoading, setUserLoading] = useState(false);
+  const [userError, setUserError] = useState<string | null>(null);
 
   async function loadAnalyticsData() {
     setLoading(true);
@@ -348,9 +549,30 @@ export default function AdminAnalyticsPage() {
     }
   }
 
+  async function loadUserAnalytics() {
+    setUserLoading(true);
+    setUserError(null);
+    try {
+      const data = await getUserAnalyticsAdmin(
+        dateRange.startDate,
+        dateRange.endDate,
+      );
+      setUserAnalyticsData(data || []);
+    } catch (err: any) {
+      console.error(err);
+      setUserError("Không thể tải dữ liệu phân tích người dùng mới.");
+    } finally {
+      setUserLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadAnalyticsData();
   }, []);
+
+  useEffect(() => {
+    loadUserAnalytics();
+  }, [dateRange.startDate, dateRange.endDate]);
 
   const selectedConcertAnalytic = analytics?.eventAnalytics?.find(
     (e: any) => e.id === selectedConcertId,
@@ -371,12 +593,17 @@ export default function AdminAnalyticsPage() {
             </p>
           </div>
           <button
-            onClick={loadAnalyticsData}
-            disabled={loading}
+            onClick={() => {
+              loadAnalyticsData();
+              loadUserAnalytics();
+            }}
+            disabled={loading || userLoading}
             className="flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary active:scale-95 disabled:opacity-50 cursor-pointer"
           >
-            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-            Làm mới dữ liệu
+            <RefreshCw
+              className={`size-4 ${loading || userLoading ? "animate-spin" : ""}`}
+            />
+            Làm mới
           </button>
         </div>
 
@@ -406,22 +633,37 @@ export default function AdminAnalyticsPage() {
 
         {analytics && (
           <>
-            {/* New Users Last Month Card */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-3xl border border-border bg-card p-6 shadow-sm transition hover:shadow-md">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
-                      Người dùng mới (Tháng trước)
-                    </p>
-                    <p className="text-3xl font-black text-foreground">
-                      {(analytics.newUsersLastMonth || 0).toLocaleString(
-                        "vi-VN",
-                      )}
-                    </p>
-                  </div>
-                  <Users className="size-10 text-primary/25" />
+            {/* Thống kê người dùng đăng ký mới (Bar Chart) */}
+            <div className="rounded-[2.5rem] border border-border bg-card p-6 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-black text-foreground mb-1 flex items-center gap-2">
+                    <Users className="size-5 text-primary" />
+                    Thống kê người dùng đăng ký mới
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Theo dõi số lượng tài khoản đăng ký mới theo khoảng thời
+                    gian tùy chỉnh.
+                  </p>
                 </div>
+                <DateRangePicker value={dateRange} onChange={setDateRange} />
+              </div>
+
+              {userError && (
+                <div className="rounded-3xl border border-destructive/20 bg-destructive/5 p-6 text-center text-destructive font-semibold">
+                  {userError}
+                </div>
+              )}
+
+              <div className="flex items-center justify-center min-h-[240px]">
+                {userLoading ? (
+                  <div className="flex items-center gap-2 text-muted-foreground animate-pulse font-bold text-sm">
+                    <RefreshCw className="size-4 animate-spin" />
+                    Đang tải dữ liệu...
+                  </div>
+                ) : (
+                  <UserAnalyticsChart data={userAnalyticsData} />
+                )}
               </div>
             </div>
 
