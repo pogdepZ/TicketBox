@@ -3,11 +3,13 @@
  * Stack Navigator with 6 screens for check-in flow
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { COLORS, FONT_SIZES, SPACING } from '../constants/theme';
+import { COLORS } from '../constants/theme';
 import type { RootStackParamList } from '../types';
+import { apiService } from '../services/api';
 
 import LoginScreen from '../screens/LoginScreen';
 import ScannerScreen from '../screens/ScannerScreen';
@@ -39,10 +41,39 @@ const screenOptions = {
 };
 
 export default function AppNavigator() {
+  const [initialRoute, setInitialRoute] = useState<"Login" | "Scanner" | null>(
+    null,
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function bootstrapAuth() {
+      const isAuthenticated = await apiService.restoreAuthSession();
+      if (isMounted) {
+        setInitialRoute(isAuthenticated ? "Scanner" : "Login");
+      }
+    }
+
+    bootstrapAuth();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  if (!initialRoute) {
+    return (
+      <View style={styles.bootstrapContainer}>
+        <ActivityIndicator color={COLORS.primary} size="large" />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer theme={navigationTheme}>
       <Stack.Navigator
-        initialRouteName="Login"
+        initialRouteName={initialRoute}
         screenOptions={screenOptions}
       >
         <Stack.Screen
@@ -87,3 +118,12 @@ export default function AppNavigator() {
     </NavigationContainer>
   );
 }
+
+const styles = {
+  bootstrapContainer: {
+    alignItems: "center" as const,
+    backgroundColor: COLORS.background,
+    flex: 1,
+    justifyContent: "center" as const,
+  },
+};

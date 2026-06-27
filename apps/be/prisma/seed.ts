@@ -1,6 +1,9 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcrypt';
+import fs from 'fs';
+import path from 'path';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import {
   Permission,
   PrismaClient,
@@ -19,6 +22,54 @@ if (!connectionString) {
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
 });
+
+const s3Client = new S3Client({
+  region: process.env.AWS_S3_REGION ?? 'us-east-1',
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? 'minioadmin',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? 'minioadmin',
+  },
+  endpoint: process.env.AWS_S3_ENDPOINT ?? 'http://localhost:9000',
+  forcePathStyle: process.env.AWS_S3_FORCE_PATH_STYLE === 'true',
+});
+const s3Bucket = process.env.AWS_S3_BUCKET ?? 'ticketbox-media';
+const s3Endpoint = process.env.AWS_S3_ENDPOINT ?? 'http://localhost:9000';
+
+async function uploadPoster(s3Key: string, relativePath: string): Promise<string> {
+  const localPath = path.resolve(__dirname, relativePath);
+  if (!fs.existsSync(localPath)) {
+    console.log(`Poster file not found at ${localPath}, skipping upload.`);
+    return '';
+  }
+
+  const fileBuffer = fs.readFileSync(localPath);
+  console.log(`Uploading local poster ${localPath} to MinIO bucket "${s3Bucket}" with key "${s3Key}"...`);
+
+  const ext = path.extname(localPath).toLowerCase();
+  let contentType = 'image/jpeg';
+  if (ext === '.png') {
+    contentType = 'image/png';
+  } else if (ext === '.webp') {
+    contentType = 'image/webp';
+  }
+
+  try {
+    const command = new PutObjectCommand({
+      Bucket: s3Bucket,
+      Key: s3Key,
+      Body: fileBuffer,
+      ContentType: contentType,
+    });
+
+    await s3Client.send(command);
+
+    const endpoint = s3Endpoint.replace(/\/$/, '');
+    return `${endpoint}/${s3Bucket}/${s3Key}`;
+  } catch (error) {
+    console.error(`Failed to upload poster to S3/MinIO:`, error);
+    return '';
+  }
+}
 
 const permissions = [
   'concert:read',
@@ -315,90 +366,95 @@ async function upsertUserRole(params: {
   });
 }
 
-async function seedConcertsAndTicketTypes(): Promise<void> {
-  const concertName = 'TicketBox Live Seeded';
-  const expectedConcertId = '202dedd0-18dc-4d48-a652-d0ee8aa1f441';
+interface ZoneSeedData {
+  code: string;
+  name: string;
+  color: string;
+}
 
-  let concert = await prisma.concert.findFirst({
-    where: { name: concertName },
+interface TicketTypeSeedData {
+  id: string;
+  name: string;
+  price: string;
+  totalQuantity: number;
+  maxPerUser: number;
+}
+
+interface ConcertSeedData {
+  id: string;
+  name: string;
+  description: string;
+  artistName: string;
+  venueName: string;
+  venueAddress: string;
+  eventDate: Date;
+  status: ConcertStatus;
+  seatMapSvgUrl: string;
+  posterLocalPath: string;
+  s3Key: string;
+  defaultPosterUrl: string;
+  zones: ZoneSeedData[];
+  ticketTypes: TicketTypeSeedData[];
+}
+
+async function seedConcert(data: ConcertSeedData): Promise<void> {
+  const posterUrl = (await uploadPoster(data.s3Key, data.posterLocalPath)) || data.defaultPosterUrl;
+
+  let concert = await prisma.concert.findUnique({
+    where: { id: data.id },
   });
 
-  if (concert && concert.id !== expectedConcertId) {
-    console.log(`Found seeded concert with incorrect ID (${concert.id}). Recreating with expected ID (${expectedConcertId})...`);
-    // Delete dependent records first to avoid foreign key violations
-    await prisma.guestImportRow.deleteMany({ where: { batch: { concertId: concert.id } } });
-    await prisma.guestImportBatch.deleteMany({ where: { concertId: concert.id } });
-    await prisma.guestList.deleteMany({ where: { concertId: concert.id } });
-    await prisma.checkinEvent.deleteMany({ where: { ticket: { concertId: concert.id } } });
-    await prisma.ticket.deleteMany({ where: { concertId: concert.id } });
-    await prisma.paymentEvent.deleteMany({ where: { order: { concertId: concert.id } } });
-    await prisma.orderItem.deleteMany({ where: { order: { concertId: concert.id } } });
-    await prisma.order.deleteMany({ where: { concertId: concert.id } });
-    await prisma.reservationItem.deleteMany({ where: { reservation: { concertId: concert.id } } });
-    await prisma.reservationSeat.deleteMany({ where: { concertId: concert.id } });
-    await prisma.reservation.deleteMany({ where: { concertId: concert.id } });
-    await prisma.waitingRoomSession.deleteMany({ where: { concertId: concert.id } });
-    await prisma.checkinDevice.deleteMany({ where: { concertId: concert.id } });
-    await prisma.artistAsset.deleteMany({ where: { concertId: concert.id } });
-    await prisma.userTicketQuota.deleteMany({ where: { ticketType: { concertId: concert.id } } });
-    await prisma.ticketType.deleteMany({ where: { concertId: concert.id } });
-    await prisma.seatZone.deleteMany({ where: { concertId: concert.id } });
-    await prisma.concert.delete({ where: { id: concert.id } });
-    concert = null;
-  }
-
   if (concert) {
-    console.log(`Cleaning up old test data (orders, tickets, reservations, quotas) for concert: ${concertName}...`);
-    await prisma.guestImportRow.deleteMany({ where: { batch: { concertId: concert.id } } });
-    await prisma.guestImportBatch.deleteMany({ where: { concertId: concert.id } });
-    await prisma.guestList.deleteMany({ where: { concertId: concert.id } });
-    await prisma.checkinEvent.deleteMany({ where: { ticket: { concertId: concert.id } } });
-    await prisma.ticket.deleteMany({ where: { concertId: concert.id } });
-    await prisma.paymentEvent.deleteMany({ where: { order: { concertId: concert.id } } });
-    await prisma.orderItem.deleteMany({ where: { order: { concertId: concert.id } } });
-    await prisma.order.deleteMany({ where: { concertId: concert.id } });
-    await prisma.reservationItem.deleteMany({ where: { reservation: { concertId: concert.id } } });
-    await prisma.reservationSeat.deleteMany({ where: { concertId: concert.id } });
-    await prisma.reservation.deleteMany({ where: { concertId: concert.id } });
-    await prisma.waitingRoomSession.deleteMany({ where: { concertId: concert.id } });
-    await prisma.artistAsset.deleteMany({ where: { concertId: concert.id } });
-    await prisma.userTicketQuota.deleteMany({ where: { ticketType: { concertId: concert.id } } });
-  }
+    console.log(`Cleaning up old test data for concert: ${data.name} (${data.id})...`);
+    await prisma.guestImportRow.deleteMany({ where: { batch: { concertId: data.id } } });
+    await prisma.guestImportBatch.deleteMany({ where: { concertId: data.id } });
+    await prisma.guestList.deleteMany({ where: { concertId: data.id } });
+    await prisma.checkinEvent.deleteMany({ where: { ticket: { concertId: data.id } } });
+    await prisma.ticket.deleteMany({ where: { concertId: data.id } });
+    await prisma.paymentEvent.deleteMany({ where: { order: { concertId: data.id } } });
+    await prisma.orderItem.deleteMany({ where: { order: { concertId: data.id } } });
+    await prisma.order.deleteMany({ where: { concertId: data.id } });
+    await prisma.reservationItem.deleteMany({ where: { reservation: { concertId: data.id } } });
+    await prisma.reservationSeat.deleteMany({ where: { concertId: data.id } });
+    await prisma.reservation.deleteMany({ where: { concertId: data.id } });
+    await prisma.waitingRoomSession.deleteMany({ where: { concertId: data.id } });
+    await prisma.artistAsset.deleteMany({ where: { concertId: data.id } });
+    await prisma.userTicketQuota.deleteMany({ where: { ticketType: { concertId: data.id } } });
 
-  if (!concert) {
-    const eventDate = new Date();
-    eventDate.setDate(eventDate.getDate() + 30); // 30 days in future
-
-    concert = await prisma.concert.create({
+    concert = await prisma.concert.update({
+      where: { id: data.id },
       data: {
-        id: expectedConcertId,
-        name: concertName,
-        description: 'A sample seeded concert for Postman flow.',
-        artistName: 'The Seeded Band',
-        venueName: 'TicketBox Arena',
-        venueAddress: '123 Nguyen Hue, District 1, Ho Chi Minh City',
-        eventDate,
-        status: ConcertStatus.PUBLISHED,
-        seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
-        posterUrl: 'https://example.com/posters/ticketbox-live.png',
+        name: data.name,
+        description: data.description,
+        artistName: data.artistName,
+        venueName: data.venueName,
+        venueAddress: data.venueAddress,
+        eventDate: data.eventDate,
+        status: data.status,
+        posterUrl,
       },
     });
-    console.log(`Created seeded concert: "${concertName}" with ID: ${concert.id}`);
   } else {
-    console.log(`Seeded concert already exists with ID: ${concert.id}`);
+    concert = await prisma.concert.create({
+      data: {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        artistName: data.artistName,
+        venueName: data.venueName,
+        venueAddress: data.venueAddress,
+        eventDate: data.eventDate,
+        status: data.status,
+        seatMapSvgUrl: data.seatMapSvgUrl,
+        posterUrl,
+      },
+    });
+    console.log(`Created seeded concert: "${data.name}"`);
   }
-
-  const zonesData = [
-    { code: 'svip', name: 'SVIP', color: '#e5484d' },
-    { code: 'vip', name: 'VIP', color: '#e0a82e' },
-    { code: 'premium', name: 'CAT1', color: '#3d6f8f' },
-    { code: 'standard', name: 'CAT2', color: '#123c3a' },
-    { code: 'economy', name: 'GA', color: '#64748b' },
-  ];
 
   const zoneMap: Record<string, string> = {};
 
-  for (const zone of zonesData) {
+  for (const zone of data.zones) {
     let existingZone = await prisma.seatZone.findFirst({
       where: {
         concertId: concert.id,
@@ -422,15 +478,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
     zoneMap[zone.name] = existingZone.id;
   }
 
-  const ticketTypesData = [
-    { id: 'da8e128c-682d-4fbb-bee4-5f26545cae11', name: 'SVIP', price: '1800000', totalQuantity: 50, maxPerUser: 100 },
-    { id: 'f7c6c7ab-f989-40c8-b81b-8338fc30730e', name: 'VIP', price: '1200000', totalQuantity: 100, maxPerUser: 100 },
-    { id: '07ad8d58-b7cc-4fbc-9593-9a76067f9070', name: 'CAT1', price: '850000', totalQuantity: 150, maxPerUser: 100 },
-    { id: '4787e219-2270-4f98-8d15-1a7581171cb1', name: 'CAT2', price: '600000', totalQuantity: 200, maxPerUser: 100 },
-    { id: '0120ec7c-8c06-4159-a3df-e242d3b2be52', name: 'GA', price: '450000', totalQuantity: 300, maxPerUser: 100 },
-  ];
-
-  for (const tt of ticketTypesData) {
+  for (const tt of data.ticketTypes) {
     const existing = await prisma.ticketType.findUnique({
       where: {
         concertId_name: {
@@ -456,7 +504,6 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       });
       console.log(`  Created TicketType: ${tt.name} (ID: ${created.id})`);
     } else {
-      // update seatZoneId, remaining and maxPerUser if it exists
       await prisma.ticketType.update({
         where: { id: existing.id },
         data: {
@@ -468,268 +515,327 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       console.log(`  TicketType ${tt.name} already exists (ID: ${existing.id}). Reset remaining/maxPerUser.`);
     }
   }
+}
 
-  const vipTicketType = await prisma.ticketType.findFirst({
-    where: {
-      concertId: concert.id,
-      name: 'VIP',
+async function seedConcertsAndTicketTypes(): Promise<void> {
+  // 1. Wipe all old database event-related data to ensure clean state
+  console.log('Wiping all existing concerts, ticket types, and dependent records...');
+  await prisma.guestImportRow.deleteMany({});
+  await prisma.guestImportBatch.deleteMany({});
+  await prisma.guestList.deleteMany({});
+  await prisma.checkinEvent.deleteMany({});
+  await prisma.ticket.deleteMany({});
+  await prisma.paymentEvent.deleteMany({});
+  await prisma.orderItem.deleteMany({});
+  await prisma.order.deleteMany({});
+  await prisma.reservationItem.deleteMany({});
+  await prisma.reservationSeat.deleteMany({});
+  await prisma.reservation.deleteMany({});
+  await prisma.waitingRoomSession.deleteMany({});
+  await prisma.checkinDevice.deleteMany({});
+  await prisma.artistAsset.deleteMany({});
+  await prisma.userTicketQuota.deleteMany({});
+  await prisma.ticketType.deleteMany({});
+  await prisma.seatZone.deleteMany({});
+  await prisma.concert.deleteMany({});
+
+  // 2. Define Stable Test Concert (TicketBox Live Seeded) - Required for Postman flows
+  const ticketBoxLiveConcert: ConcertSeedData = {
+    id: '202dedd0-18dc-4d48-a652-d0ee8aa1f441',
+    name: 'TicketBox Live Seeded',
+    description: 'A stable seeded concert for Postman and automation testing.',
+    artistName: 'The Seeded Band',
+    venueName: 'TicketBox Arena',
+    venueAddress: '123 Nguyen Hue, District 1, Ho Chi Minh City',
+    eventDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+    status: ConcertStatus.PUBLISHED,
+    seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+    posterLocalPath: '../fixtures/ticketbox_live.jpg',
+    s3Key: 'posters/ticketbox_live.jpg',
+    defaultPosterUrl: 'https://example.com/posters/ticketbox-live.png',
+    zones: [
+      { code: 'svip', name: 'SVIP', color: '#e5484d' },
+      { code: 'vip', name: 'VIP', color: '#e0a82e' },
+      { code: 'premium', name: 'CAT1', color: '#3d6f8f' },
+      { code: 'standard', name: 'CAT2', color: '#123c3a' },
+      { code: 'economy', name: 'GA', color: '#64748b' },
+    ],
+    ticketTypes: [
+      { id: 'da8e128c-682d-4fbb-bee4-5f26545cae11', name: 'SVIP', price: '1800000', totalQuantity: 50, maxPerUser: 100 },
+      { id: 'f7c6c7ab-f989-40c8-b81b-8338fc30730e', name: 'VIP', price: '1200000', totalQuantity: 100, maxPerUser: 100 },
+      { id: '07ad8d58-b7cc-4fbc-9593-9a76067f9070', name: 'CAT1', price: '850000', totalQuantity: 150, maxPerUser: 100 },
+      { id: '4787e219-2270-4f98-8d15-1a7581171cb1', name: 'CAT2', price: '600000', totalQuantity: 200, maxPerUser: 100 },
+      { id: '0120ec7c-8c06-4159-a3df-e242d3b2be52', name: 'GA', price: '450000', totalQuantity: 300, maxPerUser: 100 },
+    ]
+  };
+
+  await seedConcert(ticketBoxLiveConcert);
+
+  // 3. Define and seed real concerts corresponding to local WebP fixtures
+  const webpConcerts: ConcertSeedData[] = [
+    {
+      id: 'f0000000-0000-0000-0000-000000000001',
+      name: 'Hanwha Life Esports - Global Fanfest in Vietnam',
+      description: 'Đại nhạc hội và ngày hội giao lưu người hâm mộ Hanwha Life Esports Global Fanfest tại Việt Nam.',
+      artistName: 'Hanwha Life Esports',
+      venueName: 'Nhà thi đấu Phú Thọ',
+      venueAddress: '1 Lữ Gia, Phường 15, Quận 11, TP. Hồ Chí Minh',
+      eventDate: new Date('2026-08-28T18:00:00.000Z'),
+      status: ConcertStatus.PUBLISHED,
+      seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+      posterLocalPath: '../fixtures/2805_hanwha-life-esports-global-fanfest-in-vietnam-thumbnail-1600x900_1.webp',
+      s3Key: 'posters/hanwha_life_esports_fanfest.webp',
+      defaultPosterUrl: 'https://example.com/posters/hanwha.webp',
+      zones: [
+        { code: 'vip', name: 'VIP', color: '#eab308' },
+        { code: 'ga', name: 'GA', color: '#6b7280' }
+      ],
+      ticketTypes: [
+        { id: 'a0000001-2222-2222-2222-000000000001', name: 'VIP', price: '500000', totalQuantity: 200, maxPerUser: 4 },
+        { id: 'a0000001-2222-2222-2222-000000000002', name: 'GA', price: '200000', totalQuantity: 500, maxPerUser: 4 }
+      ]
     },
-  });
-
-  console.log('\n==================================================================');
-  console.log('POSTMAN ENVIRONMENT VARIABLES FOR ORDERS + PAYMENTS FLOW:');
-  console.log(`concertId: ${concert.id}`);
-  console.log(`ticketTypeId: ${vipTicketType?.id || 'N/A'}`);
-  console.log('==================================================================\n');
-
-  // 1. Phung Khanh Linh Concert (GIỮA MỘT VẠN TOUR)
-  const pklConcertId = 'e72e128c-682d-4fbb-bee4-5f26545cae22';
-  const pklConcertName = 'Giữa Một Vạn Tour - Chapter 4: Live Experience in Hà Nội';
-
-  let pklConcert = await prisma.concert.findUnique({
-    where: { id: pklConcertId },
-  });
-
-  if (pklConcert) {
-    console.log(`Cleaning up old test data for concert: ${pklConcertName}...`);
-    await prisma.guestImportRow.deleteMany({ where: { batch: { concertId: pklConcertId } } });
-    await prisma.guestImportBatch.deleteMany({ where: { concertId: pklConcertId } });
-    await prisma.guestList.deleteMany({ where: { concertId: pklConcertId } });
-    await prisma.checkinEvent.deleteMany({ where: { ticket: { concertId: pklConcertId } } });
-    await prisma.ticket.deleteMany({ where: { concertId: pklConcertId } });
-    await prisma.paymentEvent.deleteMany({ where: { order: { concertId: pklConcertId } } });
-    await prisma.orderItem.deleteMany({ where: { order: { concertId: pklConcertId } } });
-    await prisma.order.deleteMany({ where: { concertId: pklConcertId } });
-    await prisma.reservationItem.deleteMany({ where: { reservation: { concertId: pklConcertId } } });
-    await prisma.reservationSeat.deleteMany({ where: { concertId: pklConcertId } });
-    await prisma.reservation.deleteMany({ where: { concertId: pklConcertId } });
-    await prisma.waitingRoomSession.deleteMany({ where: { concertId: pklConcertId } });
-    await prisma.artistAsset.deleteMany({ where: { concertId: pklConcertId } });
-    await prisma.userTicketQuota.deleteMany({ where: { ticketType: { concertId: pklConcertId } } });
-  } else {
-    pklConcert = await prisma.concert.create({
-      data: {
-        id: pklConcertId,
-        name: pklConcertName,
-        description: 'Đêm nhạc "Giữa Một Vạn Tour - Chapter 4: Live Experience" mang đến không gian âm nhạc nghệ thuật độc đáo của ca sĩ Phùng Khánh Linh.',
-        artistName: 'Phùng Khánh Linh',
-        venueName: 'Trung tâm Hội nghị Quốc gia',
-        venueAddress: 'Cổng số 1, Đại lộ Thăng Long, Mễ Trì, Nam Từ Liêm, Hà Nội',
-        eventDate: new Date('2026-08-09T19:00:00.000Z'),
-        status: ConcertStatus.PUBLISHED,
-        seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
-        posterUrl: 'https://example.com/posters/giua-mot-van-tour.png',
-      },
-    });
-    console.log(`Created seeded concert: "${pklConcertName}"`);
-  }
-
-  const pklZonesData = [
-    { code: 'black_swan', name: 'BLACK SWAN', color: '#000000' },
-    { code: 'swan', name: 'SWAN', color: '#f8fafc' },
-    { code: 'sword', name: 'SWORD', color: '#94a3b8' },
-    { code: 'ballerina', name: 'BALLERINA', color: '#ec4899' },
-    { code: 'feather', name: 'FEATHER', color: '#f43f5e' },
-    { code: 'moonlight', name: 'MOONLIGHT', color: '#38bdf8' },
+    {
+      id: 'f0000000-0000-0000-0000-000000000002',
+      name: 'Lim Yoona Fan Meeting in HCMC',
+      description: 'Buổi gặp gỡ người hâm mộ chính thức của nữ ca sĩ, diễn viên Lim Yoona (Girls Generation) tại TP. Hồ Chí Minh.',
+      artistName: 'Lim Yoona',
+      venueName: 'Nhà hát Hòa Bình',
+      venueAddress: '240 Đường 3 Tháng 2, Quận 10, TP. Hồ Chí Minh',
+      eventDate: new Date('2026-08-29T19:00:00.000Z'),
+      status: ConcertStatus.PUBLISHED,
+      seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+      posterLocalPath: '../fixtures/2. 0829_THUMBNAIL_YOONA FM IN HCMC.webp',
+      s3Key: 'posters/yoona_fan_meeting.webp',
+      defaultPosterUrl: 'https://example.com/posters/yoona.webp',
+      zones: [
+        { code: 'svip', name: 'SVIP', color: '#dc2626' },
+        { code: 'vip', name: 'VIP', color: '#eab308' },
+        { code: 'std', name: 'Standard', color: '#2563eb' },
+        { code: 'ga', name: 'GA', color: '#6b7280' }
+      ],
+      ticketTypes: [
+        { id: 'a0000002-2222-2222-2222-000000000001', name: 'SVIP', price: '4500000', totalQuantity: 100, maxPerUser: 4 },
+        { id: 'a0000002-2222-2222-2222-000000000002', name: 'VIP', price: '3500000', totalQuantity: 150, maxPerUser: 4 },
+        { id: 'a0000002-2222-2222-2222-000000000003', name: 'Standard', price: '2000000', totalQuantity: 200, maxPerUser: 4 },
+        { id: 'a0000002-2222-2222-2222-000000000004', name: 'GA', price: '1000000', totalQuantity: 300, maxPerUser: 4 }
+      ]
+    },
+    {
+      id: 'f0000000-0000-0000-0000-000000000003',
+      name: 'Vỹ Dạ Waterfest 2026',
+      description: 'Lễ hội âm nhạc nước hoành tráng Vỹ Dạ Waterfest quy tụ dàn nghệ sĩ hàng đầu Việt Nam.',
+      artistName: 'Various Artists',
+      venueName: 'Sân vận động Quân khu 7',
+      venueAddress: '202 Hoàng Văn Thụ, Phường 9, Phú Nhuận, TP. Hồ Chí Minh',
+      eventDate: new Date('2027-06-02T16:00:00.000Z'),
+      status: ConcertStatus.PUBLISHED,
+      seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+      posterLocalPath: '../fixtures/0206_vy-da-waterfest-2026-thumbnail-1600x900.webp',
+      s3Key: 'posters/vy_da_waterfest.webp',
+      defaultPosterUrl: 'https://example.com/posters/vy_da.webp',
+      zones: [
+        { code: 'vip', name: 'VIP', color: '#eab308' },
+        { code: 'std', name: 'Standard', color: '#2563eb' },
+        { code: 'ga', name: 'GA', color: '#6b7280' }
+      ],
+      ticketTypes: [
+        { id: 'a0000003-2222-2222-2222-000000000001', name: 'VIP', price: '1200000', totalQuantity: 200, maxPerUser: 4 },
+        { id: 'a0000003-2222-2222-2222-000000000002', name: 'Standard', price: '800000', totalQuantity: 300, maxPerUser: 4 },
+        { id: 'a0000003-2222-2222-2222-000000000003', name: 'GA', price: '500000', totalQuantity: 500, maxPerUser: 4 }
+      ]
+    },
+    {
+      id: 'f0000000-0000-0000-0000-000000000004',
+      name: 'Rhyder - Album Live Concert',
+      description: 'Live concert ra mắt album phòng thu đặc biệt của quán quân Rhyder.',
+      artistName: 'Rhyder',
+      venueName: 'Lan Anh Stage',
+      venueAddress: '291 Cách Mạng Tháng Tám, Phường 12, Quận 10, TP. Hồ Chí Minh',
+      eventDate: new Date('2026-09-15T20:00:00.000Z'),
+      status: ConcertStatus.PUBLISHED,
+      seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+      posterLocalPath: '../fixtures/thumbnail_rhyder.webp',
+      s3Key: 'posters/rhyder_live.webp',
+      defaultPosterUrl: 'https://example.com/posters/rhyder.webp',
+      zones: [
+        { code: 'vip', name: 'VIP', color: '#eab308' },
+        { code: 'std', name: 'Standard', color: '#2563eb' },
+        { code: 'ga', name: 'GA', color: '#6b7280' }
+      ],
+      ticketTypes: [
+        { id: 'a0000004-2222-2222-2222-000000000001', name: 'VIP', price: '2500000', totalQuantity: 150, maxPerUser: 4 },
+        { id: 'a0000004-2222-2222-2222-000000000002', name: 'Standard', price: '1500000', totalQuantity: 200, maxPerUser: 4 },
+        { id: 'a0000004-2222-2222-2222-000000000003', name: 'GA', price: '800000', totalQuantity: 300, maxPerUser: 4 }
+      ]
+    },
+    {
+      id: 'f0000000-0000-0000-0000-000000000005',
+      name: 'GAM Esports Fan Meeting',
+      description: 'Buổi gặp gỡ, giao lưu chính thức của đội tuyển LMHT hàng đầu Việt Nam GAM Esports cùng người hâm mộ.',
+      artistName: 'GAM Esports',
+      venueName: 'Nhà thi đấu Nguyễn Du',
+      venueAddress: '116 Nguyễn Du, Phường Bến Thành, Quận 1, TP. Hồ Chí Minh',
+      eventDate: new Date('2026-09-20T14:00:00.000Z'),
+      status: ConcertStatus.PUBLISHED,
+      seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+      posterLocalPath: '../fixtures/1600x900_GAM.webp',
+      s3Key: 'posters/gam_esports_meeting.webp',
+      defaultPosterUrl: 'https://example.com/posters/gam.webp',
+      zones: [
+        { code: 'vip', name: 'VIP', color: '#eab308' },
+        { code: 'ga', name: 'GA', color: '#6b7280' }
+      ],
+      ticketTypes: [
+        { id: 'a0000005-2222-2222-2222-000000000001', name: 'VIP', price: '400000', totalQuantity: 150, maxPerUser: 4 },
+        { id: 'a0000005-2222-2222-2222-000000000002', name: 'GA', price: '150000', totalQuantity: 400, maxPerUser: 4 }
+      ]
+    },
+    {
+      id: 'f0000000-0000-0000-0000-000000000006',
+      name: 'Pink Run 2026',
+      description: 'Giải chạy marathon từ thiện nâng cao nhận thức cộng đồng Pink Run 2026.',
+      artistName: 'Pink Run',
+      venueName: 'Saigon Outcast',
+      venueAddress: '188/1 Nguyễn Văn Hưởng, Thảo Điền, Quận 2, TP. Hồ Chí Minh',
+      eventDate: new Date('2026-10-18T06:00:00.000Z'),
+      status: ConcertStatus.PUBLISHED,
+      seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+      posterLocalPath: '../fixtures/KV pinkrun -1600 x 900.webp',
+      s3Key: 'posters/pinkrun_marathon.webp',
+      defaultPosterUrl: 'https://example.com/posters/pinkrun.webp',
+      zones: [
+        { code: 'std', name: 'Standard', color: '#2563eb' }
+      ],
+      ticketTypes: [
+        { id: 'a0000006-2222-2222-2222-000000000001', name: 'Standard', price: '350000', totalQuantity: 1000, maxPerUser: 4 }
+      ]
+    },
+    {
+      id: 'f0000000-0000-0000-0000-000000000007',
+      name: 'The Wandering Rose Concert',
+      description: 'Đêm nhạc thính phòng acoustic The Wandering Rose lãng mạn tại không gian Đà Lạt.',
+      artistName: 'The Wandering Rose',
+      venueName: 'Đà Lạt Opera House',
+      venueAddress: 'Quảng trường Lâm Viên, Phường 10, TP. Đà Lạt',
+      eventDate: new Date('2026-10-24T19:30:00.000Z'),
+      status: ConcertStatus.PUBLISHED,
+      seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+      posterLocalPath: '../fixtures/thumbnail_the wandering rose.webp',
+      s3Key: 'posters/wandering_rose.webp',
+      defaultPosterUrl: 'https://example.com/posters/rose.webp',
+      zones: [
+        { code: 'vip', name: 'VIP', color: '#eab308' },
+        { code: 'std', name: 'Standard', color: '#2563eb' }
+      ],
+      ticketTypes: [
+        { id: 'a0000007-2222-2222-2222-000000000001', name: 'VIP', price: '1500000', totalQuantity: 100, maxPerUser: 4 },
+        { id: 'a0000007-2222-2222-2222-000000000002', name: 'Standard', price: '900000', totalQuantity: 200, maxPerUser: 4 }
+      ]
+    },
+    {
+      id: 'f0000000-0000-0000-0000-000000000008',
+      name: 'The Next Live Show',
+      description: 'Sân khấu âm nhạc đặc biệt The Next tập hợp các tài năng âm nhạc trẻ triển vọng.',
+      artistName: 'The Next',
+      venueName: 'Nhà hát Hòa Bình',
+      venueAddress: '240 Đường 3 Tháng 2, Quận 10, TP. Hồ Chí Minh',
+      eventDate: new Date('2026-10-31T20:00:00.000Z'),
+      status: ConcertStatus.PUBLISHED,
+      seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+      posterLocalPath: '../fixtures/thumbnail_thenext.webp',
+      s3Key: 'posters/the_next_show.webp',
+      defaultPosterUrl: 'https://example.com/posters/next.webp',
+      zones: [
+        { code: 'vip', name: 'VIP', color: '#eab308' },
+        { code: 'std', name: 'Standard', color: '#2563eb' }
+      ],
+      ticketTypes: [
+        { id: 'a0000008-2222-2222-2222-000000000001', name: 'VIP', price: '2000000', totalQuantity: 150, maxPerUser: 4 },
+        { id: 'a0000008-2222-2222-2222-000000000002', name: 'Standard', price: '1000000', totalQuantity: 250, maxPerUser: 4 }
+      ]
+    },
+    {
+      id: 'f0000000-0000-0000-0000-000000000009',
+      name: 'Ngày Hội Sen Huế 2026',
+      description: 'Lễ hội văn hóa ẩm thực truyền thống giới thiệu vẻ đẹp và các sản phẩm từ Sen Huế.',
+      artistName: 'Sen Huế',
+      venueName: 'Trung tâm Hội nghị Quốc gia',
+      venueAddress: '57 Phạm Hùng, Nam Từ Liêm, Hà Nội',
+      eventDate: new Date('2027-05-21T08:00:00.000Z'),
+      status: ConcertStatus.PUBLISHED,
+      seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+      posterLocalPath: '../fixtures/ngay-hoi-sen-hue-2105-bg-thumbnail.webp',
+      s3Key: 'posters/sen_hue.webp',
+      defaultPosterUrl: 'https://example.com/posters/sen_hue.webp',
+      zones: [
+        { code: 'std', name: 'Standard', color: '#2563eb' }
+      ],
+      ticketTypes: [
+        { id: 'a0000009-2222-2222-2222-000000000001', name: 'Standard', price: '100000', totalQuantity: 500, maxPerUser: 4 }
+      ]
+    },
+    {
+      id: 'f0000000-0000-0000-0000-000000000010',
+      name: 'Luminix Event 2026',
+      description: 'Trải nghiệm âm thanh và ánh sáng nghệ thuật đỉnh cao của lễ hội Luminix.',
+      artistName: 'Luminix',
+      venueName: 'Cung Điền kinh Mỹ Đình',
+      venueAddress: 'Đường Trần Hữu Dực, Cầu Diễn, Nam Từ Liêm, TP. Hà Nội',
+      eventDate: new Date('2026-11-05T19:30:00.000Z'),
+      status: ConcertStatus.PUBLISHED,
+      seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+      posterLocalPath: '../fixtures/LUMINIX-thumpnail.webp',
+      s3Key: 'posters/luminix_event.webp',
+      defaultPosterUrl: 'https://example.com/posters/luminix.webp',
+      zones: [
+        { code: 'vip', name: 'VIP', color: '#eab308' },
+        { code: 'ga', name: 'GA', color: '#6b7280' }
+      ],
+      ticketTypes: [
+        { id: 'a0000010-2222-2222-2222-000000000001', name: 'VIP', price: '1800000', totalQuantity: 150, maxPerUser: 4 },
+        { id: 'a0000010-2222-2222-2222-000000000002', name: 'GA', price: '900000', totalQuantity: 300, maxPerUser: 4 }
+      ]
+    },
+    {
+      id: 'f0000000-0000-0000-0000-000000000011',
+      name: 'Giữa Một Vạn Tour - Chapter Four (Chặng 4)',
+      description: 'Đêm nhạc "Giữa Một Vạn Tour - Chapter Four" của ca sĩ Phùng Khánh Linh.',
+      artistName: 'Phùng Khánh Linh',
+      venueName: 'Trung tâm Hội nghị Quốc gia',
+      venueAddress: '57 Phạm Hùng, Nam Từ Liêm, Hà Nội',
+      eventDate: new Date('2026-08-09T19:00:00.000Z'),
+      status: ConcertStatus.PUBLISHED,
+      seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+      posterLocalPath: '../fixtures/chang4_thumbnail_1600 x 900.webp',
+      s3Key: 'posters/giua_mot_van_tour_c4.webp',
+      defaultPosterUrl: 'https://example.com/posters/giua_mot_van_tour.webp',
+      zones: [
+        { code: 'black_swan', name: 'BLACK SWAN', color: '#000000' },
+        { code: 'swan', name: 'SWAN', color: '#f8fafc' },
+        { code: 'sword', name: 'SWORD', color: '#94a3b8' },
+        { code: 'ballerina', name: 'BALLERINA', color: '#ec4899' },
+        { code: 'feather', name: 'FEATHER', color: '#f43f5e' },
+        { code: 'moonlight', name: 'MOONLIGHT', color: '#38bdf8' }
+      ],
+      ticketTypes: [
+        { id: 'a0000011-2222-2222-2222-000000000001', name: 'BLACK SWAN', price: '10000000', totalQuantity: 10, maxPerUser: 4 },
+        { id: 'a0000011-2222-2222-2222-000000000002', name: 'SWAN', price: '3000000', totalQuantity: 50, maxPerUser: 4 },
+        { id: 'a0000011-2222-2222-2222-000000000003', name: 'SWORD', price: '2200000', totalQuantity: 100, maxPerUser: 4 },
+        { id: 'a0000011-2222-2222-2222-000000000004', name: 'BALLERINA', price: '1600000', totalQuantity: 150, maxPerUser: 4 },
+        { id: 'a0000011-2222-2222-2222-000000000005', name: 'FEATHER', price: '1100000', totalQuantity: 200, maxPerUser: 4 },
+        { id: 'a0000011-2222-2222-2222-000000000006', name: 'MOONLIGHT', price: '860000', totalQuantity: 300, maxPerUser: 4 }
+      ]
+    }
   ];
 
-  const pklZoneMap: Record<string, string> = {};
-
-  for (const zone of pklZonesData) {
-    let existingZone = await prisma.seatZone.findFirst({
-      where: {
-        concertId: pklConcertId,
-        code: zone.code,
-      },
-    });
-
-    if (!existingZone) {
-      existingZone = await prisma.seatZone.create({
-        data: {
-          concertId: pklConcertId,
-          code: zone.code,
-          name: zone.name,
-          color: zone.color,
-        },
-      });
-      console.log(`  Created SeatZone: ${zone.name} (ID: ${existingZone.id})`);
-    } else {
-      console.log(`  SeatZone ${zone.name} already exists (ID: ${existingZone.id})`);
-    }
-    pklZoneMap[zone.name] = existingZone.id;
-  }
-
-  const pklTicketTypesData = [
-    { id: '11111111-1111-1111-1111-111111111111', name: 'BLACK SWAN', price: '10000000', totalQuantity: 10, maxPerUser: 4 },
-    { id: '22222222-2222-2222-2222-222222222222', name: 'SWAN', price: '3000000', totalQuantity: 50, maxPerUser: 4 },
-    { id: '33333333-3333-3333-3333-333333333333', name: 'SWORD', price: '2200000', totalQuantity: 100, maxPerUser: 4 },
-    { id: '44444444-4444-4444-4444-444444444444', name: 'BALLERINA', price: '1600000', totalQuantity: 150, maxPerUser: 4 },
-    { id: '55555555-5555-5555-5555-555555555555', name: 'FEATHER', price: '1100000', totalQuantity: 200, maxPerUser: 4 },
-    { id: '66666666-6666-6666-6666-666666666666', name: 'MOONLIGHT', price: '860000', totalQuantity: 300, maxPerUser: 4 },
-  ];
-
-  for (const tt of pklTicketTypesData) {
-    const existing = await prisma.ticketType.findUnique({
-      where: {
-        concertId_name: {
-          concertId: pklConcertId,
-          name: tt.name,
-        },
-      },
-    });
-
-    if (!existing) {
-      const created = await prisma.ticketType.create({
-        data: {
-          id: tt.id,
-          concertId: pklConcertId,
-          seatZoneId: pklZoneMap[tt.name] || null,
-          name: tt.name,
-          price: tt.price,
-          totalQuantity: tt.totalQuantity,
-          remaining: tt.totalQuantity,
-          maxPerUser: tt.maxPerUser,
-          status: TicketTypeStatus.ACTIVE,
-        },
-      });
-      console.log(`  Created TicketType: ${tt.name} (ID: ${created.id})`);
-    } else {
-      await prisma.ticketType.update({
-        where: { id: existing.id },
-        data: {
-          seatZoneId: existing.seatZoneId || pklZoneMap[tt.name] || null,
-          remaining: tt.totalQuantity,
-          maxPerUser: tt.maxPerUser,
-        },
-      });
-      console.log(`  TicketType ${tt.name} already exists (ID: ${existing.id}). Reset remaining/maxPerUser.`);
-    }
-  }
-
-  // 2. Van Mai Huong + Vuong Binh Concert ([CAT & MOUSE])
-  const vmhConcertId = 'd83c27ab-f989-40c8-b81b-8338fc30730f';
-  const vmhConcertName = '[CAT & MOUSE] Đêm nhạc Văn Mai Hương + Vương Bình';
-
-  let vmhConcert = await prisma.concert.findUnique({
-    where: { id: vmhConcertId },
-  });
-
-  if (vmhConcert) {
-    console.log(`Cleaning up old test data for concert: ${vmhConcertName}...`);
-    await prisma.guestImportRow.deleteMany({ where: { batch: { concertId: vmhConcertId } } });
-    await prisma.guestImportBatch.deleteMany({ where: { concertId: vmhConcertId } });
-    await prisma.guestList.deleteMany({ where: { concertId: vmhConcertId } });
-    await prisma.checkinEvent.deleteMany({ where: { ticket: { concertId: vmhConcertId } } });
-    await prisma.ticket.deleteMany({ where: { concertId: vmhConcertId } });
-    await prisma.paymentEvent.deleteMany({ where: { order: { concertId: vmhConcertId } } });
-    await prisma.orderItem.deleteMany({ where: { order: { concertId: vmhConcertId } } });
-    await prisma.order.deleteMany({ where: { concertId: vmhConcertId } });
-    await prisma.reservationItem.deleteMany({ where: { reservation: { concertId: vmhConcertId } } });
-    await prisma.reservationSeat.deleteMany({ where: { concertId: vmhConcertId } });
-    await prisma.reservation.deleteMany({ where: { concertId: vmhConcertId } });
-    await prisma.waitingRoomSession.deleteMany({ where: { concertId: vmhConcertId } });
-    await prisma.artistAsset.deleteMany({ where: { concertId: vmhConcertId } });
-    await prisma.userTicketQuota.deleteMany({ where: { ticketType: { concertId: vmhConcertId } } });
-  } else {
-    vmhConcert = await prisma.concert.create({
-      data: {
-        id: vmhConcertId,
-        name: vmhConcertName,
-        description: 'Đêm nhạc kết hợp đặc biệt giữa Văn Mai Hương và Vương Bình tại phòng trà Cat & Mouse Live Music.',
-        artistName: 'Văn Mai Hương + Vương Bình',
-        venueName: 'Cat & Mouse Live Music',
-        venueAddress: '37B Phạm Ngọc Thạch, Phường Võ Thị Sáu, Quận 3, TP. Hồ Chí Minh',
-        eventDate: new Date('2026-07-18T20:00:00.000Z'),
-        status: ConcertStatus.PUBLISHED,
-        seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
-        posterUrl: 'https://example.com/posters/cat-mouse-vmh-vb.png',
-      },
-    });
-    console.log(`Created seeded concert: "${vmhConcertName}"`);
-  }
-
-  const vmhZonesData = [
-    { code: 'super_vip', name: 'Super VIP', color: '#dc2626' },
-    { code: 'vip', name: 'VIP', color: '#eab308' },
-    { code: 'std_1', name: 'Standard 1', color: '#2563eb' },
-    { code: 'std_2', name: 'Standard 2', color: '#475569' },
-  ];
-
-  const vmhZoneMap: Record<string, string> = {};
-
-  for (const zone of vmhZonesData) {
-    let existingZone = await prisma.seatZone.findFirst({
-      where: {
-        concertId: vmhConcertId,
-        code: zone.code,
-      },
-    });
-
-    if (!existingZone) {
-      existingZone = await prisma.seatZone.create({
-        data: {
-          concertId: vmhConcertId,
-          code: zone.code,
-          name: zone.name,
-          color: zone.color,
-        },
-      });
-      console.log(`  Created SeatZone: ${zone.name} (ID: ${existingZone.id})`);
-    } else {
-      console.log(`  SeatZone ${zone.name} already exists (ID: ${existingZone.id})`);
-    }
-    vmhZoneMap[zone.name] = existingZone.id;
-  }
-
-  const vmhTicketTypesData = [
-    { id: '77777777-7777-7777-7777-777777777777', name: 'Super VIP', price: '1900000', totalQuantity: 30, maxPerUser: 4 },
-    { id: '88888888-8888-8888-8888-888888888888', name: 'VIP', price: '1700000', totalQuantity: 50, maxPerUser: 4 },
-    { id: '99999999-9999-9999-9999-999999999999', name: 'Standard 1', price: '900000', totalQuantity: 80, maxPerUser: 4 },
-    { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', name: 'Standard 2', price: '600000', totalQuantity: 100, maxPerUser: 4 },
-  ];
-
-  for (const tt of vmhTicketTypesData) {
-    const existing = await prisma.ticketType.findUnique({
-      where: {
-        concertId_name: {
-          concertId: vmhConcertId,
-          name: tt.name,
-        },
-      },
-    });
-
-    if (!existing) {
-      const created = await prisma.ticketType.create({
-        data: {
-          id: tt.id,
-          concertId: vmhConcertId,
-          seatZoneId: vmhZoneMap[tt.name] || null,
-          name: tt.name,
-          price: tt.price,
-          totalQuantity: tt.totalQuantity,
-          remaining: tt.totalQuantity,
-          maxPerUser: tt.maxPerUser,
-          status: TicketTypeStatus.ACTIVE,
-        },
-      });
-      console.log(`  Created TicketType: ${tt.name} (ID: ${created.id})`);
-    } else {
-      await prisma.ticketType.update({
-        where: { id: existing.id },
-        data: {
-          seatZoneId: existing.seatZoneId || vmhZoneMap[tt.name] || null,
-          remaining: tt.totalQuantity,
-          maxPerUser: tt.maxPerUser,
-        },
-      });
-      console.log(`  TicketType ${tt.name} already exists (ID: ${existing.id}). Reset remaining/maxPerUser.`);
-    }
+  for (const cData of webpConcerts) {
+    await seedConcert(cData);
   }
 
   console.log('\n==================================================================');
-  console.log('TICKETBOX REAL SEEDED EVENTS:');
-  console.log(`- Phung Khanh Linh concert ID: ${pklConcert.id}`);
-  console.log(`- Van Mai Huong + Vuong Binh concert ID: ${vmhConcert.id}`);
+  console.log('REAL WEBP CONCERTS SEEDED SUCCESSFULLY.');
+  console.log(`Stable Concert ID: ${ticketBoxLiveConcert.id}`);
   console.log('==================================================================\n');
 }
 
