@@ -8,7 +8,7 @@ type Provider = 'VNPAY' | 'MOMO';
 type UnifiedWebhookPayload = {
   paymentRef: string;
   gatewayTransactionId: string;
-  eventType: 'SUCCESS' | 'FAILED' | 'TIMEOUT';
+  eventType: 'SUCCESS' | 'FAILED' | 'TIMEOUT' | 'CANCELLED';
   amount: number | string;
   currency: 'VND';
   gatewayPaidAt?: number | string;
@@ -218,7 +218,10 @@ export class PaymentGatewayService {
 
   normalizeMomoIpnPayload(payload: MomoIpnPayload): UnifiedWebhookPayload {
     const resultCode = Number(payload.resultCode);
-    const eventType: 'SUCCESS' | 'FAILED' = resultCode === 0 ? 'SUCCESS' : 'FAILED';
+    let eventType: 'SUCCESS' | 'FAILED' | 'CANCELLED' = resultCode === 0 ? 'SUCCESS' : 'FAILED';
+    if (resultCode === 1006 || resultCode === 49) {
+      eventType = 'CANCELLED';
+    }
 
     return {
       paymentRef: String(payload.orderId ?? ''),

@@ -40,6 +40,16 @@ export class ConcertController {
     return this.concertService.create(createConcertDto, user?.id);
   }
 
+  @Post("upload-poster")
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermissions("concert:create")
+  @UseInterceptors(FileInterceptor("file"))
+  uploadPoster(
+    @UploadedFile() file?: UploadedFileDto,
+  ) {
+    return this.concertService.uploadPoster(file);
+  }
+
   @Post(":id/seat-map-svg")
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermissions("ticket_type:manage")

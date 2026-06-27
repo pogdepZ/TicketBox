@@ -469,6 +469,16 @@ export async function uploadConcertSeatMapSvg(
   });
 }
 
+export async function uploadConcertPoster(file: File): Promise<{ url: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return await fetchApi("/concerts/upload-poster", {
+    method: "POST",
+    body: formData,
+  });
+}
+
 export async function getConcertById(id: string) {
   try {
     const url = `/concerts/${id}`;

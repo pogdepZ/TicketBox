@@ -69,7 +69,7 @@ export class PaymentsController {
       provider: Provider;
       paymentRef: string;
       gatewayTransactionId: string;
-      eventType: 'SUCCESS' | 'FAILED' | 'TIMEOUT';
+      eventType: 'SUCCESS' | 'FAILED' | 'TIMEOUT' | 'CANCELLED';
       amount: number;
     },
   ) {

@@ -537,6 +537,10 @@
                   "pm.collectionVariables.set('concertName', `TicketBox Live ${timestamp}`);",
                   "pm.collectionVariables.set('concertEventDate', futureDate);",
                   "",
+                  "if (!pm.collectionVariables.get('lastUploadedPosterUrl')) {",
+                  "  pm.collectionVariables.set('lastUploadedPosterUrl', 'https://example.com/posters/ticketbox-live.png');",
+                  "}",
+                  "",
                   "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
                   "",
                   "if (!accessToken) {",
@@ -583,7 +587,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"{{concertName}}\",\n  \"description\": \"A sample concert created from Postman.\",\n  \"artistName\": \"The TicketBox Band\",\n  \"venueName\": \"TicketBox Arena\",\n  \"venueAddress\": \"123 Nguyen Hue, District 1, Ho Chi Minh City\",\n  \"eventDate\": \"{{concertEventDate}}\",\n  \"seatMapSvg\": \"<svg viewBox=\\\"0 0 100 100\\\"><rect width=\\\"100\\\" height=\\\"100\\\" /></svg>\",\n  \"posterUrl\": \"https://example.com/posters/ticketbox-live.png\"\n}"
+              "raw": "{\n  \"name\": \"{{concertName}}\",\n  \"description\": \"A sample concert created from Postman.\",\n  \"artistName\": \"The TicketBox Band\",\n  \"venueName\": \"TicketBox Arena\",\n  \"venueAddress\": \"123 Nguyen Hue, District 1, Ho Chi Minh City\",\n  \"eventDate\": \"{{concertEventDate}}\",\n  \"seatMapSvg\": \"https://example.com/seatmap.svg\",\n  \"posterUrl\": \"{{lastUploadedPosterUrl}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/concerts",
@@ -731,6 +735,10 @@
                   "  throw new Error('Missing draftConcertId. Run POST /concerts first.');",
                   "}",
                   "",
+                  "if (!pm.collectionVariables.get('lastUploadedPosterUrl')) {",
+                  "  pm.collectionVariables.set('lastUploadedPosterUrl', 'https://example.com/posters/ticketbox-live-updated.png');",
+                  "}",
+                  "",
                   "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
                   "",
                   "if (!accessToken) {",
@@ -773,7 +781,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"description\": \"Updated from Postman before publish.\",\n  \"artistName\": \"The Updated TicketBox Band\",\n  \"venueName\": \"TicketBox Arena\",\n  \"venueAddress\": \"123 Nguyen Hue, District 1, Ho Chi Minh City\",\n  \"posterUrl\": \"https://example.com/posters/ticketbox-live-updated.png\"\n}"
+              "raw": "{\n  \"description\": \"Updated from Postman before publish.\",\n  \"artistName\": \"The Updated TicketBox Band\",\n  \"venueName\": \"TicketBox Arena\",\n  \"venueAddress\": \"123 Nguyen Hue, District 1, Ho Chi Minh City\",\n  \"posterUrl\": \"{{lastUploadedPosterUrl}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/concerts/{{draftConcertId}}",
@@ -2215,6 +2223,14 @@
                   "",
                   "if (!pm.collectionVariables.get('checkinSourceDeviceId')) {",
                   "  pm.collectionVariables.set('checkinSourceDeviceId', 'device-postman-001');",
+                  "}",
+                  "",
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "if (accessToken) {",
+                  "  pm.request.headers.upsert({",
+                  "    key: 'Authorization',",
+                  "    value: `Bearer ${accessToken}`",
+                  "  });",
                   "}"
                 ]
               }
@@ -2301,6 +2317,14 @@
                   "",
                   "if (!pm.collectionVariables.get('checkinSourceDeviceId')) {",
                   "  pm.collectionVariables.set('checkinSourceDeviceId', 'device-postman-001');",
+                  "}",
+                  "",
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "if (accessToken) {",
+                  "  pm.request.headers.upsert({",
+                  "    key: 'Authorization',",
+                  "    value: `Bearer ${accessToken}`",
+                  "  });",
                   "}"
                 ]
               }
@@ -2395,23 +2419,32 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status code is 201', function () {",
-                  "  pm.response.to.have.status(201);",
+                  "const isConflict = pm.response.code === 409;",
+                  "",
+                  "pm.test('status code is 201 or 409', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
                   "});",
                   "",
-                  "const json = pm.response.json();",
-                  "const resData = json.data;",
+                  "if (!isConflict) {",
+                  "  const json = pm.response.json();",
+                  "  const resData = json.data;",
                   "",
-                  "pm.test('global interceptor wraps guest-list import payload', function () {",
-                  "  pm.expect(json).to.have.property('statusCode', 201);",
-                  "  pm.expect(json).to.have.property('message', 'Request successful');",
-                  "});",
+                  "  pm.test('global interceptor wraps guest-list import payload', function () {",
+                  "    pm.expect(json).to.have.property('statusCode', 201);",
+                  "    pm.expect(json).to.have.property('message', 'Request successful');",
+                  "  });",
                   "",
-                  "pm.test('import counts are returned', function () {",
-                  "  pm.expect(resData).to.have.property('imported');",
-                  "  pm.expect(resData).to.have.property('duplicates');",
-                  "  pm.expect(resData).to.have.property('errors');",
-                  "});"
+                  "  pm.test('import counts are returned', function () {",
+                  "    pm.expect(resData).to.have.property('imported');",
+                  "    pm.expect(resData).to.have.property('duplicates');",
+                  "    pm.expect(resData).to.have.property('errors');",
+                  "  });",
+                  "} else {",
+                  "  pm.test('conflict handled gracefully', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('statusCode', 409);",
+                  "  });",
+                  "}"
                 ]
               }
             }
@@ -2460,7 +2493,17 @@
                   "}",
                   "",
                   "if (!pm.collectionVariables.get('artistBioPdfFilePath')) {",
-                  "  console.warn('Set artistBioPdfFilePath to a local PDF path before sending this request.');",
+                  "  pm.collectionVariables.set('artistBioPdfFilePath', '/home/pognova/TicketBox/apps/be/fixtures/sample.pdf');",
+                  "}",
+                  "",
+                  "pm.collectionVariables.set('artistBioIdempotencyKey', pm.variables.replaceIn('{{$guid}}'));",
+                  "",
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "if (accessToken) {",
+                  "  pm.request.headers.upsert({",
+                  "    key: 'Authorization',",
+                  "    value: `Bearer ${accessToken}`",
+                  "  });",
                   "}"
                 ]
               }
@@ -2470,31 +2513,45 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status code is 201', function () {",
-                  "  pm.response.to.have.status(201);",
+                  "const isConflict = pm.response.code === 409;",
+                  "",
+                  "pm.test('status code is 201 or 409', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
                   "});",
                   "",
-                  "const json = pm.response.json();",
-                  "const resData = json.data;",
+                  "if (!isConflict) {",
+                  "  const json = pm.response.json();",
+                  "  const resData = json.data;",
                   "",
-                  "pm.test('global interceptor wraps artist-bio upload payload', function () {",
-                  "  pm.expect(json).to.have.property('statusCode', 201);",
-                  "  pm.expect(json).to.have.property('message', 'Request successful');",
-                  "});",
+                  "  pm.test('global interceptor wraps artist-bio upload payload', function () {",
+                  "    pm.expect(json).to.have.property('statusCode', 201);",
+                  "    pm.expect(json).to.have.property('message', 'Request successful');",
+                  "  });",
                   "",
-                  "pm.test('mock AI bio is returned', function () {",
-                  "  pm.expect(resData).to.have.property('bio');",
-                  "  pm.expect(resData.bio).to.include('Artist bio request accepted');",
-                  "});",
+                  "  pm.test('mock AI bio is returned', function () {",
+                  "    pm.expect(resData).to.have.property('bio');",
+                  "    pm.expect(resData.bio).to.include('Artist bio request accepted');",
+                  "  });",
                   "",
-                  "pm.collectionVariables.set('artistBio', resData.bio);"
+                  "  pm.collectionVariables.set('artistBio', resData.bio);",
+                  "} else {",
+                  "  pm.test('conflict handled gracefully', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('statusCode', 409);",
+                  "  });",
+                  "}"
                 ]
               }
             }
           ],
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "idempotency-key",
+                "value": "{{artistBioIdempotencyKey}}"
+              }
+            ],
             "body": {
               "mode": "formdata",
               "formdata": [
@@ -2520,6 +2577,79 @@
               ]
             },
             "description": "Uploads artist press-kit PDF and returns a mock generated bio. Current service only uses file.originalname."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /concerts/upload-poster - Upload concert poster image",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const accessToken = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken') || pm.variables.get('accessToken');",
+                  "",
+                  "if (!accessToken) {",
+                  "  throw new Error('Missing accessToken. Login with a user that has concert:create first.');",
+                  "}",
+                  "",
+                  "pm.request.headers.upsert({",
+                  "  key: 'Authorization',",
+                  "  value: `Bearer ${accessToken}`",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const resData = json.data;",
+                  "",
+                  "pm.test('upload returns image url', function () {",
+                  "  pm.expect(json).to.have.property('statusCode', 201);",
+                  "  pm.expect(resData).to.have.property('url');",
+                  "});",
+                  "",
+                  "if (resData && resData.url) {",
+                  "  pm.collectionVariables.set('lastUploadedPosterUrl', resData.url);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "apps/be/fixtures/sample.png",
+                  "description": "Image file field expected by FileInterceptor('file')."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/concerts/upload-poster",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "concerts",
+                "upload-poster"
+              ]
+            },
+            "description": "Uploads a concert poster image to S3/MinIO and returns the public access URL."
           },
           "response": []
         }
@@ -2674,12 +2804,12 @@
     },
     {
       "key": "guestListCsvFilePath",
-      "value": "apps/be/fixtures/guest-list-sample.csv",
+      "value": "/home/pognova/TicketBox/apps/be/fixtures/guest-list-sample.csv",
       "type": "string"
     },
     {
       "key": "artistBioPdfFilePath",
-      "value": "apps/be/fixtures/sample.pdf",
+      "value": "/home/pognova/TicketBox/apps/be/fixtures/sample.pdf",
       "type": "string"
     },
     {

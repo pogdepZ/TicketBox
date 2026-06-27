@@ -440,7 +440,12 @@ export class OrdersService {
       throw new NotFoundException("Order not found");
     }
 
-    if (order.status !== OrderStatus.PENDING_PAYMENT) {
+    const cancelableStatuses: OrderStatus[] = [
+      OrderStatus.PENDING_PAYMENT,
+      OrderStatus.PAYMENT_PROCESSING,
+    ];
+
+    if (!cancelableStatuses.includes(order.status as OrderStatus)) {
       throw new ConflictException({
         message: `Cannot cancel order with status ${order.status}`,
         currentStatus: order.status,

@@ -23,6 +23,7 @@ import {
 } from "./dto/payment-status-response.dto";
 import { AuthUser } from "../auth/dto/user-response.dto";
 import { getPaymentGraceUntil } from "../orders/order-expiration.constants";
+import { RedisService } from "../../common/redis/redis.service";
 import {
   IdempotencyStatus,
   NotificationChannel,
@@ -48,6 +49,7 @@ export class PaymentsService {
     private readonly ticketsService: TicketsService,
     private readonly circuitBreaker: PaymentCircuitBreakerService,
     private readonly outboxService: OutboxService,
+    private readonly redis: RedisService,
   ) {}
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -272,6 +274,8 @@ export class PaymentsService {
       if (dto.eventType === "SUCCESS") {
         finalStatus = (await this.handleSuccess(order.id, dto)) as OrderStatus;
         await this.circuitBreaker.recordSuccess(provider);
+      } else if (dto.eventType === "CANCELLED") {
+        finalStatus = (await this.handleCancelled(order.id)) as OrderStatus;
       } else {
         // FAILED hoặc TIMEOUT
         finalStatus = (await this.handleFailed(order.id)) as OrderStatus;
@@ -344,9 +348,13 @@ export class PaymentsService {
       }
 
       const vnpResponseCode = query["vnp_ResponseCode"];
-      // VNPAY uses '00' for success
-      const eventType: "SUCCESS" | "FAILED" =
-        vnpResponseCode === "00" ? "SUCCESS" : "FAILED";
+      // VNPAY uses '00' for success, '24' for user cancellation
+      let eventType: "SUCCESS" | "FAILED" | "CANCELLED" = "FAILED";
+      if (vnpResponseCode === "00") {
+        eventType = "SUCCESS";
+      } else if (vnpResponseCode === "24") {
+        eventType = "CANCELLED";
+      }
       const amountInCents = Number(query["vnp_Amount"]);
       const amount = amountInCents / 100;
 
@@ -556,14 +564,79 @@ export class PaymentsService {
         return OrderStatus.PENDING_PAYMENT;
       }
 
-      await this.txHelper.releaseOrder(
+      const result = await this.txHelper.releaseOrder(
         tx as any,
         orderId,
         OrderStatus.PAYMENT_FAILED,
         ReservationStatus.CANCELLED,
       );
 
+      if (result && result.releasedSeats) {
+        for (const seat of result.releasedSeats) {
+          const key = `hold:seat:${seat.concertId}:${seat.seatNumber}`;
+          try {
+            await this.redis.del(key);
+          } catch (err) {
+            this.logger.warn(
+              `Failed to delete Redis key on webhook order payment failure: ${(err as any).message}`,
+            );
+          }
+        }
+      }
+
       return OrderStatus.PAYMENT_FAILED;
+    });
+  }
+
+  private async handleCancelled(orderId: string): Promise<string> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM orders WHERE id = ${orderId}::uuid FOR UPDATE`;
+
+      const order = await tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        select: { id: true, status: true, expiresAt: true },
+      });
+
+      if (order.status === OrderStatus.PAID) {
+        this.logger.warn(
+          `CANCELLED webhook for already PAID order: ${order.id}. Ignoring.`,
+        );
+        return OrderStatus.PAID;
+      }
+
+      const alreadyReleased: OrderStatus[] = [
+        OrderStatus.PAYMENT_FAILED,
+        OrderStatus.EXPIRED,
+        OrderStatus.CANCELLED,
+        OrderStatus.REFUND_REQUIRED,
+      ];
+
+      if (alreadyReleased.includes(order.status as OrderStatus)) {
+        return order.status;
+      }
+
+      // Hủy order ngay lập tức và giải phóng ghế, không cần kiểm tra expiresAt vì người dùng đã chủ động hủy
+      const result = await this.txHelper.releaseOrder(
+        tx as any,
+        orderId,
+        OrderStatus.CANCELLED,
+        ReservationStatus.CANCELLED,
+      );
+
+      if (result && result.releasedSeats) {
+        for (const seat of result.releasedSeats) {
+          const key = `hold:seat:${seat.concertId}:${seat.seatNumber}`;
+          try {
+            await this.redis.del(key);
+          } catch (err) {
+            this.logger.warn(
+              `Failed to delete Redis key on webhook order cancellation: ${(err as any).message}`,
+            );
+          }
+        }
+      }
+
+      return OrderStatus.CANCELLED;
     });
   }
 

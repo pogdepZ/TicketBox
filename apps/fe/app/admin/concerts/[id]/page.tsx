@@ -14,6 +14,7 @@ import {
   updateConcertBio,
   importGuestList,
   updateConcert,
+  uploadConcertPoster,
 } from "@/lib/api";
 import {
   ArrowLeft,
@@ -74,6 +75,44 @@ export default function AdminConcertDetailPage({
   const [editPosterUrl, setEditPosterUrl] = useState("");
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
+  const [uploadingPoster, setUploadingPoster] = useState(false);
+
+  async function handlePosterUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
+    if (!allowedTypes.includes(file.type.toLowerCase())) {
+      setEditError("File poster phải là định dạng hình ảnh (JPEG, PNG, WEBP, GIF).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setEditError("File poster không được vượt quá 5 MB.");
+      return;
+    }
+
+    setUploadingPoster(true);
+    setEditError("");
+    try {
+      const res = await uploadConcertPoster(file);
+      if (res && res.url) {
+        setEditPosterUrl(res.url);
+        window.dispatchEvent(
+          new CustomEvent("ticketbox-toast", {
+            detail: {
+              title: "Tải ảnh thành công",
+              message: "Poster sự kiện đã được tải lên MinIO.",
+              type: "success",
+            },
+          }),
+        );
+      }
+    } catch (err: any) {
+      setEditError(getFriendlyErrorMessage(err));
+    } finally {
+      setUploadingPoster(false);
+    }
+  }
 
   // Ticket Form State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -718,15 +757,32 @@ export default function AdminConcertDetailPage({
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">
-                        Đường dẫn Poster sự kiện (URL)
+                        Poster sự kiện (URL hoặc tải lên)
                       </label>
-                      <input
-                        type="url"
-                        placeholder="https://example.com/poster.jpg"
-                        value={editPosterUrl}
-                        onChange={(e) => setEditPosterUrl(e.target.value)}
-                        className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15"
-                      />
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <input
+                          type="text"
+                          placeholder="https://example.com/poster.jpg"
+                          value={editPosterUrl}
+                          onChange={(e) => setEditPosterUrl(e.target.value)}
+                          className="h-11 flex-1 rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15"
+                        />
+                        <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 font-bold text-foreground transition hover:border-primary/40 hover:bg-primary/5 active:translate-y-px">
+                          {uploadingPoster ? (
+                            <RefreshCw className="size-4 animate-spin text-primary" />
+                          ) : (
+                            <Upload className="size-4 text-primary" />
+                          )}
+                          <span>Tải ảnh lên</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={uploadingPoster}
+                            onChange={handlePosterUpload}
+                          />
+                        </label>
+                      </div>
                     </div>
                   </div>
                   <div>

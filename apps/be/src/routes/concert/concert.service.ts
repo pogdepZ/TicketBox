@@ -333,6 +333,40 @@ export class ConcertService {
     return this.toResponse(updatedConcert!);
   }
 
+  async uploadPoster(file?: UploadedFileDto): Promise<{ url: string }> {
+    if (!file) {
+      throw new BadRequestException("Poster file is required");
+    }
+
+    const allowedMimeTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+    ];
+    if (!allowedMimeTypes.includes(file.mimetype.toLowerCase())) {
+      throw new BadRequestException(
+        "Invalid file type. Only JPEG, PNG, WEBP, and GIF images are allowed.",
+      );
+    }
+
+    const fileExtension = file.originalname.split(".").pop();
+    const s3Key = `concerts/posters/${randomUUID()}.${fileExtension}`;
+
+    try {
+      const fileUrl = await this.s3Service.uploadFile(
+        s3Key,
+        file.buffer,
+        file.mimetype,
+      );
+      return { url: fileUrl };
+    } catch (error) {
+      this.logger.error("Failed to upload poster to S3/MinIO", error);
+      throw new BadRequestException("Failed to upload poster image");
+    }
+  }
+
   private validateSanitizeAndParseSeatMapSvg(
     input: UploadedFileDto | string,
   ): SanitizedSeatMapSvg {
