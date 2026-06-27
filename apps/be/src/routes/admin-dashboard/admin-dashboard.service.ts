@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma/prisma.service";
+import { AuthCacheService } from "../auth/auth-cache.service";
 
 function getLocalDateString(d: Date): string {
   const year = d.getFullYear();
@@ -10,7 +11,10 @@ function getLocalDateString(d: Date): string {
 
 @Injectable()
 export class AdminDashboardService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly authCacheService: AuthCacheService,
+  ) {}
 
   async getRevenueSummary() {
     const now = new Date();
@@ -391,7 +395,7 @@ export class AdminDashboardService {
       throw new NotFoundException("Không tìm thấy người dùng");
     }
 
-    return this.prismaService.user.update({
+    const updatedUser = await this.prismaService.user.update({
       where: { id },
       data: { status: status as any },
       select: {
@@ -401,6 +405,10 @@ export class AdminDashboardService {
         status: true,
       },
     });
+
+    await this.authCacheService.invalidateUser(id);
+
+    return updatedUser;
   }
 
   async updateUserRole(id: string, roleName: string, adminId?: string) {
@@ -438,6 +446,8 @@ export class AdminDashboardService {
         },
       });
     });
+
+    await this.authCacheService.invalidateUser(id);
 
     return {
       userId: id,
