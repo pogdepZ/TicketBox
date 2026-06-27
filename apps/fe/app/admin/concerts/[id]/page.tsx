@@ -15,6 +15,7 @@ import {
   importGuestList,
   updateConcert,
   uploadConcertPoster,
+  getGuestList,
 } from "@/lib/api";
 import {
   ArrowLeft,
@@ -137,6 +138,20 @@ export default function AdminConcertDetailPage({
   const [guestLoading, setGuestLoading] = useState(false);
   const [guestError, setGuestError] = useState("");
   const [importResult, setImportResult] = useState<any>(null);
+  const [guestsList, setGuestsList] = useState<any[]>([]);
+  const [loadingGuests, setLoadingGuests] = useState(false);
+
+  async function fetchGuestList() {
+    setLoadingGuests(true);
+    try {
+      const list = await getGuestList(concertId);
+      setGuestsList(list || []);
+    } catch (err) {
+      console.error("Failed to fetch guest list:", err);
+    } finally {
+      setLoadingGuests(false);
+    }
+  }
 
   const isPublished = concert?.rawStatus === "PUBLISHED";
   const isCancelledOrCompleted =
@@ -233,6 +248,9 @@ export default function AdminConcertDetailPage({
         const bioData = await getAiBioStatus(concertId);
         setBioStatus(bioData.status);
         setBioText(bioData.bio || "");
+
+        // Load Guest List
+        await fetchGuestList();
       } catch (err) {
         setError(getFriendlyErrorMessage(err));
       } finally {
@@ -588,6 +606,7 @@ export default function AdminConcertDetailPage({
       );
       setImportResult(res);
       setGuestFile(null);
+      await fetchGuestList();
     } catch (err) {
       setGuestError(getFriendlyErrorMessage(err));
     } finally {
@@ -1342,71 +1361,88 @@ export default function AdminConcertDetailPage({
               </div>
             </div>
 
-            {/* Results & Statistics Area */}
-            <div className="lg:col-span-2 rounded-[2rem] border border-border bg-card p-6 shadow-sm flex flex-col h-full min-h-[420px]">
+            {/* Guest List Display Area */}
+            <div className="lg:col-span-2 rounded-[2rem] border border-border bg-card p-6 shadow-sm flex flex-col h-full min-h-[480px]">
               <h2 className="text-xl font-black text-foreground mb-4 flex items-center gap-2">
-                <FileText className="size-5 text-primary" />
-                Kết quả xử lý tệp khách mời
+                <Users className="size-5 text-primary" />
+                Danh sách khách mời sự kiện ({guestsList.length})
               </h2>
 
-              {importResult ? (
-                <div className="space-y-6 flex-grow flex flex-col justify-center">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="rounded-2xl border border-border bg-card p-5 text-center shadow-sm">
-                      <p className="text-sm text-muted-foreground mb-1">
-                        Thành công (Imported)
-                      </p>
-                      <p className="text-3xl font-black text-emerald-500">
-                        {importResult.imported ?? 0}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-border bg-card p-5 text-center shadow-sm">
-                      <p className="text-sm text-muted-foreground mb-1">
-                        Bị trùng lặp (Duplicates)
-                      </p>
-                      <p className="text-3xl font-black text-amber-500">
-                        {importResult.duplicates ?? 0}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-border bg-card p-5 text-center shadow-sm">
-                      <p className="text-sm text-muted-foreground mb-1">
-                        Lỗi dòng dữ liệu (Errors)
-                      </p>
-                      <p className="text-3xl font-black text-rose-500">
-                        {importResult.errors ?? 0}
-                      </p>
-                    </div>
+              {/* Show import summary if recently imported */}
+              {importResult && (
+                <div className="mb-5 p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-sm text-muted-foreground flex flex-wrap items-center justify-between gap-3 animate-fade-in">
+                  <div>
+                    <span className="font-bold text-emerald-500">Kết quả import gần nhất:</span>{" "}
+                    Thêm mới <strong className="text-foreground">{importResult.imported ?? 0}</strong>,{" "}
+                    Trùng lặp <strong className="text-foreground">{importResult.duplicates ?? 0}</strong>,{" "}
+                    Lỗi <strong className="text-foreground">{importResult.errors ?? 0}</strong>.
                   </div>
+                  <button 
+                    onClick={() => setImportResult(null)}
+                    className="text-xs font-semibold text-primary hover:text-primary/80 cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              )}
 
-                  <div className="rounded-2xl bg-muted/30 border border-border p-5 text-sm leading-relaxed text-muted-foreground">
-                    <p className="font-bold text-foreground mb-2">
-                      Tóm tắt tiến trình:
-                    </p>
-                    <ul className="list-disc pl-5 space-y-1">
-                      <li>
-                        Hệ thống đã nhận diện và phân tích toàn bộ các dòng dữ
-                        liệu trong file CSV.
-                      </li>
-                      <li>
-                        Các khách mời hợp lệ đã được gửi thư mời và phát hành vé
-                        điện tử (E-ticket) trực tiếp trong hệ thống.
-                      </li>
-                      <li>
-                        Các dòng bị trùng lặp hoặc lỗi định dạng email/số điện
-                        thoại đã bị bỏ qua để bảo đảm tính nhất quán dữ liệu.
-                      </li>
-                    </ul>
+              {loadingGuests ? (
+                <div className="flex-grow flex items-center justify-center">
+                  <RefreshCw className="size-8 animate-spin text-primary" />
+                </div>
+              ) : guestsList.length > 0 ? (
+                <div className="flex-grow overflow-hidden flex flex-col">
+                  <div className="overflow-y-auto max-h-[420px] rounded-2xl border border-border/80">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-muted/40 text-xs font-black uppercase tracking-wider text-muted-foreground border-b border-border">
+                          <th className="p-3 pl-4">Họ và tên</th>
+                          <th className="p-3">Email</th>
+                          <th className="p-3">Số điện thoại</th>
+                          <th className="p-3">Phân loại</th>
+                          <th className="p-3">Mã vé</th>
+                          <th className="p-3 pr-4 text-center">Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guestsList.map((guest: any) => (
+                          <tr key={guest.id} className="text-sm border-b border-border/60 hover:bg-muted/10 transition">
+                            <td className="p-3 pl-4 font-bold text-foreground truncate max-w-[150px]">{guest.fullName}</td>
+                            <td className="p-3 text-muted-foreground truncate max-w-[180px]">{guest.email || "—"}</td>
+                            <td className="p-3 text-muted-foreground">{guest.phone || "—"}</td>
+                            <td className="p-3">
+                              <span className={`inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                                (guest.guestType || "").toLowerCase() === "sponsor" 
+                                  ? "bg-amber-500/10 text-amber-500 border border-amber-500/15" 
+                                  : "bg-primary/10 text-primary border border-primary/15"
+                              }`}>
+                                {guest.guestType || "Guest"}
+                              </span>
+                            </td>
+                            <td className="p-3 font-mono text-xs text-muted-foreground">{guest.guestCode}</td>
+                            <td className="p-3 pr-4 text-center">
+                              <span className={`inline-block text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                                guest.status === "ACTIVE" 
+                                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
+                                  : "bg-zinc-500/10 text-zinc-500 border border-zinc-500/20"
+                              }`}>
+                                {guest.status === "ACTIVE" ? "Hoạt động" : "Đã check-in"}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               ) : (
                 <div className="flex-grow flex flex-col items-center justify-center text-center p-12 text-muted-foreground">
-                  <Users className="size-16 text-muted-foreground/35 mb-4 animate-pulse" />
+                  <Users className="size-16 text-muted-foreground/35 mb-4" />
                   <p className="font-bold text-foreground mb-1">
-                    Chưa có dữ liệu nhập
+                    Chưa có khách mời nào được tải lên
                   </p>
-                  <p className="text-sm max-w-sm">
-                    Tải lên file danh sách khách mời CSV ở cột bên trái để xem
-                    kết quả thống kê chi tiết tại đây.
+                  <p className="text-xs max-w-sm">
+                    Tải lên file danh sách khách mời CSV ở cột bên trái để cấp vé mời và hiển thị danh sách tại đây.
                   </p>
                 </div>
               )}

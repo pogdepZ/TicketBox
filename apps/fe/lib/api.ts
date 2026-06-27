@@ -18,15 +18,24 @@ export class ApiError extends Error {
   }
 }
 
-let refreshAccessTokenPromise: Promise<{ token: string | null; status: "success" | "unauthorized" | "server_error" }> | null = null;
+let refreshAccessTokenPromise: Promise<{
+  token: string | null;
+  status: "success" | "unauthorized" | "server_error";
+}> | null = null;
 
-async function refreshAccessToken(): Promise<{ token: string | null; status: "success" | "unauthorized" | "server_error" }> {
+async function refreshAccessToken(): Promise<{
+  token: string | null;
+  status: "success" | "unauthorized" | "server_error";
+}> {
   if (typeof window === "undefined") {
     return { token: null, status: "server_error" };
   }
 
   if (!refreshAccessTokenPromise) {
-    refreshAccessTokenPromise = (async (): Promise<{ token: string | null; status: "success" | "unauthorized" | "server_error" }> => {
+    refreshAccessTokenPromise = (async (): Promise<{
+      token: string | null;
+      status: "success" | "unauthorized" | "server_error";
+    }> => {
       try {
         const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
           method: "POST",
@@ -57,7 +66,10 @@ async function refreshAccessToken(): Promise<{ token: string | null; status: "su
 
         return { token: newAccessToken, status: "success" };
       } catch (refreshError) {
-        console.error("Silent token refresh failed due to network error:", refreshError);
+        console.error(
+          "Silent token refresh failed due to network error:",
+          refreshError,
+        );
         return { token: null, status: "server_error" };
       }
     })().finally(() => {
@@ -699,7 +711,7 @@ function mapConcertToDisplay(concert: any, useLocalOverride = false) {
   return {
     id: concert.id,
     title: concert.name,
-    artist: concert.artistName || "Various Artists",
+    artist: concert.artistName || "Nhiều nghệ sĩ",
     date: concert.eventDate,
     time: new Date(concert.eventDate).toLocaleTimeString("vi-VN", {
       hour: "2-digit",
@@ -739,6 +751,7 @@ function mapConcertToDisplay(concert: any, useLocalOverride = false) {
     seatZones: concert.seatZones,
     artistBio: concert.artistBio,
     artistBioStatus: concert.artistBioStatus,
+    guestList: concert.guestList || [],
   };
 }
 
@@ -1745,4 +1758,8 @@ export function addLocalNotification(title: string, message: string) {
       detail: { title, message, type: "success" },
     }),
   );
+}
+
+export async function getGuestList(concertId: string) {
+  return await fetchApi(`/admin/concerts/${concertId}/guest-list`);
 }

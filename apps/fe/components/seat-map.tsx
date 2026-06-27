@@ -204,7 +204,7 @@ export function SeatMap({ concertId, concertTitle, zones, seats, svgContent }: S
           },
         })
       );
-      router.push(`/login?redirect=/concert/${concertId}`);
+      router.push(`/login?redirect=/concert/${concertId}/booking`);
       return;
     }
 

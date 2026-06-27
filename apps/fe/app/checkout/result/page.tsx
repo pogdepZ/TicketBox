@@ -1,39 +1,44 @@
-'use client';
+"use client";
 
-import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Header } from '@/components/header';
-import { Footer } from '@/components/footer';
-import Link from 'next/link';
-import { CheckCircle2, XCircle, Home, Ticket } from 'lucide-react';
-import { fetchApi, getFriendlyErrorMessage, addLocalNotification } from '@/lib/api';
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Header } from "@/components/header";
+import { Footer } from "@/components/footer";
+import Link from "next/link";
+import { CheckCircle2, XCircle, Home, Ticket } from "lucide-react";
+import {
+  fetchApi,
+  getFriendlyErrorMessage,
+  addLocalNotification,
+} from "@/lib/api";
 
 function CheckoutResultContent() {
   const searchParams = useSearchParams();
 
   // Extract VNPAY parameters
-  const responseCode = searchParams.get('vnp_ResponseCode');
-  const transactionStatus = searchParams.get('vnp_TransactionStatus');
-  const vnpAmountStr = searchParams.get('vnp_Amount');
-  const vnpTxnRef = searchParams.get('vnp_TxnRef');
-  const bankCode = searchParams.get('vnp_BankCode');
-  const vnpTransactionNo = searchParams.get('vnp_TransactionNo');
-  const vnpPayDateStr = searchParams.get('vnp_PayDate');
+  const responseCode = searchParams.get("vnp_ResponseCode");
+  const transactionStatus = searchParams.get("vnp_TransactionStatus");
+  const vnpAmountStr = searchParams.get("vnp_Amount");
+  const vnpTxnRef = searchParams.get("vnp_TxnRef");
+  const bankCode = searchParams.get("vnp_BankCode");
+  const vnpTransactionNo = searchParams.get("vnp_TransactionNo");
+  const vnpPayDateStr = searchParams.get("vnp_PayDate");
 
   // Extract MoMo parameters
-  const momoResultCode = searchParams.get('resultCode');
-  const momoTxnRef = searchParams.get('orderId');
-  const momoTransactionNo = searchParams.get('transId');
-  const momoAmountStr = searchParams.get('amount');
-  const momoPayDateStr = searchParams.get('responseTime');
-  const momoMessage = searchParams.get('message');
-  const momoPayType = searchParams.get('payType');
+  const momoResultCode = searchParams.get("resultCode");
+  const momoTxnRef = searchParams.get("orderId");
+  const momoTransactionNo = searchParams.get("transId");
+  const momoAmountStr = searchParams.get("amount");
+  const momoPayDateStr = searchParams.get("responseTime");
+  const momoMessage = searchParams.get("message");
+  const momoPayType = searchParams.get("payType");
 
-  const provider = momoResultCode !== null ? 'MOMO' : 'VNPAY';
-  const txnRef = provider === 'MOMO' ? momoTxnRef : vnpTxnRef;
-  const transactionNo = provider === 'MOMO' ? momoTransactionNo : vnpTransactionNo;
-  const amountStr = provider === 'MOMO' ? momoAmountStr : vnpAmountStr;
-  const payDateStr = provider === 'MOMO' ? momoPayDateStr : vnpPayDateStr;
+  const provider = momoResultCode !== null ? "MOMO" : "VNPAY";
+  const txnRef = provider === "MOMO" ? momoTxnRef : vnpTxnRef;
+  const transactionNo =
+    provider === "MOMO" ? momoTransactionNo : vnpTransactionNo;
+  const amountStr = provider === "MOMO" ? momoAmountStr : vnpAmountStr;
+  const payDateStr = provider === "MOMO" ? momoPayDateStr : vnpPayDateStr;
 
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -45,40 +50,51 @@ function CheckoutResultContent() {
     async function verifyPayment() {
       if (!txnRef) {
         setLoading(false);
-        setErrorMsg('Không tìm thấy thông tin mã đơn hàng để xác thực.');
+        setErrorMsg("Không tìm thấy thông tin mã đơn hàng để xác thực.");
         return;
       }
 
       try {
         const queryStr = searchParams.toString();
         const providerPath = provider.toLowerCase();
-        
+
         // Gọi API backend webhook GET
-        const res = await fetchApi(`/payments/webhooks/${providerPath}?${queryStr}`);
-        
+        const res = await fetchApi(
+          `/payments/webhooks/${providerPath}?${queryStr}`,
+        );
+
         if (!active) return;
 
-        const success = res?.orderStatus === 'PAID' || res?.paymentStatus === 'PAID';
+        const success =
+          res?.orderStatus === "PAID" || res?.paymentStatus === "PAID";
 
         if (success) {
           setBackendSuccess(true);
           const sessionKey = `notified-order-${txnRef}`;
-          const alreadyNotified = typeof window !== 'undefined' && window.sessionStorage.getItem(sessionKey);
+          const alreadyNotified =
+            typeof window !== "undefined" &&
+            window.sessionStorage.getItem(sessionKey);
           if (!alreadyNotified) {
             addLocalNotification(
-              'Thanh toán thành công!',
-              `Đơn đặt vé #${txnRef?.substring(0, 8).toUpperCase()} của bạn đã được thanh toán thành công.`
+              "Thanh toán thành công!",
+              `Đơn đặt vé #${txnRef?.substring(0, 8).toUpperCase()} của bạn đã được thanh toán thành công.`,
             );
-            if (typeof window !== 'undefined') {
-              window.sessionStorage.setItem(sessionKey, 'true');
+            if (typeof window !== "undefined") {
+              window.sessionStorage.setItem(sessionKey, "true");
             }
           }
         } else {
           setBackendSuccess(false);
-          if (responseCode === '24' || searchParams.get('status') === 'failed' || momoResultCode === '49') {
-            setErrorMsg('Giao dịch đã bị hủy bởi người dùng.');
+          if (
+            responseCode === "24" ||
+            searchParams.get("status") === "failed" ||
+            momoResultCode === "49"
+          ) {
+            setErrorMsg("Giao dịch đã bị hủy bởi người dùng.");
           } else {
-            setErrorMsg('Thanh toán thất bại từ cổng thanh toán hoặc chữ ký không hợp lệ.');
+            setErrorMsg(
+              "Thanh toán thất bại từ cổng thanh toán hoặc chữ ký không hợp lệ.",
+            );
           }
         }
       } catch (err: any) {
@@ -101,15 +117,15 @@ function CheckoutResultContent() {
 
   // Format amount
   const rawAmount = amountStr ? Number(amountStr) : 0;
-  const amountInVnd = provider === 'MOMO' ? rawAmount : rawAmount / 100;
+  const amountInVnd = provider === "MOMO" ? rawAmount : rawAmount / 100;
 
   // Format payDate (YYYYMMDDHHmmss -> DD/MM/YYYY HH:mm:ss)
   const formatPayDate = (dateStr: string | null) => {
-    if (!dateStr) return 'N/A';
-    if (provider === 'MOMO') {
-      return new Date(Number(dateStr)).toLocaleString('vi-VN');
+    if (!dateStr) return "N/A";
+    if (provider === "MOMO") {
+      return new Date(Number(dateStr)).toLocaleString("vi-VN");
     }
-    if (dateStr.length < 14) return 'N/A';
+    if (dateStr.length < 14) return "N/A";
 
     const year = dateStr.slice(0, 4);
     const month = dateStr.slice(4, 6);
@@ -126,9 +142,12 @@ function CheckoutResultContent() {
         <div className="flex min-h-[40vh] items-center justify-center">
           <div className="text-center">
             <div className="mx-auto mb-6 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-            <h2 className="mb-2 text-2xl font-black text-foreground animate-pulse">Đang xác thực giao dịch</h2>
+            <h2 className="mb-2 text-2xl font-black text-foreground animate-pulse">
+              Đang xác thực giao dịch
+            </h2>
             <p className="text-muted-foreground font-medium max-w-md mx-auto">
-              Vui lòng không đóng hoặc tải lại trang. Chúng tôi đang kiểm tra kết quả thanh toán từ cổng {provider}...
+              Vui lòng không đóng hoặc tải lại trang. Chúng tôi đang kiểm tra
+              kết quả thanh toán từ cổng {provider}...
             </p>
           </div>
         </div>
@@ -153,18 +172,21 @@ function CheckoutResultContent() {
           )}
         </div>
         <h1 className="mb-3 text-3xl font-black tracking-tight text-foreground md:text-4xl">
-          {displaySuccess ? 'Thanh toán thành công' : 'Thanh toán thất bại'}
+          {displaySuccess ? "Thanh toán thành công" : "Thanh toán thất bại"}
         </h1>
         <p className="mx-auto max-w-md text-muted-foreground">
           {displaySuccess
-            ? 'Đơn hàng của bạn đã được thanh toán thành công. Hệ thống đã xác thực và tiến hành phát hành vé.'
-            : errorMsg || 'Đã xảy ra lỗi trong quá trình xử lý giao dịch hoặc chữ ký xác thực không hợp lệ.'}
+            ? "Đơn hàng của bạn đã được thanh toán thành công. Hệ thống đã xác thực và tiến hành phát hành vé."
+            : errorMsg ||
+              "Đã xảy ra lỗi trong quá trình xử lý giao dịch hoặc chữ ký xác thực không hợp lệ."}
         </p>
       </div>
 
       {/* Transaction Details Card */}
       <div className="mb-8 rounded-[2rem] border border-border bg-card p-6 shadow-sm md:p-8">
-        <h2 className="mb-6 text-xl font-black text-foreground">Chi tiết giao dịch</h2>
+        <h2 className="mb-6 text-xl font-black text-foreground">
+          Chi tiết giao dịch
+        </h2>
         <div className="space-y-4">
           <div className="flex justify-between border-b border-border/50 pb-3">
             <span className="text-muted-foreground">Nhà cung cấp</span>
@@ -173,15 +195,23 @@ function CheckoutResultContent() {
 
           {txnRef && (
             <div className="flex justify-between border-b border-border/50 pb-3">
-              <span className="text-muted-foreground">Mã tham chiếu đơn hàng</span>
-              <span className="font-mono font-bold text-foreground">{txnRef}</span>
+              <span className="text-muted-foreground">
+                Mã tham chiếu đơn hàng
+              </span>
+              <span className="font-mono font-bold text-foreground">
+                {txnRef}
+              </span>
             </div>
           )}
 
           {transactionNo && (
             <div className="flex justify-between border-b border-border/50 pb-3">
-              <span className="text-muted-foreground">Mã giao dịch {provider}</span>
-              <span className="font-mono font-bold text-foreground">{transactionNo}</span>
+              <span className="text-muted-foreground">
+                Mã giao dịch {provider}
+              </span>
+              <span className="font-mono font-bold text-foreground">
+                {transactionNo}
+              </span>
             </div>
           )}
 
@@ -189,7 +219,7 @@ function CheckoutResultContent() {
             <div className="flex justify-between border-b border-border/50 pb-3">
               <span className="text-muted-foreground">Số tiền thanh toán</span>
               <span className="text-lg font-black text-primary">
-                {amountInVnd.toLocaleString('vi-VN')}đ
+                {amountInVnd.toLocaleString("vi-VN")}đ
               </span>
             </div>
           )}
@@ -204,21 +234,29 @@ function CheckoutResultContent() {
           {momoPayType && (
             <div className="flex justify-between border-b border-border/50 pb-3">
               <span className="text-muted-foreground">Kênh thanh toán</span>
-              <span className="font-semibold text-foreground">{momoPayType}</span>
+              <span className="font-semibold text-foreground">
+                {momoPayType}
+              </span>
             </div>
           )}
 
           {momoMessage && (
             <div className="flex justify-between border-b border-border/50 pb-3">
               <span className="text-muted-foreground">Thông báo</span>
-              <span className="text-right font-semibold text-foreground">{momoMessage}</span>
+              <span className="text-right font-semibold text-foreground">
+                {momoMessage}
+              </span>
             </div>
           )}
 
           {payDateStr && (
             <div className="flex justify-between pb-1">
-              <span className="text-muted-foreground">Thời gian thanh toán</span>
-              <span className="font-semibold text-foreground">{formatPayDate(payDateStr)}</span>
+              <span className="text-muted-foreground">
+                Thời gian thanh toán
+              </span>
+              <span className="font-semibold text-foreground">
+                {formatPayDate(payDateStr)}
+              </span>
             </div>
           )}
         </div>
@@ -227,9 +265,14 @@ function CheckoutResultContent() {
       {/* Next steps advice */}
       {displaySuccess && (
         <div className="mb-8 rounded-[2rem] border border-border bg-muted/40 p-6 md:p-8">
-          <h3 className="mb-3 text-lg font-black text-foreground">Lưu ý tiếp theo</h3>
+          <h3 className="mb-3 text-lg font-black text-foreground">
+            Lưu ý tiếp theo
+          </h3>
           <ul className="list-inside list-disc space-y-2 text-muted-foreground text-sm">
-            <li>Thông tin vé và QR Check-in sẽ được cập nhật trong tài khoản của bạn.</li>
+            <li>
+              Thông tin vé và QR Check-in sẽ được cập nhật trong tài khoản của
+              bạn.
+            </li>
             <li>Hệ thống gửi email xác nhận kèm vé điện tử (nếu có).</li>
             <li>Vui lòng không chia sẻ mã vé hoặc mã QR cho người khác.</li>
           </ul>
@@ -251,7 +294,7 @@ function CheckoutResultContent() {
             className="flex items-center justify-center gap-2 rounded-full bg-primary px-8 py-3.5 font-bold text-primary-foreground transition hover:bg-primary/95 active:translate-y-px shadow-lg shadow-primary/10"
           >
             <Ticket className="size-5" />
-            Xem vé của tôi
+            Xem vé đã thanh toán
           </Link>
         ) : (
           <Link
@@ -270,14 +313,18 @@ export default function CheckoutResultPage() {
   return (
     <main className="min-h-screen bg-background">
       <Header />
-      <Suspense fallback={
-        <div className="flex min-h-[50vh] items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-            <p className="text-muted-foreground font-medium">Đang tải kết quả giao dịch...</p>
+      <Suspense
+        fallback={
+          <div className="flex min-h-[50vh] items-center justify-center">
+            <div className="text-center">
+              <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+              <p className="text-muted-foreground font-medium">
+                Đang tải kết quả giao dịch...
+              </p>
+            </div>
           </div>
-        </div>
-      }>
+        }
+      >
         <CheckoutResultContent />
       </Suspense>
       <Footer />

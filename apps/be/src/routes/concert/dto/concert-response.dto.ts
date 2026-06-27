@@ -27,6 +27,7 @@ export class ConcertResponseDto {
   createdAt: Date;
   updatedAt: Date;
   seatZones?: any[];
+  guestList?: any[];
 
   constructor(concert: Concert) {
     this.id = concert.id;
@@ -47,5 +48,6 @@ export class ConcertResponseDto {
     this.createdAt = concert.createdAt;
     this.updatedAt = concert.updatedAt;
     this.seatZones = (concert as any).seatZones;
+    this.guestList = (concert as any).guestList;
   }
 }

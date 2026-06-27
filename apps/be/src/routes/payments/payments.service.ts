@@ -533,7 +533,13 @@ export class PaymentsService {
 
       const order = await tx.order.findUniqueOrThrow({
         where: { id: orderId },
-        select: { id: true, status: true, expiresAt: true },
+        select: {
+          id: true,
+          status: true,
+          expiresAt: true,
+          userId: true,
+          concert: { select: { name: true } },
+        },
       });
 
       if (order.status === OrderStatus.PAID) {
@@ -561,6 +567,16 @@ export class PaymentsService {
           where: { id: orderId },
           data: { status: OrderStatus.PENDING_PAYMENT },
         });
+
+        await tx.inAppNotification.create({
+          data: {
+            userId: order.userId,
+            title: "Thanh toán thất bại",
+            message: `Giao dịch thanh toán cho đơn hàng vé concert "${order.concert.name}" thất bại. Bạn có thể thực hiện thanh toán lại trước khi đơn hàng hết hạn.`,
+            read: false,
+          },
+        });
+
         return OrderStatus.PENDING_PAYMENT;
       }
 
@@ -570,6 +586,15 @@ export class PaymentsService {
         OrderStatus.PAYMENT_FAILED,
         ReservationStatus.CANCELLED,
       );
+
+      await tx.inAppNotification.create({
+        data: {
+          userId: order.userId,
+          title: "Thanh toán thất bại - Đơn hàng bị hủy",
+          message: `Giao dịch thanh toán thất bại và thời gian giữ chỗ đã hết hạn. Đơn đặt vé cho concert "${order.concert.name}" của bạn đã bị hủy tự động.`,
+          read: false,
+        },
+      });
 
       if (result && result.releasedSeats) {
         for (const seat of result.releasedSeats) {
@@ -594,7 +619,13 @@ export class PaymentsService {
 
       const order = await tx.order.findUniqueOrThrow({
         where: { id: orderId },
-        select: { id: true, status: true, expiresAt: true },
+        select: {
+          id: true,
+          status: true,
+          expiresAt: true,
+          userId: true,
+          concert: { select: { name: true } },
+        },
       });
 
       if (order.status === OrderStatus.PAID) {
@@ -622,6 +653,15 @@ export class PaymentsService {
         OrderStatus.CANCELLED,
         ReservationStatus.CANCELLED,
       );
+
+      await tx.inAppNotification.create({
+        data: {
+          userId: order.userId,
+          title: "Thanh toán bị hủy",
+          message: `Giao dịch thanh toán cho đơn hàng vé concert "${order.concert.name}" đã bị hủy bỏ.`,
+          read: false,
+        },
+      });
 
       if (result && result.releasedSeats) {
         for (const seat of result.releasedSeats) {

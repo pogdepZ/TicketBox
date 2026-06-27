@@ -54,6 +54,17 @@ export class AuthService {
         },
       });
       await this.authCacheService.invalidateUser(user.id);
+      
+      // Tạo thông báo chào mừng in-app
+      await this.prismaService.inAppNotification.create({
+        data: {
+          userId: user.id,
+          title: "Chào mừng bạn đến với TicketBox",
+          message: "Đăng ký tài khoản thành công! Khám phá các concert và săn vé ngay nhé.",
+          read: false,
+        },
+      });
+
       return new UserResponseDto(user);
     } catch (error: any) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {

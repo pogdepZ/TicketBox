@@ -91,4 +91,11 @@ export class GuestListService implements OnModuleDestroy {
       message: 'Queue system is temporarily unavailable. The CSV file has been saved and will be processed automatically as soon as the queue recovers.',
     } as any;
   }
+
+  async findAllForConcert(concertId: string) {
+    return this.prisma.guestList.findMany({
+      where: { concertId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }

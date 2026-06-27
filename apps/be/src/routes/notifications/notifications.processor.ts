@@ -1,4 +1,4 @@
-﻿import { Processor, WorkerHost } from "@nestjs/bullmq";
+import { Processor, WorkerHost } from "@nestjs/bullmq";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Job } from "bullmq";
@@ -91,6 +91,15 @@ export class NotificationsProcessor extends WorkerHost {
       payload: basePayload,
       status: NotificationStatus.SENT,
       sentAt: new Date(),
+    });
+
+    await this.prisma.inAppNotification.create({
+      data: {
+        userId: order.userId,
+        title: "Thanh toán đơn hàng thành công",
+        message: `Thanh toán thành công đơn hàng vé concert "${order.concert.name}". Mã vé QR của bạn đã sẵn sàng!`,
+        read: false,
+      },
     });
 
     const email = await this.createNotification({

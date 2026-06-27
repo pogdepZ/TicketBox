@@ -47,5 +47,43 @@ export class NotificationsService {
       status: 'QUEUED',
     };
   }
+
+  // --- In-App Notifications API Methods ---
+
+  async getInAppNotifications(userId: string) {
+    const items = await this.prisma.inAppNotification.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    const unreadCount = items.filter((n: any) => !n.read).length;
+    return { items, unreadCount };
+  }
+
+  async markInAppNotificationAsRead(id: string, userId: string) {
+    await this.prisma.inAppNotification.updateMany({
+      where: { id, userId },
+      data: { read: true },
+    });
+    return { success: true };
+  }
+
+  async markAllInAppNotificationsAsRead(userId: string) {
+    await this.prisma.inAppNotification.updateMany({
+      where: { userId, read: false },
+      data: { read: true },
+    });
+    return { success: true };
+  }
+
+  async createInAppNotification(userId: string, title: string, message: string) {
+    return this.prisma.inAppNotification.create({
+      data: {
+        userId,
+        title,
+        message,
+        read: false,
+      },
+    });
+  }
 }
 

@@ -699,6 +699,15 @@ export class ConcertService {
             ticketTypes: true,
           },
         },
+        guestList: {
+          select: {
+            fullName: true,
+            guestType: true,
+          },
+          where: {
+            status: "ACTIVE"
+          }
+        }
       },
     });
 
