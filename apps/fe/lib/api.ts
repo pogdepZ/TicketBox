@@ -26,7 +26,7 @@ async function refreshAccessToken(): Promise<{ token: string | null; status: "su
   }
 
   if (!refreshAccessTokenPromise) {
-    refreshAccessTokenPromise = (async () => {
+    refreshAccessTokenPromise = (async (): Promise<{ token: string | null; status: "success" | "unauthorized" | "server_error" }> => {
       try {
         const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
           method: "POST",
@@ -65,7 +65,7 @@ async function refreshAccessToken(): Promise<{ token: string | null; status: "su
     });
   }
 
-  return refreshAccessTokenPromise;
+  return refreshAccessTokenPromise!;
 }
 
 function clearLocalAuthSession() {
