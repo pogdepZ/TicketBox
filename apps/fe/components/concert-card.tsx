@@ -7,6 +7,7 @@ import { MouseEvent, useEffect, useState } from 'react';
 
 interface ConcertCardProps {
   id: string;
+  slug: string;
   title: string;
   artist: string;
   date: string;
@@ -35,6 +36,7 @@ function getFavorites() {
 
 export function ConcertCard({
   id,
+  slug,
   title,
   artist,
   date,
@@ -70,7 +72,7 @@ export function ConcertCard({
   }
 
   return (
-    <Link href={`/concert/${id}`} className="group block h-full">
+    <Link href={`/concert/${slug}`} className="group block h-full">
       <div className="flex flex-col h-full overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/45 hover:shadow-xl hover:shadow-primary/10">
         <div className="relative aspect-[4/3] overflow-hidden bg-muted flex-shrink-0">
           <Image

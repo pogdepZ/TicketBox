@@ -3,6 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcrypt';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import {
   Permission,
@@ -370,6 +371,7 @@ interface ZoneSeedData {
   code: string;
   name: string;
   color: string;
+  svgElementId?: string;
 }
 
 interface TicketTypeSeedData {
@@ -390,6 +392,7 @@ interface ConcertSeedData {
   eventDate: Date;
   status: ConcertStatus;
   seatMapSvgUrl: string;
+  seatMapSvgLocalPath?: string;
   posterLocalPath: string;
   s3Key: string;
   defaultPosterUrl: string;
@@ -397,12 +400,64 @@ interface ConcertSeedData {
   ticketTypes: TicketTypeSeedData[];
 }
 
+async function uploadSeatMapSvg(concertId: string, relativePath: string): Promise<string> {
+  const localPath = path.resolve(__dirname, relativePath);
+  if (!fs.existsSync(localPath)) {
+    console.log(`Seatmap SVG file not found at ${localPath}, skipping upload.`);
+    return '';
+  }
+
+  const fileBuffer = fs.readFileSync(localPath);
+  console.log(`Uploading local seatmap SVG ${localPath} to MinIO bucket "${s3Bucket}"...`);
+
+  const s3Key = `concerts/${concertId}/seat-maps/map.svg`;
+
+  try {
+    const command = new PutObjectCommand({
+      Bucket: s3Bucket,
+      Key: s3Key,
+      Body: fileBuffer,
+      ContentType: 'image/svg+xml',
+    });
+
+    await s3Client.send(command);
+
+    const endpoint = s3Endpoint.replace(/\/$/, '');
+    return `${endpoint}/${s3Bucket}/${s3Key}`;
+  } catch (error) {
+    console.error(`Failed to upload seatmap SVG to S3/MinIO:`, error);
+    return '';
+  }
+}
+
+function slugify(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .replace(/([^0-9a-z-\s])/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 async function seedConcert(data: ConcertSeedData): Promise<void> {
   const posterUrl = (await uploadPoster(data.s3Key, data.posterLocalPath)) || data.defaultPosterUrl;
+
+  let seatMapSvgUrl = data.seatMapSvgUrl;
+  if (data.seatMapSvgLocalPath) {
+    const uploadedSvgUrl = await uploadSeatMapSvg(data.id, data.seatMapSvgLocalPath);
+    if (uploadedSvgUrl) {
+      seatMapSvgUrl = uploadedSvgUrl;
+    }
+  }
 
   let concert = await prisma.concert.findUnique({
     where: { id: data.id },
   });
+
+  const slug = slugify(data.name);
 
   if (concert) {
     console.log(`Cleaning up old test data for concert: ${data.name} (${data.id})...`);
@@ -425,6 +480,7 @@ async function seedConcert(data: ConcertSeedData): Promise<void> {
       where: { id: data.id },
       data: {
         name: data.name,
+        slug,
         description: data.description,
         artistName: data.artistName,
         venueName: data.venueName,
@@ -432,6 +488,7 @@ async function seedConcert(data: ConcertSeedData): Promise<void> {
         eventDate: data.eventDate,
         status: data.status,
         posterUrl,
+        seatMapSvgUrl,
       },
     });
   } else {
@@ -439,13 +496,14 @@ async function seedConcert(data: ConcertSeedData): Promise<void> {
       data: {
         id: data.id,
         name: data.name,
+        slug,
         description: data.description,
         artistName: data.artistName,
         venueName: data.venueName,
         venueAddress: data.venueAddress,
         eventDate: data.eventDate,
         status: data.status,
-        seatMapSvgUrl: data.seatMapSvgUrl,
+        seatMapSvgUrl,
         posterUrl,
       },
     });
@@ -469,11 +527,21 @@ async function seedConcert(data: ConcertSeedData): Promise<void> {
           code: zone.code,
           name: zone.name,
           color: zone.color,
+          svgElementId: zone.svgElementId || null,
         },
       });
       console.log(`  Created SeatZone: ${zone.name} (ID: ${existingZone.id})`);
     } else {
-      console.log(`  SeatZone ${zone.name} already exists (ID: ${existingZone.id})`);
+      existingZone = await prisma.seatZone.update({
+        where: { id: existingZone.id },
+        data: {
+          code: zone.code,
+          name: zone.name,
+          color: zone.color,
+          svgElementId: zone.svgElementId || null,
+        },
+      });
+      console.log(`  SeatZone ${zone.name} updated/synced (ID: ${existingZone.id})`);
     }
     zoneMap[zone.name] = existingZone.id;
   }
@@ -508,6 +576,7 @@ async function seedConcert(data: ConcertSeedData): Promise<void> {
         where: { id: existing.id },
         data: {
           seatZoneId: existing.seatZoneId || zoneMap[tt.name] || null,
+          totalQuantity: tt.totalQuantity,
           remaining: tt.totalQuantity,
           maxPerUser: tt.maxPerUser,
         },
@@ -550,22 +619,23 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
     eventDate: new Date(new Date().setDate(new Date().getDate() + 30)),
     status: ConcertStatus.PUBLISHED,
     seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+    seatMapSvgLocalPath: '../fixtures/seatmap_template (2).svg',
     posterLocalPath: '../fixtures/ticketbox_live.jpg',
     s3Key: 'posters/ticketbox_live.jpg',
     defaultPosterUrl: 'https://example.com/posters/ticketbox-live.png',
     zones: [
-      { code: 'svip', name: 'SVIP', color: '#e5484d' },
-      { code: 'vip', name: 'VIP', color: '#e0a82e' },
-      { code: 'premium', name: 'CAT1', color: '#3d6f8f' },
-      { code: 'standard', name: 'CAT2', color: '#123c3a' },
-      { code: 'economy', name: 'GA', color: '#64748b' },
+      { code: 'svip', name: 'SVIP', color: '#e5484d', svgElementId: 'zone-svip' },
+      { code: 'vip', name: 'VIP', color: '#e0a82e', svgElementId: 'zone-vip' },
+      { code: 'cat1', name: 'CAT1', color: '#3d6f8f', svgElementId: 'zone-cat1' },
+      { code: 'cat2', name: 'CAT2', color: '#123c3a', svgElementId: 'zone-cat2' },
+      { code: 'ga', name: 'GA', color: '#64748b', svgElementId: 'zone-ga' },
     ],
     ticketTypes: [
-      { id: 'da8e128c-682d-4fbb-bee4-5f26545cae11', name: 'SVIP', price: '1800000', totalQuantity: 50, maxPerUser: 100 },
-      { id: 'f7c6c7ab-f989-40c8-b81b-8338fc30730e', name: 'VIP', price: '1200000', totalQuantity: 100, maxPerUser: 100 },
-      { id: '07ad8d58-b7cc-4fbc-9593-9a76067f9070', name: 'CAT1', price: '850000', totalQuantity: 150, maxPerUser: 100 },
-      { id: '4787e219-2270-4f98-8d15-1a7581171cb1', name: 'CAT2', price: '600000', totalQuantity: 200, maxPerUser: 100 },
-      { id: '0120ec7c-8c06-4159-a3df-e242d3b2be52', name: 'GA', price: '450000', totalQuantity: 300, maxPerUser: 100 },
+      { id: 'da8e128c-682d-4fbb-bee4-5f26545cae11', name: 'SVIP', price: '2000000', totalQuantity: 50, maxPerUser: 100 },
+      { id: 'f7c6c7ab-f989-40c8-b81b-8338fc30730e', name: 'VIP', price: '1500000', totalQuantity: 50, maxPerUser: 100 },
+      { id: '07ad8d58-b7cc-4fbc-9593-9a76067f9070', name: 'CAT1', price: '1000000', totalQuantity: 50, maxPerUser: 100 },
+      { id: '4787e219-2270-4f98-8d15-1a7581171cb1', name: 'CAT2', price: '700000', totalQuantity: 50, maxPerUser: 100 },
+      { id: '0120ec7c-8c06-4159-a3df-e242d3b2be52', name: 'GA', price: '400000', totalQuantity: 50, maxPerUser: 100 },
     ]
   };
 
@@ -829,7 +899,42 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
     }
   ];
 
+  const defaultZones: ZoneSeedData[] = [
+    { code: 'svip', name: 'SVIP', color: '#e5484d', svgElementId: 'zone-svip' },
+    { code: 'vip', name: 'VIP', color: '#e0a82e', svgElementId: 'zone-vip' },
+    { code: 'cat1', name: 'CAT1', color: '#3d6f8f', svgElementId: 'zone-cat1' },
+    { code: 'cat2', name: 'CAT2', color: '#123c3a', svgElementId: 'zone-cat2' },
+    { code: 'ga', name: 'GA', color: '#64748b', svgElementId: 'zone-ga' },
+  ];
+
+  const defaultTicketTypeTemplates = [
+    { name: 'SVIP', price: '2000000', totalQuantity: 50, maxPerUser: 4 },
+    { name: 'VIP', price: '1500000', totalQuantity: 50, maxPerUser: 4 },
+    { name: 'CAT1', price: '1000000', totalQuantity: 50, maxPerUser: 4 },
+    { name: 'CAT2', price: '700000', totalQuantity: 50, maxPerUser: 4 },
+    { name: 'GA', price: '400000', totalQuantity: 50, maxPerUser: 4 },
+  ];
+
+  function generateDeterministicUuid(concertId: string, ticketTypeName: string): string {
+    const hash = crypto.createHash('sha256').update(`${concertId}-${ticketTypeName}`).digest('hex');
+    const part1 = hash.substring(0, 8);
+    const part2 = hash.substring(8, 12);
+    const part3 = '4' + hash.substring(13, 16);
+    const part4 = 'a' + hash.substring(17, 20);
+    const part5 = hash.substring(20, 32);
+    return `${part1}-${part2}-${part3}-${part4}-${part5}`;
+  }
+
   for (const cData of webpConcerts) {
+    cData.seatMapSvgLocalPath = '../fixtures/seatmap_template (2).svg';
+    cData.zones = defaultZones;
+    cData.ticketTypes = defaultTicketTypeTemplates.map(tpl => ({
+      id: generateDeterministicUuid(cData.id, tpl.name),
+      name: tpl.name,
+      price: tpl.price,
+      totalQuantity: tpl.totalQuantity,
+      maxPerUser: tpl.maxPerUser,
+    }));
     await seedConcert(cData);
   }
 

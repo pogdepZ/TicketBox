@@ -86,7 +86,7 @@ export function ConcertTable({ concerts, onToggleActive }: ConcertTableProps) {
               <td className="px-6 py-3">
                 <div className="flex gap-3 items-center">
                   <Link
-                    href={`/concert/${concert.id}`}
+                    href={`/concert/${concert.slug}`}
                     target="_blank"
                     className="rounded-full p-2 text-muted-foreground transition hover:bg-primary/10 hover:text-primary flex items-center justify-center"
                     aria-label="Xem sự kiện"

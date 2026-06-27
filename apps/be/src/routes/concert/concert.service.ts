@@ -122,6 +122,18 @@ type ConcertTicketTypeInput = {
   svgElementId?: string;
 };
 
+function slugify(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .replace(/([^0-9a-z-\s])/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 @Injectable()
 export class ConcertService {
   private readonly logger = new Logger(ConcertService.name);
@@ -181,6 +193,7 @@ export class ConcertService {
         data: {
           id: concertId,
           name: createConcertDto.name.trim(),
+          slug: slugify(createConcertDto.name),
           description: createConcertDto.description,
           type: createConcertDto.type?.trim(),
           artistName: createConcertDto.artistName,
@@ -684,16 +697,17 @@ export class ConcertService {
     };
   }
 
-  async findOne(id: string): Promise<ConcertResponseDto> {
-    const cacheKey = this.buildConcertDetailCacheKey(id);
+  async findOne(idOrSlug: string): Promise<ConcertResponseDto> {
+    const cacheKey = this.buildConcertDetailCacheKey(idOrSlug);
     const cached = await this.getCache<ConcertResponseDto>(cacheKey);
 
     if (cached) {
       return cached;
     }
 
-    const concert = await this.prismaService.concert.findUnique({
-      where: { id },
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+    const concert = await this.prismaService.concert.findFirst({
+      where: isUuid ? { id: idOrSlug } : { slug: idOrSlug },
       include: {
         seatZones: {
           include: {
@@ -724,9 +738,12 @@ export class ConcertService {
   }
 
   async getReservedSeats(concertId: string) {
+    const concert = await this.findConcertOrThrow(concertId);
+    const resolvedId = concert.id;
+
     const seats = await this.prismaService.reservationSeat.findMany({
       where: {
-        concertId,
+        concertId: resolvedId,
         OR: [
           { status: ReservationStatus.CONFIRMED },
           {
@@ -836,9 +853,10 @@ export class ConcertService {
     return this.toResponse(updatedConcert);
   }
 
-  private async findConcertOrThrow(id: string): Promise<Concert> {
-    const concert = await this.prismaService.concert.findUnique({
-      where: { id },
+  private async findConcertOrThrow(idOrSlug: string): Promise<Concert> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+    const concert = await this.prismaService.concert.findFirst({
+      where: isUuid ? { id: idOrSlug } : { slug: idOrSlug },
     });
 
     if (!concert) {
@@ -1066,22 +1084,23 @@ export class ConcertService {
   }
 
   async createTicketType(concertId: string, dto: CreateTicketTypeDto) {
-    await this.findConcertOrThrow(concertId);
+    const concert = await this.findConcertOrThrow(concertId);
+    const resolvedId = concert.id;
 
     const zoneCode = dto.name.replace(/\s+/g, "-").toLowerCase();
 
     const ticketType = await this.prismaService.$transaction(async (tx) => {
       // 1. Find or create SeatZone
       let seatZone = await tx.seatZone.findFirst({
-        where: { concertId, code: zoneCode },
+        where: { concertId: resolvedId, code: zoneCode },
       });
 
       if (!seatZone) {
         // Find existing seatZones count to pick a color
-        const zonesCount = await tx.seatZone.count({ where: { concertId } });
+        const zonesCount = await tx.seatZone.count({ where: { concertId: resolvedId } });
         seatZone = await tx.seatZone.create({
           data: {
-            concertId,
+            concertId: resolvedId,
             code: zoneCode,
             name: dto.name.trim(),
             color: ["#e5484d", "#e0a82e", "#3d6f8f", "#123c3a", "#64748b"][
@@ -1094,7 +1113,7 @@ export class ConcertService {
       // 2. Create TicketType
       return tx.ticketType.create({
         data: {
-          concertId,
+          concertId: resolvedId,
           seatZoneId: seatZone.id,
           name: dto.name.trim(),
           price: dto.price,
@@ -1108,7 +1127,7 @@ export class ConcertService {
       });
     });
 
-    await this.invalidateConcertCache(concertId);
+    await this.invalidateConcertCache(resolvedId);
     return ticketType;
   }
 
@@ -1117,10 +1136,11 @@ export class ConcertService {
     ticketTypeId: string,
     dto: UpdateTicketTypeDto,
   ) {
-    await this.findConcertOrThrow(concertId);
+    const concert = await this.findConcertOrThrow(concertId);
+    const resolvedId = concert.id;
 
     const ticketType = await this.prismaService.ticketType.findFirst({
-      where: { id: ticketTypeId, concertId },
+      where: { id: ticketTypeId, concertId: resolvedId },
     });
 
     if (!ticketType) {
@@ -1185,15 +1205,16 @@ export class ConcertService {
       });
     });
 
-    await this.invalidateConcertCache(concertId);
+    await this.invalidateConcertCache(resolvedId);
     return updated;
   }
 
   async deleteTicketType(concertId: string, ticketTypeId: string) {
-    await this.findConcertOrThrow(concertId);
+    const concert = await this.findConcertOrThrow(concertId);
+    const resolvedId = concert.id;
 
     const ticketType = await this.prismaService.ticketType.findFirst({
-      where: { id: ticketTypeId, concertId },
+      where: { id: ticketTypeId, concertId: resolvedId },
     });
 
     if (!ticketType) {
@@ -1222,7 +1243,7 @@ export class ConcertService {
       }
     });
 
-    await this.invalidateConcertCache(concertId);
+    await this.invalidateConcertCache(resolvedId);
     return { success: true };
   }
 }

@@ -612,6 +612,18 @@ export async function uploadConcertPoster(
   });
 }
 
+function slugify(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .replace(/([^0-9a-z-\s])/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 export async function getConcertById(id: string) {
   try {
     const url = `/concerts/${id}`;
@@ -624,7 +636,7 @@ export async function getConcertById(id: string) {
       `Backend API /concerts/${id} failed, falling back to mock data:`,
       error,
     );
-    const mock = mockConcerts.find((c) => c.id === id);
+    const mock = mockConcerts.find((c) => c.id === id || slugify(c.name || c.title || "") === id);
     if (!mock) {
       throw error;
     }
@@ -635,6 +647,7 @@ export async function getConcertById(id: string) {
 function mapLocalMockToBEConcert(mock: any) {
   return {
     id: mock.id,
+    slug: mock.slug || slugify(mock.title || ""),
     name: mock.title,
     description: mock.description || "Tiểu sử nghệ sĩ và chi tiết show diễn.",
     artistName: mock.artist,
@@ -715,6 +728,7 @@ function mapConcertToDisplay(concert: any, useLocalOverride = false) {
 
   return {
     id: concert.id,
+    slug: concert.slug || slugify(concert.name || ""),
     title: concert.name,
     artist: concert.artistName || "Nhiều nghệ sĩ",
     date: concert.eventDate,

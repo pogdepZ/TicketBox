@@ -18,6 +18,7 @@ async function main() {
     select: {
       id: true,
       name: true,
+      slug: true,
       status: true,
       eventDate: true
     }
@@ -27,6 +28,7 @@ async function main() {
   console.log("=================================");
   concerts.forEach(c => {
     console.log(`- ID: ${c.id}`);
+    console.log(`  Slug: ${c.slug}`);
     console.log(`  Name: ${c.name}`);
     console.log(`  Status: ${c.status}`);
     console.log(`  Date: ${c.eventDate}`);

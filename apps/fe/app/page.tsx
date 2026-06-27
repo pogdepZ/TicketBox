@@ -38,7 +38,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             {featured && (
               <Link
-                href={`/concert/${featured.id}`}
+                href={`/concert/${featured.slug}`}
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-px"
               >
                 Xem show nổi bật

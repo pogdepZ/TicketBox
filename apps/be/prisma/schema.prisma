@@ -237,6 +237,7 @@ model UserRole {
 model Concert {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
+  slug        String? @unique @db.VarChar(200)
   name        String  @db.VarChar(200)
   description String?
   type        String? @db.VarChar(50)

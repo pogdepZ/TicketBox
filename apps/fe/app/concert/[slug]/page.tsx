@@ -9,17 +9,17 @@ import Image from "next/image";
 
 interface ConcertDetailPageProps {
   params: Promise<{
-    id: string;
+    slug: string;
   }>;
 }
 
 export default async function ConcertDetailPage({
   params,
 }: ConcertDetailPageProps) {
-  const { id } = await params;
+  const { slug } = await params;
   let concert;
   try {
-    concert = await getConcertById(id);
+    concert = await getConcertById(slug);
   } catch {
     notFound();
   }
@@ -227,7 +227,7 @@ export default async function ConcertDetailPage({
               </div>
 
               <Link
-                href={`/concert/${concert.id}/booking`}
+                href={`/concert/${concert.slug}/booking`}
                 className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-full bg-primary py-4 font-black text-primary-foreground shadow-lg shadow-primary/20 hover:scale-[1.01] hover:bg-primary/95 transition duration-200"
               >
                 Mua vé ngay
@@ -247,7 +247,7 @@ export default async function ConcertDetailPage({
             <p className="text-lg font-black text-primary">{minPrice.toLocaleString('vi-VN')}đ</p>
           </div>
           <Link
-            href={`/concert/${concert.id}/booking`}
+            href={`/concert/${concert.slug}/booking`}
             className="flex flex-1 items-center justify-center gap-2 rounded-full bg-primary py-3 px-5 text-sm font-black text-primary-foreground transition hover:bg-primary/95"
           >
             Mua vé ngay

@@ -25,6 +25,7 @@ export class ConcertResponseDto {
   posterUrl: string | null;
   status: ConcertStatus;
   createdBy: string | null;
+  slug: string | null;
   createdAt: Date;
   updatedAt: Date;
   seatZones?: any[];
@@ -47,6 +48,7 @@ export class ConcertResponseDto {
     this.posterUrl = concert.posterUrl;
     this.status = fromPrismaConcertStatus(concert.status as PrismaConcertStatus);
     this.createdBy = concert.createdById;
+    this.slug = concert.slug;
     this.createdAt = concert.createdAt;
     this.updatedAt = concert.updatedAt;
     this.seatZones = (concert as any).seatZones;
