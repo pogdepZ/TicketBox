@@ -33,10 +33,13 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           router.push('/');
         }
       } catch (err: any) {
-        if (err?.statusCode !== 401) {
-          console.error(err);
+        console.error("Auth check failed:", err);
+        if (err?.statusCode === 401) {
+          router.push('/login');
+        } else {
+          // Tránh bắt đăng nhập lại khi gặp lỗi server tạm thời, chuyển về trang chủ
+          router.push('/');
         }
-        router.push('/login');
       } finally {
         setLoading(false);
       }

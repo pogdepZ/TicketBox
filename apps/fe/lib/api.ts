@@ -498,6 +498,11 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
         // Chỉ xóa session khi refresh token thực sự bị từ chối (hết hạn / không hợp lệ)
         if (refreshResult.status === "unauthorized") {
           clearLocalAuthSession();
+        } else if (refreshResult.status === "server_error") {
+          throw new ApiError(
+            "Không thể kết nối đến máy chủ để gia hạn phiên làm việc. Vui lòng thử lại sau.",
+            503
+          );
         }
       }
     }

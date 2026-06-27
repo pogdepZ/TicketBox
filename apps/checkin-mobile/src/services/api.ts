@@ -159,7 +159,9 @@ class ApiService {
     );
 
     if (!result.response.ok) {
-      await this.clearAuthState();
+      if (result.response.status === 401 || result.response.status === 403) {
+        await this.clearAuthState();
+      }
       return null;
     }
 
