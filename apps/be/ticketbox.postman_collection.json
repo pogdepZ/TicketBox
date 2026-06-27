@@ -2442,7 +2442,8 @@
                   "} else {",
                   "  pm.test('conflict handled gracefully', function () {",
                   "    const json = pm.response.json();",
-                  "    pm.expect(json).to.have.property('statusCode', 409);",
+                  "    pm.expect(pm.response.code).to.equal(409);",
+                  "    pm.expect(json.success).to.be.false;",
                   "  });",
                   "}"
                 ]
@@ -2537,7 +2538,8 @@
                   "} else {",
                   "  pm.test('conflict handled gracefully', function () {",
                   "    const json = pm.response.json();",
-                  "    pm.expect(json).to.have.property('statusCode', 409);",
+                  "    pm.expect(pm.response.code).to.equal(409);",
+                  "    pm.expect(json.success).to.be.false;",
                   "  });",
                   "}"
                 ]
@@ -2804,12 +2806,12 @@
     },
     {
       "key": "guestListCsvFilePath",
-      "value": "/home/pognova/TicketBox/apps/be/fixtures/guest-list-sample.csv",
+      "value": "apps/be/fixtures/guest-list-sample.csv",
       "type": "string"
     },
     {
       "key": "artistBioPdfFilePath",
-      "value": "/home/pognova/TicketBox/apps/be/fixtures/sample.pdf",
+      "value": "apps/be/fixtures/sample.pdf",
       "type": "string"
     },
     {

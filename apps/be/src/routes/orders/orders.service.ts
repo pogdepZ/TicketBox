@@ -75,19 +75,22 @@ export class OrdersService {
       return cached.body as OrderResponseDto;
     }
 
-    // Bước 3: Rate limit theo userId
-    const rateLimitKey = `order-rate:${user.id}`;
-    const rateResult = await this.redis.consumeTokenBucket(
-      rateLimitKey,
-      RATE_LIMIT_CAPACITY,
-      RATE_LIMIT_REFILL_PER_SECOND,
-      RATE_LIMIT_TTL_SECONDS,
-    );
-    if (!rateResult.allowed) {
-      throw new HttpException(
-        `Too many order requests. Retry after ${rateResult.retryAfterSeconds}s`,
-        HttpStatus.TOO_MANY_REQUESTS,
+    // Bước 3: Rate limit theo userId (bypass for admin)
+    const isAdmin = user.roles.some((role) => role.name === 'admin');
+    if (!isAdmin) {
+      const rateLimitKey = `order-rate:${user.id}`;
+      const rateResult = await this.redis.consumeTokenBucket(
+        rateLimitKey,
+        RATE_LIMIT_CAPACITY,
+        RATE_LIMIT_REFILL_PER_SECOND,
+        RATE_LIMIT_TTL_SECONDS,
       );
+      if (!rateResult.allowed) {
+        throw new HttpException(
+          `Too many order requests. Retry after ${rateResult.retryAfterSeconds}s`,
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
     }
 
     // Bước 4: Đánh dấu PROCESSING (chặn concurrent duplicate với cùng key)
