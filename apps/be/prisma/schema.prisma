@@ -269,6 +269,7 @@ model Concert {
   waitingRoomSessions WaitingRoomSession[]
   tickets             Ticket[]
   reservationSeats    ReservationSeat[]
+  notifications       Notification[]
 
   @@index([status, eventDate])
   @@map("concerts")
@@ -750,10 +751,12 @@ model ArtistAsset {
 model Notification {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  userId String? @map("user_id") @db.Uuid
+  userId    String? @map("user_id") @db.Uuid
+  concertId String? @map("concert_id") @db.Uuid
 
-  channel  NotificationChannel
-  template String              @db.VarChar(50)
+  channel   NotificationChannel
+  template  String              @db.VarChar(50)
+  dedupeKey String?            @unique @map("dedupe_key") @db.VarChar(200)
 
   payload Json?
 
@@ -765,9 +768,11 @@ model Notification {
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user User? @relation(fields: [userId], references: [id])
+  user    User?    @relation(fields: [userId], references: [id])
+  concert Concert? @relation(fields: [concertId], references: [id])
 
   @@index([userId])
+  @@index([concertId])
   @@index([status])
   @@map("notifications")
 }
