@@ -29,6 +29,20 @@ export default async function ConcertDetailPage({ params }: ConcertDetailPagePro
   const concertZones = await getTicketZonesAsync(concert.id, concert.seatZones);
   const concertSeats = await getSeatsAsync(concert.id, concert.seatZones);
 
+  let svgContent = '';
+  if (concert.seatMapSvgUrl) {
+    try {
+      const response = await fetch(concert.seatMapSvgUrl, { cache: 'no-store' });
+      if (response.ok) {
+        svgContent = await response.text();
+      } else {
+        console.warn(`Failed to fetch seatmap SVG from ${concert.seatMapSvgUrl}: status ${response.status}`);
+      }
+    } catch (e) {
+      console.error("Error fetching seatmap SVG in server component:", e);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-background">
       <Header />
@@ -79,7 +93,13 @@ export default async function ConcertDetailPage({ params }: ConcertDetailPagePro
           </div>
         </div>
 
-        <SeatMap concertId={concert.id} concertTitle={concert.title} zones={concertZones} seats={concertSeats} />
+        <SeatMap 
+          concertId={concert.id} 
+          concertTitle={concert.title} 
+          zones={concertZones} 
+          seats={concertSeats} 
+          svgContent={svgContent}
+        />
       </section>
 
       <Footer />
