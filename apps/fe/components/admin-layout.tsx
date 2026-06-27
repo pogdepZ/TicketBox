@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LayoutDashboard, List, LogOut, Plus, Settings, Ticket, Home } from 'lucide-react';
+import { LayoutDashboard, List, LogOut, Plus, Settings, Ticket, Home, BarChart3, Users } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from './theme-toggle';
 import { getProfile, logout } from '@/lib/api';
@@ -57,6 +57,18 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       icon: List,
       exact: false, // matches subroutes like /admin/concerts/:id
       extraMatches: ['/admin/create-concert'],
+    },
+    {
+      href: '/admin/analytics',
+      label: 'Phân tích',
+      icon: BarChart3,
+      exact: true,
+    },
+    {
+      href: '/admin/users',
+      label: 'Người dùng',
+      icon: Users,
+      exact: true,
     },
     {
       href: '/admin/settings',

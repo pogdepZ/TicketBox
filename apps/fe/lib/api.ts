@@ -45,8 +45,14 @@ export function getFriendlyErrorMessage(error: any): string {
     ) {
       return "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.";
     }
+    if (msgLower === "user is blocked") {
+      return "Tài khoản của bạn đã bị khóa hoặc vô hiệu hóa. Vui lòng liên hệ Admin.";
+    }
+    if (msgLower === "user is deleted") {
+      return "Tài khoản của bạn đã bị xóa khỏi hệ thống.";
+    }
     if (msgLower === "user is not active") {
-      return "Tài khoản của bạn tạm thời đã bị khóa hoặc chưa được kích hoạt.";
+      return "Tài khoản của bạn tạm thời chưa được kích hoạt.";
     }
     if (
       msgLower.includes("do not have permission") ||
@@ -139,6 +145,20 @@ export function getFriendlyErrorMessage(error: any): string {
     }
     if (msgLower.includes("venueaddress is required")) {
       return "Vui lòng điền địa chỉ tổ chức.";
+    }
+
+    // 4.5. Payment & Verification
+    if (msgLower.includes("invalid vnpay signature") || msgLower.includes("invalid signature")) {
+      return "Chữ ký xác thực thanh toán không hợp lệ.";
+    }
+    if (msgLower.includes("invalid momo signature")) {
+      return "Chữ ký xác thực MoMo không hợp lệ.";
+    }
+    if (msgLower.includes("unknown payment provider")) {
+      return "Cổng thanh toán không được hỗ trợ.";
+    }
+    if (msgLower.includes("order status is invalid") || msgLower.includes("payment status is invalid")) {
+      return "Trạng thái đơn đặt vé không hợp lệ để thanh toán.";
     }
 
     // 5. Zod Validation (format: "fieldName: message")
@@ -260,6 +280,27 @@ export function getFriendlyErrorMessage(error: any): string {
           : checkMsg(String(raw));
         if (hasInvalidCreds) {
           return "Email hoặc mật khẩu không chính xác.";
+        }
+
+        const checkBlockedOrInactive = (msg: string) => {
+          const m = msg.toLowerCase().trim();
+          return (
+            m === "user is blocked" ||
+            m === "user is deleted" ||
+            m === "user is not active"
+          );
+        };
+        const hasBlockedOrInactive = Array.isArray(raw)
+          ? raw.some(checkBlockedOrInactive)
+          : checkBlockedOrInactive(String(raw));
+        if (hasBlockedOrInactive) {
+          if (Array.isArray(raw)) {
+            return raw
+              .map((r) => translateSingleMessage(r))
+              .filter(Boolean)
+              .join("\n");
+          }
+          return translateSingleMessage(String(raw));
         }
       }
       return "Phiên làm việc hết hạn. Vui lòng đăng nhập lại.";
@@ -659,11 +700,12 @@ export async function logout() {
 // Import these locally inside functions or handle in mock-data.ts
 // to avoid circular dependency for now, or just expose async mock functions.
 import { getTicketZonesByConcertId, getSeatsByConcertId } from "./mock-data";
+import type { TicketZone, TicketZoneStatus } from "./mock-data";
 
 export async function getTicketZonesAsync(
   concertId: string,
   preFetchedSeatZones?: any[],
-) {
+): Promise<TicketZone[]> {
   try {
     let seatZones = preFetchedSeatZones;
     if (!seatZones) {
@@ -696,31 +738,25 @@ export async function getTicketZonesAsync(
           concertId,
           seatZoneId: t.id,
           ticketTypeId: t.id,
+          code: ["svip", "vip", "premium", "standard", "economy"][idx % 5],
         }));
       }
       return getTicketZonesByConcertId(concertId); // fallback if no real zones
     }
 
-    return seatZones.flatMap((zone: any) => {
+    const processedZones = seatZones.flatMap((zone: any) => {
       const ticketType = zone.ticketTypes?.[0];
       if (!ticketType) return [];
 
-      let status = "available";
+      let status: TicketZoneStatus = "available";
       if (ticketType.status === "SOLD_OUT" || ticketType.remaining === 0)
         status = "sold-out";
       else if (ticketType.remaining / ticketType.totalQuantity <= 0.15)
         status = "limited";
 
-      let mockCode = (zone.code || "economy").toLowerCase();
-      if (
-        !["svip", "vip", "premium", "standard", "economy"].includes(mockCode)
-      ) {
-        mockCode = "economy";
-      }
-
       return [
         {
-          id: mockCode,
+          id: zone.id, // Use database UUID to guarantee uniqueness
           name: zone.name,
           label: ticketType.name,
           price: Number(ticketType.price),
@@ -732,9 +768,47 @@ export async function getTicketZonesAsync(
           concertId,
           seatZoneId: zone.id,
           ticketTypeId: ticketType.id,
+          code: (zone.code || "").toLowerCase(),
         },
       ];
     });
+
+    const validCodes = ["svip", "vip", "premium", "standard", "economy"];
+
+    // Sort all unique zones by price descending
+    const sortedByPrice = [...processedZones].sort(
+      (a, b) => b.price - a.price || a.name.localeCompare(b.name),
+    );
+
+    const N = sortedByPrice.length;
+    let mappedCodes: string[] = [];
+    if (N === 1) {
+      mappedCodes = ["economy"];
+    } else if (N === 2) {
+      mappedCodes = ["vip", "economy"];
+    } else if (N === 3) {
+      mappedCodes = ["vip", "standard", "economy"];
+    } else if (N === 4) {
+      mappedCodes = ["vip", "premium", "standard", "economy"];
+    } else {
+      mappedCodes = ["svip", "vip", "premium", "standard", "economy"];
+    }
+
+    processedZones.forEach((zone) => {
+      // If code is already explicitly valid, keep it
+      if (validCodes.includes(zone.code)) {
+        return;
+      }
+      // Otherwise, assign visual code based on price ranking index
+      const idx = sortedByPrice.findIndex((z) => z.id === zone.id);
+      if (idx !== -1 && idx < mappedCodes.length) {
+        zone.code = mappedCodes[idx];
+      } else {
+        zone.code = "economy";
+      }
+    });
+
+    return processedZones;
   } catch (error) {
     console.error("Error fetching ticket zones:", error);
     return getTicketZonesByConcertId(concertId);
@@ -847,12 +921,12 @@ export async function getSeatsAsync(
           }
 
           seats.push({
-            id: `seat-${concertId}-${mockCode}-${row}-${number}`,
+            id: `seat-${concertId}-${zone.id}-${row}-${number}`,
             row,
             number,
             label: seatLabel,
             status,
-            zoneId: mockCode,
+            zoneId: zone.id,
             concertId,
             seatZoneId: zone.id,
           });
@@ -1136,6 +1210,55 @@ export async function getConcertRevenue(concertId: string): Promise<any> {
         },
       ],
     };
+  }
+}
+
+export async function getDashboardAnalytics(): Promise<any> {
+  try {
+    return await fetchApi("/admin/dashboard/analytics");
+  } catch (error) {
+    console.warn("Failed to fetch dashboard analytics, using mock fallback", error);
+    return {
+      newUsersLastMonth: 120,
+      eventAnalytics: [],
+    };
+  }
+}
+
+export async function getUsersAdmin(page = 1, limit = 10, search = ""): Promise<any> {
+  try {
+    let url = `/admin/users?page=${page}&limit=${limit}`;
+    if (search.trim()) {
+      url += `&search=${encodeURIComponent(search.trim())}`;
+    }
+    return await fetchApi(url);
+  } catch (error) {
+    console.error("Failed to fetch users list:", error);
+    throw error;
+  }
+}
+
+export async function updateUserStatusAdmin(userId: string, status: string): Promise<any> {
+  try {
+    return await fetchApi(`/admin/users/${userId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+  } catch (error) {
+    console.error(`Failed to update user ${userId} status:`, error);
+    throw error;
+  }
+}
+
+export async function updateUserRoleAdmin(userId: string, role: string): Promise<any> {
+  try {
+    return await fetchApi(`/admin/users/${userId}/role`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    });
+  } catch (error) {
+    console.error(`Failed to update user ${userId} role:`, error);
+    throw error;
   }
 }
 

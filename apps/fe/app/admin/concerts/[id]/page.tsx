@@ -99,9 +99,9 @@ export default function AdminConcertDetailPage({
   const [guestError, setGuestError] = useState("");
   const [importResult, setImportResult] = useState<any>(null);
 
-  const isPublished = concert?.status === "PUBLISHED";
+  const isPublished = concert?.rawStatus === "PUBLISHED";
   const isCancelledOrCompleted =
-    concert?.status === "CANCELLED" || concert?.status === "COMPLETED";
+    concert?.rawStatus === "CANCELLED" || concert?.rawStatus === "COMPLETED";
   const isBasicInfoReadOnly = isPublished || isCancelledOrCompleted;
 
   async function refreshTicketTypes() {
@@ -344,6 +344,13 @@ export default function AdminConcertDetailPage({
     e.preventDefault();
     setError("");
 
+    if (isBasicInfoReadOnly) {
+      setError(
+        "Không thể thêm hoặc chỉnh sửa hạng vé của sự kiện đã xuất bản, đã hủy hoặc đã hoàn thành.",
+      );
+      return;
+    }
+
     const validationMsg = validate();
     if (validationMsg) {
       setError(validationMsg);
@@ -403,12 +410,24 @@ export default function AdminConcertDetailPage({
   }
 
   function handleDelete(ticketTypeId: string) {
+    if (isBasicInfoReadOnly) {
+      setError(
+        "Không thể xóa hạng vé của sự kiện đã xuất bản, đã hủy hoặc đã hoàn thành.",
+      );
+      return;
+    }
     setDeleteTicketTypeId(ticketTypeId);
     setDeleteConfirmOpen(true);
   }
 
   async function confirmDeleteTicketType() {
     if (!deleteTicketTypeId) return;
+    if (isBasicInfoReadOnly) {
+      setError(
+        "Không thể xóa hạng vé của sự kiện đã xuất bản, đã hủy hoặc đã hoàn thành.",
+      );
+      return;
+    }
     setDeleteConfirmOpen(false);
     setError("");
     try {
@@ -567,20 +586,20 @@ export default function AdminConcertDetailPage({
                 </h1>
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
-                    concert.status === "PUBLISHED"
+                    concert.rawStatus === "PUBLISHED"
                       ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                      : concert.status === "DRAFT"
+                      : concert.rawStatus === "DRAFT"
                         ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
-                        : concert.status === "CANCELLED"
+                        : concert.rawStatus === "CANCELLED"
                           ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
                           : "bg-zinc-500/10 text-zinc-500 border border-zinc-500/20"
                   }`}
                 >
-                  {concert.status === "PUBLISHED"
+                  {concert.rawStatus === "PUBLISHED"
                     ? "Đã xuất bản"
-                    : concert.status === "DRAFT"
+                    : concert.rawStatus === "DRAFT"
                       ? "Bản nháp"
-                      : concert.status === "CANCELLED"
+                      : concert.rawStatus === "CANCELLED"
                         ? "Đã hủy"
                         : "Đã hoàn thành"}
                 </span>
@@ -821,6 +840,16 @@ export default function AdminConcertDetailPage({
                 {editingId ? "Sửa hạng vé" : "Thêm hạng vé mới"}
               </h2>
 
+              {isBasicInfoReadOnly && (
+                <div className="mb-6 rounded-2xl border border-border bg-muted/30 p-4 text-xs font-semibold text-muted-foreground flex gap-2">
+                  <AlertCircle className="size-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <span>
+                    Không thể thêm hoặc chỉnh sửa hạng vé khi sự kiện đã xuất
+                    bản, đã hủy hoặc đã hoàn thành.
+                  </span>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-bold text-foreground mb-2">
@@ -828,10 +857,11 @@ export default function AdminConcertDetailPage({
                   </label>
                   <input
                     type="text"
+                    disabled={isBasicInfoReadOnly}
                     placeholder="Ví dụ: Vé VIP, Vé GA..."
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="h-11 w-full rounded-2xl border border-border bg-background px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
+                    className="h-11 w-full rounded-2xl border border-border bg-background px-4 focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -843,6 +873,7 @@ export default function AdminConcertDetailPage({
                     <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                     <input
                       type="text"
+                      disabled={isBasicInfoReadOnly}
                       placeholder="Mệnh giá"
                       value={
                         price
@@ -855,7 +886,7 @@ export default function AdminConcertDetailPage({
                         const raw = e.target.value.replace(/\D/g, "");
                         setPrice(raw);
                       }}
-                      className="h-11 w-full rounded-2xl border border-border bg-background pl-10 pr-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
+                      className="h-11 w-full rounded-2xl border border-border bg-background pl-10 pr-4 focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:opacity-60 disabled:cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -869,10 +900,11 @@ export default function AdminConcertDetailPage({
                       <Users className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                       <input
                         type="number"
+                        disabled={isBasicInfoReadOnly}
                         placeholder="Tổng số vé"
                         value={totalQuantity}
                         onChange={(e) => setTotalQuantity(e.target.value)}
-                        className="h-11 w-full rounded-2xl border border-border bg-background pl-10 pr-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
+                        className="h-11 w-full rounded-2xl border border-border bg-background pl-10 pr-4 focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:opacity-60 disabled:cursor-not-allowed"
                       />
                     </div>
                   </div>
@@ -882,10 +914,11 @@ export default function AdminConcertDetailPage({
                     </label>
                     <input
                       type="number"
+                      disabled={isBasicInfoReadOnly}
                       placeholder="4"
                       value={maxPerUser}
                       onChange={(e) => setMaxPerUser(e.target.value)}
-                      className="h-11 w-full rounded-2xl border border-border bg-background px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
+                      className="h-11 w-full rounded-2xl border border-border bg-background px-4 focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:opacity-60 disabled:cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -897,6 +930,7 @@ export default function AdminConcertDetailPage({
                   <DateTimePicker
                     value={saleStartAt}
                     onChange={setSaleStartAt}
+                    disabled={isBasicInfoReadOnly}
                     placeholder="Chọn thời gian mở bán"
                   />
                 </div>
@@ -908,6 +942,7 @@ export default function AdminConcertDetailPage({
                   <DateTimePicker
                     value={saleEndAt}
                     onChange={setSaleEndAt}
+                    disabled={isBasicInfoReadOnly}
                     placeholder="Chọn thời gian đóng bán"
                   />
                 </div>
@@ -928,12 +963,14 @@ export default function AdminConcertDetailPage({
                       Hủy sửa
                     </button>
                   )}
-                  <button
-                    type="submit"
-                    className="flex-1 rounded-full bg-primary py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition cursor-pointer"
-                  >
-                    {editingId ? "Lưu thay đổi" : "Tạo hạng vé"}
-                  </button>
+                  {!isBasicInfoReadOnly && (
+                    <button
+                      type="submit"
+                      className="flex-1 rounded-full bg-primary py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition cursor-pointer"
+                    >
+                      {editingId ? "Lưu thay đổi" : "Tạo hạng vé"}
+                    </button>
+                  )}
                 </div>
               </form>
             </div>
@@ -1017,20 +1054,28 @@ export default function AdminConcertDetailPage({
                           <td className="py-4 text-center">{t.maxPerUser}</td>
                           <td className="py-4 text-right">
                             <div className="flex gap-1 justify-end">
-                              <button
-                                onClick={() => handleEdit(t)}
-                                className="rounded-full p-2 text-muted-foreground hover:bg-primary/10 hover:text-primary transition cursor-pointer"
-                                aria-label="Sửa hạng vé"
-                              >
-                                <Edit className="size-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(t.id)}
-                                className="rounded-full p-2 text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
-                                aria-label="Xóa hạng vé"
-                              >
-                                <Trash2 className="size-4" />
-                              </button>
+                              {!isBasicInfoReadOnly ? (
+                                <>
+                                  <button
+                                    onClick={() => handleEdit(t)}
+                                    className="rounded-full p-2 text-muted-foreground hover:bg-primary/10 hover:text-primary transition cursor-pointer"
+                                    aria-label="Sửa hạng vé"
+                                  >
+                                    <Edit className="size-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(t.id)}
+                                    className="rounded-full p-2 text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
+                                    aria-label="Xóa hạng vé"
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="text-xs text-muted-foreground italic px-2">
+                                  Đã khóa
+                                </span>
+                              )}
                             </div>
                           </td>
                         </tr>

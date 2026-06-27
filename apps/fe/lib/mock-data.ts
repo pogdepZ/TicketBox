@@ -62,6 +62,7 @@ export interface TicketZone {
   concertId?: string;
   seatZoneId?: string;
   ticketTypeId?: string;
+  code?: string;
 }
 
 export interface Seat {
@@ -445,6 +446,7 @@ export function getTicketZonesByConcertId(concertId: string): TicketZone[] {
         concertId,
         seatZoneId: seatZone.id,
         ticketTypeId: ticketType.id,
+        code: seatZone.code,
       };
     });
 }

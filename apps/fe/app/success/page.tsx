@@ -51,7 +51,7 @@ export default function SuccessPage() {
               const concertData = await getConcertById(fetchedOrder.concertId);
               if (concertData) {
                 concertTitle = concertData.title;
-                concertVenue = concertData.venue || concertData.venueAddress || 'TicketBox Arena';
+                concertVenue = concertData.venue || concertData.city || 'TicketBox Arena';
                 concertDate = concertData.date || fetchedOrder.createdAt;
               }
             } catch (err) {
