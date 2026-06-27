@@ -18,46 +18,51 @@ export class ApiError extends Error {
   }
 }
 
-let refreshAccessTokenPromise: Promise<string | null> | null = null;
+let refreshAccessTokenPromise: Promise<{ token: string | null; status: "success" | "unauthorized" | "server_error" }> | null = null;
 
-async function refreshAccessToken(): Promise<string | null> {
+async function refreshAccessToken(): Promise<{ token: string | null; status: "success" | "unauthorized" | "server_error" }> {
   if (typeof window === "undefined") {
-    return null;
+    return { token: null, status: "server_error" };
   }
 
   if (!refreshAccessTokenPromise) {
     refreshAccessTokenPromise = (async () => {
-      const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
+      try {
+        const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        });
 
-      if (!refreshRes.ok) {
-        return null;
+        if (!refreshRes.ok) {
+          // Nếu lỗi do hết hạn / không hợp lệ (401 hoặc 403), đánh dấu unauthorized
+          if (refreshRes.status === 401 || refreshRes.status === 403) {
+            return { token: null, status: "unauthorized" };
+          }
+          // Các lỗi khác như 500, 502, 504 là do server / kết nối tạm thời
+          return { token: null, status: "server_error" };
+        }
+
+        const refreshJson = await refreshRes.json().catch(() => ({}));
+        const newAccessToken = refreshJson?.data?.accessToken;
+
+        if (typeof newAccessToken !== "string" || !newAccessToken) {
+          return { token: null, status: "unauthorized" };
+        }
+
+        window.localStorage.setItem("access_token", newAccessToken);
+        window.dispatchEvent(new CustomEvent("ticketbox-auth-change"));
+
+        return { token: newAccessToken, status: "success" };
+      } catch (refreshError) {
+        console.error("Silent token refresh failed due to network error:", refreshError);
+        return { token: null, status: "server_error" };
       }
-
-      const refreshJson = await refreshRes.json().catch(() => ({}));
-      const newAccessToken = refreshJson?.data?.accessToken;
-
-      if (typeof newAccessToken !== "string" || !newAccessToken) {
-        return null;
-      }
-
-      window.localStorage.setItem("access_token", newAccessToken);
-      window.dispatchEvent(new CustomEvent("ticketbox-auth-change"));
-
-      return newAccessToken;
-    })()
-      .catch((refreshError) => {
-        console.error("Silent token refresh failed:", refreshError);
-        return null;
-      })
-      .finally(() => {
-        refreshAccessTokenPromise = null;
-      });
+    })().finally(() => {
+      refreshAccessTokenPromise = null;
+    });
   }
 
   return refreshAccessTokenPromise;
@@ -440,8 +445,8 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     if (canAttemptRefresh) {
       const oldToken = window.localStorage.getItem("access_token");
       if (oldToken) {
-        const newAccessToken = await refreshAccessToken();
-        if (newAccessToken) {
+        const refreshResult = await refreshAccessToken();
+        if (refreshResult.status === "success" && refreshResult.token) {
           const retryHeaders = new Headers(options.headers);
           if (
             !retryHeaders.has("Content-Type") &&
@@ -449,7 +454,7 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
           ) {
             retryHeaders.set("Content-Type", "application/json");
           }
-          retryHeaders.set("Authorization", `Bearer ${newAccessToken}`);
+          retryHeaders.set("Authorization", `Bearer ${refreshResult.token}`);
 
           if (typeof window !== "undefined") {
             retryHeaders.set(
@@ -478,7 +483,10 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
           );
         }
 
-        clearLocalAuthSession();
+        // Chỉ xóa session khi refresh token thực sự bị từ chối (hết hạn / không hợp lệ)
+        if (refreshResult.status === "unauthorized") {
+          clearLocalAuthSession();
+        }
       }
     }
 
