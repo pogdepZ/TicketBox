@@ -30,6 +30,14 @@ export class AdminDashboardController {
     return this.dashboardService.getRevenueAnalytics(startDateStr, endDateStr);
   }
 
+  @Get("dashboard/genre-revenue")
+  async getGenreRevenue(
+    @Query("startDate") startDateStr: string,
+    @Query("endDate") endDateStr: string,
+  ) {
+    return this.dashboardService.getGenreRevenue(startDateStr, endDateStr);
+  }
+
   @Get("users/analytics")
   async getUserAnalytics(
     @Query("startDate") startDateStr: string,

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { DatePicker, TimePicker } from "@/components/date-time-picker";
+import { VIETNAM_PROVINCES } from "@/lib/constants";
 
 export default function CreateConcertPage() {
   const router = useRouter();
@@ -29,6 +30,7 @@ export default function CreateConcertPage() {
   const [eventTime, setEventTime] = useState("");
   const [venueName, setVenueName] = useState("");
   const [venueAddress, setVenueAddress] = useState("");
+  const [city, setCity] = useState("Thành phố Hồ Chí Minh");
   const [posterUrl, setPosterUrl] = useState("");
   const [seatMapSvgFile, setSeatMapSvgFile] = useState<File | null>(null);
   const [uploadingPoster, setUploadingPoster] = useState(false);
@@ -171,6 +173,7 @@ export default function CreateConcertPage() {
         artistName: artistName.trim() || undefined,
         venueName: venueName.trim(),
         venueAddress: venueAddress.trim(),
+        city: city,
         eventDate: parsedDate.toISOString(),
         posterUrl: posterUrl.trim() || undefined,
         ticketTypes:
@@ -336,7 +339,7 @@ export default function CreateConcertPage() {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
                       Tên địa điểm <span className="text-destructive">*</span>
@@ -344,7 +347,7 @@ export default function CreateConcertPage() {
                     <input
                       type="text"
                       required
-                      placeholder="Ví dụ: Sân vận động Quân khu 7, Nhà hát Hòa Bình..."
+                      placeholder="Ví dụ: Sân vận động Quân khu 7..."
                       value={venueName}
                       onChange={(e) => setVenueName(e.target.value)}
                       className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15"
@@ -352,17 +355,38 @@ export default function CreateConcertPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
-                      Địa chỉ chi tiết địa điểm{" "}
-                      <span className="text-destructive">*</span>
+                      Địa chỉ chi tiết địa điểm <span className="text-destructive">*</span>
                     </label>
                     <input
                       type="text"
                       required
-                      placeholder="Ví dụ: 202 Hoàng Văn Thụ, Phường 9, Phú Nhuận..."
+                      placeholder="Ví dụ: 202 Hoàng Văn Thụ, Phường 9..."
                       value={venueAddress}
                       onChange={(e) => setVenueAddress(e.target.value)}
                       className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Tỉnh/Thành phố <span className="text-destructive">*</span>
+                    </label>
+                    <select
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15 cursor-pointer appearance-none"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
+                        backgroundPosition: "right 1rem center",
+                        backgroundSize: "1.25rem",
+                        backgroundRepeat: "no-repeat",
+                      }}
+                    >
+                      {VIETNAM_PROVINCES.map((c) => (
+                        <option key={c} value={c} className="bg-card text-foreground">
+                          {c}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>

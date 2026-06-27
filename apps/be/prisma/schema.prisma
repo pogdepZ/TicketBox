@@ -241,6 +241,7 @@ model Concert {
   name        String  @db.VarChar(200)
   description String?
   type        String? @db.VarChar(50)
+  city        String? @db.VarChar(100)
 
   artistName      String?         @map("artist_name") @db.VarChar(200)
   artistBio       String?         @map("artist_bio")

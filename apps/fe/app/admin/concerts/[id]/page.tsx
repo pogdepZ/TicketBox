@@ -17,6 +17,7 @@ import {
   uploadConcertPoster,
   getGuestList,
 } from "@/lib/api";
+import { VIETNAM_PROVINCES } from "@/lib/constants";
 import {
   ArrowLeft,
   Plus,
@@ -73,6 +74,7 @@ export default function AdminConcertDetailPage({
   const [editEventTime, setEditEventTime] = useState("");
   const [editVenueName, setEditVenueName] = useState("");
   const [editVenueAddress, setEditVenueAddress] = useState("");
+  const [editCity, setEditCity] = useState("Thành phố Hồ Chí Minh");
   const [editPosterUrl, setEditPosterUrl] = useState("");
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
@@ -201,7 +203,8 @@ export default function AdminConcertDetailPage({
         setEditArtistName(concertData.artist || "");
         setEditDescription(concertData.description || "");
         setEditVenueName(concertData.venue || "");
-        setEditVenueAddress(concertData.city || "");
+        setEditVenueAddress(concertData.address || "");
+        setEditCity(concertData.city || "Hồ Chí Minh");
         setEditPosterUrl(concertData.image || "");
 
         if (concertData.date) {
@@ -345,6 +348,7 @@ export default function AdminConcertDetailPage({
           artistName: editArtistName.trim() || undefined,
           venueName: editVenueName.trim(),
           venueAddress: editVenueAddress.trim(),
+          city: editCity,
           eventDate: parsedDate.toISOString(),
           posterUrl: editPosterUrl.trim() || undefined,
         };
@@ -848,7 +852,7 @@ export default function AdminConcertDetailPage({
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">
                         Tên địa điểm <span className="text-destructive">*</span>
@@ -857,7 +861,7 @@ export default function AdminConcertDetailPage({
                         type="text"
                         required
                         disabled={isBasicInfoReadOnly}
-                        placeholder="Ví dụ: Sân vận động Quân khu 7, Nhà hát Hòa Bình..."
+                        placeholder="Ví dụ: Sân vận động Quân khu 7..."
                         value={editVenueName}
                         onChange={(e) => setEditVenueName(e.target.value)}
                         className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
@@ -865,18 +869,40 @@ export default function AdminConcertDetailPage({
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">
-                        Địa chỉ chi tiết địa điểm{" "}
-                        <span className="text-destructive">*</span>
+                        Địa chỉ chi tiết địa điểm <span className="text-destructive">*</span>
                       </label>
                       <input
                         type="text"
                         required
                         disabled={isBasicInfoReadOnly}
-                        placeholder="Ví dụ: 202 Hoàng Văn Thụ, Phường 9, Phú Nhuận..."
+                        placeholder="Ví dụ: 202 Hoàng Văn Thụ, Phường 9..."
                         value={editVenueAddress}
                         onChange={(e) => setEditVenueAddress(e.target.value)}
                         className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Tỉnh/Thành phố <span className="text-destructive">*</span>
+                      </label>
+                      <select
+                        value={editCity}
+                        onChange={(e) => setEditCity(e.target.value)}
+                        disabled={isBasicInfoReadOnly}
+                        className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed cursor-pointer appearance-none"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
+                          backgroundPosition: "right 1rem center",
+                          backgroundSize: "1.25rem",
+                          backgroundRepeat: "no-repeat",
+                        }}
+                      >
+                        {VIETNAM_PROVINCES.map((c) => (
+                          <option key={c} value={c} className="bg-card text-foreground">
+                            {c}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>

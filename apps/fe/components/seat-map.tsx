@@ -7,7 +7,7 @@ import { OrderSummary } from '@/components/checkout/OrderSummary';
 import { VenueMapOverview } from '@/components/seat-map/VenueMapOverview';
 import { ZoneSeatMap } from '@/components/seat-map/ZoneSeatMap';
 import { InteractiveSeatMap } from '@/components/seat-map/InteractiveSeatMap';
-import { createDraftReservation } from '@/lib/mock-reservation';
+import { createDraftReservation } from '@/lib/draft-reservation';
 import { createOrder, getFriendlyErrorMessage, fetchApi } from '@/lib/api';
 
 interface SeatMapProps {
@@ -145,11 +145,27 @@ export function SeatMap({ concertId, concertTitle, zones, seats, svgContent }: S
     if (seat.status !== 'available') {
       return;
     }
-    setSelectedSeatIds((current) =>
-      current.includes(seat.id)
-        ? current.filter((seatId) => seatId !== seat.id)
-        : [...current, seat.id],
-    );
+    setSelectedSeatIds((current) => {
+      const exists = current.includes(seat.id);
+      if (exists) {
+        return current.filter((seatId) => seatId !== seat.id);
+      } else {
+        const maxLimit = activeSelectedZone && activeSelectedZone.maxPerUser !== undefined ? activeSelectedZone.maxPerUser : Infinity;
+        if (maxLimit !== Infinity && current.length >= maxLimit) {
+          window.dispatchEvent(
+            new CustomEvent('ticketbox-toast', {
+              detail: {
+                title: 'Giới hạn số lượng',
+                message: `Bạn chỉ được đặt tối đa ${maxLimit} vé cho hạng vé này.`,
+                type: 'error',
+              },
+            })
+          );
+          return current;
+        }
+        return [...current, seat.id];
+      }
+    });
   }
 
   // SVG event handlers
@@ -160,14 +176,14 @@ export function SeatMap({ concertId, concertTitle, zones, seats, svgContent }: S
         return current.filter((s) => s.label.toUpperCase() !== seatLabel.toUpperCase());
       } else {
         const zone = currentZones.find((z) => (z.code || "").toLowerCase() === zoneCode.toLowerCase());
-        const maxLimit = zone && zone.maxPerUser !== undefined ? zone.maxPerUser : 4;
+        const maxLimit = zone && zone.maxPerUser !== undefined ? zone.maxPerUser : Infinity;
         
-        if (current.length >= maxLimit) {
+        if (maxLimit !== Infinity && current.length >= maxLimit) {
           window.dispatchEvent(
             new CustomEvent('ticketbox-toast', {
               detail: {
                 title: 'Giới hạn số lượng',
-                message: `Bạn chỉ được đặt tối đa ${maxLimit} vé cho mỗi giao dịch.`,
+                message: `Bạn chỉ được đặt tối đa ${maxLimit} vé cho hạng vé này.`,
                 type: 'error',
               },
             })
@@ -210,51 +226,18 @@ export function SeatMap({ concertId, concertTitle, zones, seats, svgContent }: S
 
     setIsSubmitting(true);
     try {
-      const idempotencyKey = typeof window !== 'undefined' && window.crypto?.randomUUID 
-        ? window.crypto.randomUUID() 
-        : `idempotency-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
-      // Phân nhóm ghế theo ticketTypeId để hỗ trợ đặt nhiều loại vé khác nhau
-      const itemsMap = new Map<string, string[]>();
-      selectedSeats.forEach((s) => {
-        const tId = s.ticketTypeId || s.zoneId;
-        if (tId) {
-          const currentSeats = itemsMap.get(tId) || [];
-          itemsMap.set(tId, [...currentSeats, s.label]);
-        }
-      });
-
-      const items = Array.from(itemsMap.entries()).map(([ticketTypeId, seatNumbers]) => ({
-        ticketTypeId,
-        seatNumbers,
-      }));
-
-      const payload = {
-        concertId,
-        items,
-        ticketTypeId: items[0]?.ticketTypeId,
-        seatNumbers: selectedSeats.map((s) => s.label),
-      };
-
-      const orderResponse = await createOrder(payload, idempotencyKey);
-
-      const orderId = orderResponse.orderId || orderResponse.data?.orderId || orderResponse.id;
-      if (!orderId) {
-        throw new Error('Không nhận được Mã đơn hàng từ hệ thống.');
-      }
-
       createDraftReservation({
         concertId,
         concertTitle,
-        selectedZone: activeSelectedZone,
+        zones: currentZones,
         selectedSeats,
       });
-      router.push(`/checkout?orderId=${orderId}`);
+      router.push(`/checkout?t=${Date.now()}`);
     } catch (err: any) {
       window.dispatchEvent(
         new CustomEvent('ticketbox-toast', {
           detail: {
-            title: 'Không thể giữ ghế',
+            title: 'Lỗi đặt vé',
             message: getFriendlyErrorMessage(err),
             type: 'error',
           },

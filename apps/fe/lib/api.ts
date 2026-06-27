@@ -1,4 +1,4 @@
-import { getStoredMockOrder, getStoredMockOrders } from "./mock-reservation";
+import { getStoredMockOrder, getStoredMockOrders } from "./draft-reservation";
 import { adminStats, concerts as mockConcerts } from "./mock-data";
 
 export const API_BASE_URL =
@@ -738,7 +738,8 @@ function mapConcertToDisplay(concert: any, useLocalOverride = false) {
       hour12: false,
     }),
     venue: concert.venueName,
-    city: concert.venueAddress, // Map to address since BE doesn't have separate city field
+    city: concert.city || "",
+    address: concert.venueAddress || "",
     image:
       concert.posterUrl ||
       "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=900&h=700&fit=crop",
@@ -759,7 +760,7 @@ function mapConcertToDisplay(concert: any, useLocalOverride = false) {
     })(),
     capacity: capacity,
     soldOut: isSoldOut,
-    genre: concert.genre || "N/A",
+    genre: concert.type || concert.genre || "N/A",
     language: concert.language || "N/A",
     ageLimit: concert.ageLimit || "N/A",
     ticketsSold: ticketsSold,
@@ -1240,7 +1241,7 @@ export async function getOrderById(orderId: string): Promise<any> {
         try {
           const draft = JSON.parse(draftStr);
           const { createMockOrderFromDraft } =
-            await import("./mock-reservation");
+            await import("./draft-reservation");
           stored = createMockOrderFromDraft({
             draft,
             paymentMethod: "MOMO",
@@ -1383,6 +1384,20 @@ export async function getDashboardAnalytics(): Promise<any> {
       newUsersLastMonth: 120,
       eventAnalytics: [],
     };
+  }
+}
+
+export async function getGenreRevenueAnalytics(
+  startDate: string,
+  endDate: string,
+): Promise<any> {
+  try {
+    return await fetchApi(
+      `/admin/dashboard/genre-revenue?startDate=${startDate}&endDate=${endDate}`,
+    );
+  } catch (error) {
+    console.error("Failed to fetch genre revenue analytics:", error);
+    throw error;
   }
 }
 

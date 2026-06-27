@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { ETicketCard } from '@/components/eticket-card';
-import { getStoredMockOrder, StoredMockOrder } from '@/lib/mock-reservation';
+import { getStoredMockOrder, StoredMockOrder } from '@/lib/draft-reservation';
 import { getOrderById, addLocalNotification } from '@/lib/api';
 import Link from 'next/link';
 import { CheckCircle, XCircle, Download, Share2, HomeIcon, ArrowRight } from 'lucide-react';

@@ -20,13 +20,18 @@ export default function AdminConcertsPage() {
   const [keyword, setKeyword] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmConcertId, setConfirmConcertId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 10;
 
-  async function loadConcerts(searchKeyword = "") {
+  async function loadConcerts(searchKeyword = keyword, targetPage = 1) {
     setLoading(true);
     setError(null);
     try {
-      const res = await getConcerts({ keyword: searchKeyword });
+      const res = await getConcerts({ keyword: searchKeyword, page: targetPage, limit });
       setConcertsList(res.items || []);
+      setTotalPages(res.meta?.totalPages || 1);
+      setPage(res.meta?.page || targetPage);
     } catch (err: any) {
       console.error(err);
       setError(err?.message || "Không thể tải danh sách sự kiện.");
@@ -36,7 +41,7 @@ export default function AdminConcertsPage() {
   }
 
   useEffect(() => {
-    loadConcerts();
+    loadConcerts(keyword, 1);
   }, []);
 
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -45,7 +50,7 @@ export default function AdminConcertsPage() {
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
-      loadConcerts(keyword);
+      loadConcerts(keyword, 1);
     }
   }
 
@@ -63,7 +68,7 @@ export default function AdminConcertsPage() {
             },
           }),
         );
-        loadConcerts(keyword);
+        loadConcerts(keyword, page);
       } catch (err: any) {
         window.dispatchEvent(
           new CustomEvent("ticketbox-toast", {
@@ -95,7 +100,7 @@ export default function AdminConcertsPage() {
           },
         }),
       );
-      loadConcerts(keyword);
+      loadConcerts(keyword, page);
     } catch (err: any) {
       window.dispatchEvent(
         new CustomEvent("ticketbox-toast", {
@@ -146,7 +151,7 @@ export default function AdminConcertsPage() {
             />
           </div>
           <button
-            onClick={() => loadConcerts(keyword)}
+            onClick={() => loadConcerts(keyword, 1)}
             disabled={loading}
             className="flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2 font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary active:scale-95 disabled:opacity-50 cursor-pointer"
           >
@@ -171,10 +176,36 @@ export default function AdminConcertsPage() {
             Không tìm thấy sự kiện nào phù hợp.
           </div>
         ) : (
-          <ConcertTable
-            concerts={concertsList}
-            onToggleActive={handleToggleActive}
-          />
+          <div className="space-y-6">
+            <ConcertTable
+              concerts={concertsList}
+              onToggleActive={handleToggleActive}
+            />
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-border/80 pt-6">
+                <span className="text-sm text-muted-foreground">
+                  Trang <strong className="text-foreground">{page}</strong> / <strong className="text-foreground">{totalPages}</strong>
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    disabled={page <= 1 || loading}
+                    onClick={() => loadConcerts(keyword, page - 1)}
+                    className="flex items-center gap-1 rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold text-foreground transition hover:border-primary/40 hover:text-primary disabled:opacity-40 cursor-pointer"
+                  >
+                    Trước
+                  </button>
+                  <button
+                    disabled={page >= totalPages || loading}
+                    onClick={() => loadConcerts(keyword, page + 1)}
+                    className="flex items-center gap-1 rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold text-foreground transition hover:border-primary/40 hover:text-primary disabled:opacity-40 cursor-pointer"
+                  >
+                    Sau
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 

@@ -49,7 +49,7 @@ export function HomeBanner() {
         <div className="grid gap-8 rounded-[2rem] bg-foreground p-6 text-background md:grid-cols-[1fr_0.9fr] md:p-10">
           <div>
             <h2 className="max-w-xl text-3xl font-black tracking-tight md:text-4xl">Nhận thông báo khi show mới mở bán</h2>
-            <p className="mt-3 max-w-lg text-background/65">Theo dõi lịch mở bán theo nghệ sĩ và thành phố bạn quan tâm.</p>
+            <p className="mt-3 max-w-lg text-background/65">Theo dõi lịch mở bán theo nghệ sĩ bạn quan tâm.</p>
           </div>
           <div className="min-h-12 w-full bg-white/10 rounded-full animate-pulse self-center" />
         </div>
@@ -105,7 +105,7 @@ export function HomeBanner() {
       <div className="grid gap-8 rounded-[2rem] bg-foreground p-6 text-background md:grid-cols-[1fr_0.9fr] md:p-10">
         <div>
           <h2 className="max-w-xl text-3xl font-black tracking-tight md:text-4xl">Nhận thông báo khi show mới mở bán</h2>
-          <p className="mt-3 max-w-lg text-background/65">Theo dõi lịch mở bán theo nghệ sĩ và thành phố bạn quan tâm.</p>
+          <p className="mt-3 max-w-lg text-background/65">Theo dõi lịch mở bán theo nghệ sĩ bạn quan tâm.</p>
         </div>
         <NewsletterSignup />
       </div>

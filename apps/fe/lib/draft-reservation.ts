@@ -3,6 +3,19 @@ import type { Seat, TicketZone } from '@/lib/mock-data';
 export const DRAFT_RESERVATION_KEY = 'ticketbox-draft-reservation';
 export const MOCK_ORDERS_KEY = 'ticketbox-mock-orders';
 
+export interface DraftReservationItem {
+  id: string;
+  ticketTypeId: string;
+  seatZoneId: string;
+  zoneId: string;
+  zoneName: string;
+  zoneLabel: string;
+  zoneColor: string;
+  quantity: number;
+  unitPrice: number;
+  seatLabels: string[];
+}
+
 export interface DraftReservation {
   id: string;
   userId: string;
@@ -11,18 +24,7 @@ export interface DraftReservation {
   status: 'HELD';
   expiresAt: string;
   createdAt: string;
-  item: {
-    id: string;
-    ticketTypeId: string;
-    seatZoneId: string;
-    zoneId: string;
-    zoneName: string;
-    zoneLabel: string;
-    zoneColor: string;
-    quantity: number;
-    unitPrice: number;
-    seatLabels: string[];
-  };
+  items: DraftReservationItem[];
 }
 
 export interface StoredMockTicket {
@@ -65,12 +67,38 @@ export interface StoredMockOrder {
 export function createDraftReservation(input: {
   concertId: string;
   concertTitle: string;
-  selectedZone: TicketZone;
+  zones: TicketZone[];
   selectedSeats: Seat[];
 }): DraftReservation {
   const createdAt = new Date();
   const expiresAt = new Date(createdAt.getTime() + 5 * 60 * 1000);
   const reservationId = `reservation-${input.concertId}-${createdAt.getTime()}`;
+
+  // Gom nhóm selectedSeats theo ticketTypeId (hoặc zoneId)
+  const seatsByZoneMap = new Map<string, Seat[]>();
+  input.selectedSeats.forEach((seat) => {
+    const zoneId = seat.zoneId || seat.seatZoneId || '';
+    if (zoneId) {
+      const current = seatsByZoneMap.get(zoneId) || [];
+      seatsByZoneMap.set(zoneId, [...current, seat]);
+    }
+  });
+
+  const items: DraftReservationItem[] = Array.from(seatsByZoneMap.entries()).map(([zoneId, seats], index) => {
+    const zone = input.zones.find((z) => z.id === zoneId) || input.zones[0];
+    return {
+      id: `reservation-item-${reservationId}-${index}`,
+      ticketTypeId: zone.ticketTypeId ?? zone.id,
+      seatZoneId: zone.seatZoneId ?? zone.id,
+      zoneId: zone.id,
+      zoneName: zone.name,
+      zoneLabel: zone.label,
+      zoneColor: zone.color,
+      quantity: seats.length,
+      unitPrice: zone.price,
+      seatLabels: seats.map((s) => s.label),
+    };
+  });
 
   const draft: DraftReservation = {
     id: reservationId,
@@ -80,18 +108,7 @@ export function createDraftReservation(input: {
     status: 'HELD',
     createdAt: createdAt.toISOString(),
     expiresAt: expiresAt.toISOString(),
-    item: {
-      id: `reservation-item-${reservationId}`,
-      ticketTypeId: input.selectedZone.ticketTypeId ?? input.selectedZone.id,
-      seatZoneId: input.selectedZone.seatZoneId ?? input.selectedZone.id,
-      zoneId: input.selectedZone.id,
-      zoneName: input.selectedZone.name,
-      zoneLabel: input.selectedZone.label,
-      zoneColor: input.selectedZone.color,
-      quantity: input.selectedSeats.length,
-      unitPrice: input.selectedZone.price,
-      seatLabels: input.selectedSeats.map((seat) => seat.label),
-    },
+    items,
   };
 
   window.localStorage.setItem(DRAFT_RESERVATION_KEY, JSON.stringify(draft));
@@ -144,26 +161,27 @@ export function createMockOrderFromDraft(input: {
   orderId?: string;
 }): StoredMockOrder {
   const paidAt = new Date();
-  const subtotal = input.draft.item.quantity * input.draft.item.unitPrice;
-  const totalAmount = subtotal;
+  const totalAmount = input.draft.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
   const orderId = input.orderId || `order-${input.draft.concertId}-${paidAt.getTime()}`;
   const orderNumber = `ORD-${paidAt.getFullYear()}-${String(paidAt.getTime()).slice(-6)}`;
 
-  const tickets = input.draft.item.seatLabels.map((seatLabel, index) => {
-    const ticketCode = `TBX-${paidAt.getFullYear()}-${String(paidAt.getTime()).slice(-5)}${index + 1}`;
-
-    return {
-      id: `ticket-${orderId}-${index + 1}`,
-      orderId,
-      ticketTypeId: input.draft.item.ticketTypeId,
-      ticketCode,
-      qrPayload: `mock-qr:${ticketCode}:${input.draft.concertId}:${input.draft.item.ticketTypeId}`,
-      seatZone: input.draft.item.zoneName,
-      seatNumber: seatLabel,
-      price: input.draft.item.unitPrice,
-      status: 'ACTIVE' as const,
-      createdAt: paidAt.toISOString(),
-    };
+  const tickets: StoredMockTicket[] = [];
+  input.draft.items.forEach((item) => {
+    item.seatLabels.forEach((seatLabel, index) => {
+      const ticketCode = `TBX-${paidAt.getFullYear()}-${String(paidAt.getTime()).slice(-5)}${tickets.length + 1}`;
+      tickets.push({
+        id: `ticket-${orderId}-${tickets.length + 1}`,
+        orderId,
+        ticketTypeId: item.ticketTypeId,
+        ticketCode,
+        qrPayload: `mock-qr:${ticketCode}:${input.draft.concertId}:${item.ticketTypeId}`,
+        seatZone: item.zoneName,
+        seatNumber: seatLabel,
+        price: item.unitPrice,
+        status: 'ACTIVE' as const,
+        createdAt: paidAt.toISOString(),
+      });
+    });
   });
 
   const order: StoredMockOrder = {
@@ -179,15 +197,13 @@ export function createMockOrderFromDraft(input: {
     paidAt: paidAt.toISOString(),
     createdAt: paidAt.toISOString(),
     expiresAt: input.draft.expiresAt,
-    items: [
-      {
-        id: `order-item-${orderId}`,
-        ticketTypeId: input.draft.item.ticketTypeId,
-        quantity: input.draft.item.quantity,
-        unitPrice: input.draft.item.unitPrice,
-        seatLabels: input.draft.item.seatLabels,
-      },
-    ],
+    items: input.draft.items.map((item) => ({
+      id: item.id,
+      ticketTypeId: item.ticketTypeId,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      seatLabels: item.seatLabels,
+    })),
     tickets,
   };
 

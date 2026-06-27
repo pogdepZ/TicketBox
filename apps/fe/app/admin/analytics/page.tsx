@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { AdminLayout } from "@/components/admin-layout";
-import { getDashboardAnalytics, getUserAnalyticsAdmin } from "@/lib/api";
+import { getDashboardAnalytics, getUserAnalyticsAdmin, getGenreRevenueAnalytics } from "@/lib/api";
 import { DateRangePicker, DateRange } from "@/components/date-range-picker";
 import { Users, Percent, Activity, RefreshCw, BarChart3 } from "lucide-react";
 
@@ -501,6 +501,158 @@ function UserAnalyticsChart({ data }: { data: any[] }) {
   );
 }
 
+function GenreRevenuePieChart({ data }: { data: any[] }) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="text-muted-foreground text-center py-16">
+        Không có dữ liệu doanh thu thể loại trong khoảng thời gian này
+      </div>
+    );
+  }
+
+  const colors = [
+    "#e5484d", // Đỏ
+    "#e0a82e", // Vàng
+    "#3d6f8f", // Xanh dương
+    "#2a9d8f", // Teal
+    "#af52de", // Tím
+    "#64748b", // Xám
+  ];
+
+  const totalRevenue = data.reduce((sum, item) => sum + item.revenue, 0);
+
+  // Doughnut math
+  const radius = 70;
+  const strokeWidth = 22;
+  const circumference = 2 * Math.PI * radius;
+  const center = 100;
+  const gapAngle = data.length > 1 ? 0.02 : 0; // small gap between segments
+
+  // Pre-compute arc segments to avoid mutable let in JSX
+  const segments = useMemo(() => {
+    let accumulated = 0;
+    return data.map((item, idx) => {
+      // Use actual revenue ratio for accurate arcs (not rounded percentage)
+      const ratio = totalRevenue > 0 ? item.revenue / totalRevenue : 0;
+      const segmentLength = Math.max((ratio - gapAngle) * circumference, 0);
+      const offset = -accumulated * circumference; // negative = clockwise advance
+      accumulated += ratio;
+      return {
+        segmentLength,
+        offset,
+        color: colors[idx % colors.length],
+        ratio,
+      };
+    });
+  }, [data, totalRevenue]);
+
+  return (
+    <div className="flex flex-col md:flex-row items-center justify-around gap-8 p-6 bg-card border border-border/40 rounded-[2rem] shadow-sm">
+      {/* Doughnut SVG */}
+      <div className="relative size-[200px] shrink-0">
+        <svg viewBox="0 0 200 200" className="size-full" style={{ transform: 'rotate(-90deg)' }}>
+          {/* Base background circle */}
+          <circle
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="none"
+            stroke="var(--color-border)"
+            strokeOpacity={0.1}
+            strokeWidth={strokeWidth}
+          />
+          {segments.map((seg, idx) => {
+            const isHovered = hoveredIdx === idx;
+            const isAnyHovered = hoveredIdx !== null;
+            const opacity = isAnyHovered ? (isHovered ? 1.0 : 0.3) : 1.0;
+            const currentStrokeWidth = isHovered ? strokeWidth + 5 : strokeWidth;
+
+            return (
+              <circle
+                key={idx}
+                cx={center}
+                cy={center}
+                r={radius}
+                fill="none"
+                stroke={seg.color}
+                strokeWidth={currentStrokeWidth}
+                strokeDasharray={`${seg.segmentLength} ${circumference - seg.segmentLength}`}
+                strokeDashoffset={seg.offset}
+                strokeLinecap="butt"
+                className="transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer"
+                style={{ opacity }}
+                onMouseEnter={() => setHoveredIdx(idx)}
+                onMouseLeave={() => setHoveredIdx(null)}
+              />
+            );
+          })}
+        </svg>
+
+        {/* Center label */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
+          {hoveredIdx !== null ? (
+            <>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                {data[hoveredIdx].genre}
+              </span>
+              <span className="text-base font-black text-foreground mt-0.5">
+                {data[hoveredIdx].percentage}%
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                Tổng doanh thu
+              </span>
+              <span className="text-base font-black text-foreground mt-0.5">
+                {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(totalRevenue)}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex-1 w-full space-y-3">
+        <h4 className="text-sm font-black text-foreground mb-3 pl-2 border-l-3 border-primary">Chi tiết theo thể loại</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {data.map((item, idx) => {
+            const color = colors[idx % colors.length];
+            const isHovered = hoveredIdx === idx;
+            const isAnyHovered = hoveredIdx !== null;
+            const opacity = isAnyHovered ? (isHovered ? 1.0 : 0.4) : 1.0;
+
+            return (
+              <div
+                key={idx}
+                className="flex items-center justify-between p-3 rounded-2xl border border-border/40 bg-background/50 transition-all duration-300 cursor-pointer"
+                style={{ opacity, transform: isHovered ? "translateX(4px)" : "none" }}
+                onMouseEnter={() => setHoveredIdx(idx)}
+                onMouseLeave={() => setHoveredIdx(null)}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="size-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                  <span className="text-xs font-bold text-foreground truncate">{item.genre}</span>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-xs font-black text-foreground">
+                    {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(item.revenue)}
+                  </span>
+                  <span className="block text-[10px] font-bold text-muted-foreground">
+                    {item.percentage}%
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminAnalyticsPage() {
   const [analytics, setAnalytics] = useState<any>(null);
   const [selectedConcertId, setSelectedConcertId] = useState<string | null>(
@@ -508,6 +660,8 @@ export default function AdminAnalyticsPage() {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [eventPage, setEventPage] = useState(1);
+  const eventLimit = 3;
 
   // Khởi tạo khoảng ngày mặc định: 30 ngày qua
   const getInitialDateRange = () => {
@@ -529,12 +683,36 @@ export default function AdminAnalyticsPage() {
   const [userLoading, setUserLoading] = useState(false);
   const [userError, setUserError] = useState<string | null>(null);
 
+  // Genre Revenue Analytics States
+  const [genreDateRange, setGenreDateRange] = useState<DateRange>(getInitialDateRange());
+  const [genreData, setGenreData] = useState<any[]>([]);
+  const [genreLoading, setGenreLoading] = useState(false);
+  const [genreError, setGenreError] = useState<string | null>(null);
+
+  async function loadGenreRevenue() {
+    setGenreLoading(true);
+    setGenreError(null);
+    try {
+      const data = await getGenreRevenueAnalytics(
+        genreDateRange.startDate,
+        genreDateRange.endDate,
+      );
+      setGenreData(data || []);
+    } catch (err: any) {
+      console.error(err);
+      setGenreError("Không thể tải dữ liệu doanh thu theo thể loại.");
+    } finally {
+      setGenreLoading(false);
+    }
+  }
+
   async function loadAnalyticsData() {
     setLoading(true);
     setError(null);
     try {
       const data = await getDashboardAnalytics();
       setAnalytics(data);
+      setEventPage(1);
       if (data?.eventAnalytics?.length > 0) {
         setSelectedConcertId(data.eventAnalytics[0].id);
       }
@@ -574,9 +752,22 @@ export default function AdminAnalyticsPage() {
     loadUserAnalytics();
   }, [dateRange.startDate, dateRange.endDate]);
 
+  useEffect(() => {
+    loadGenreRevenue();
+  }, [genreDateRange.startDate, genreDateRange.endDate]);
+
   const selectedConcertAnalytic = analytics?.eventAnalytics?.find(
     (e: any) => e.id === selectedConcertId,
   );
+
+  const totalEventPages = Math.ceil(
+    (analytics?.eventAnalytics?.length || 0) / eventLimit,
+  );
+  const paginatedEvents =
+    analytics?.eventAnalytics?.slice(
+      (eventPage - 1) * eventLimit,
+      eventPage * eventLimit,
+    ) || [];
 
   return (
     <AdminLayout>
@@ -596,12 +787,13 @@ export default function AdminAnalyticsPage() {
             onClick={() => {
               loadAnalyticsData();
               loadUserAnalytics();
+              loadGenreRevenue();
             }}
-            disabled={loading || userLoading}
+            disabled={loading || userLoading || genreLoading}
             className="flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary active:scale-95 disabled:opacity-50 cursor-pointer"
           >
             <RefreshCw
-              className={`size-4 ${loading || userLoading ? "animate-spin" : ""}`}
+              className={`size-4 ${loading || userLoading || genreLoading ? "animate-spin" : ""}`}
             />
             Làm mới
           </button>
@@ -667,6 +859,41 @@ export default function AdminAnalyticsPage() {
               </div>
             </div>
 
+            {/* Doanh thu theo thể loại sự kiện (Doughnut Chart) */}
+            <div className="rounded-[2.5rem] border border-border bg-card p-6 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-black text-foreground mb-1 flex items-center gap-2">
+                    <Percent className="size-5 text-primary" />
+                    Doanh thu theo thể loại sự kiện
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Tỷ lệ phần trăm đóng góp doanh thu của từng thể loại đêm nhạc trong khoảng thời gian tùy chọn.
+                  </p>
+                </div>
+                <DateRangePicker value={genreDateRange} onChange={setGenreDateRange} />
+              </div>
+
+              {genreError && (
+                <div className="rounded-3xl border border-destructive/20 bg-destructive/5 p-6 text-center text-destructive font-semibold">
+                  {genreError}
+                </div>
+              )}
+
+              <div className="min-h-[260px] flex items-center justify-center">
+                {genreLoading ? (
+                  <div className="flex items-center gap-2 text-muted-foreground animate-pulse font-bold text-sm">
+                    <RefreshCw className="size-4 animate-spin" />
+                    Đang tải dữ liệu...
+                  </div>
+                ) : (
+                  <div className="w-full">
+                    <GenreRevenuePieChart data={genreData} />
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Sell-through rates list */}
               <div className="lg:col-span-1 rounded-[2.5rem] border border-border bg-card p-6 shadow-sm h-fit">
@@ -675,24 +902,25 @@ export default function AdminAnalyticsPage() {
                   Tỷ lệ bán vé theo sự kiện
                 </h3>
                 <div className="space-y-5">
-                  {analytics.eventAnalytics?.map((event: any) => (
+                  {paginatedEvents.map((event: any) => (
                     <div
                       key={event.id}
                       onClick={() => setSelectedConcertId(event.id)}
                       className={`p-4 rounded-2xl border transition-all cursor-pointer ${
                         selectedConcertId === event.id
-                          ? "border-primary bg-primary/5"
+                          ? "border-primary bg-primary/5 shadow-sm"
                           : "border-border hover:border-primary/40 bg-card"
                       }`}
                     >
                       <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                            <h4 className="font-bold text-foreground text-sm line-clamp-1">
-                              {event.title}
-                            </h4>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-bold text-foreground text-sm line-clamp-1 mb-1.5">
+                            {event.title}
+                          </h4>
+                          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                            <span className="truncate">{event.artist}</span>
                             <span
-                              className={`text-[9px] font-black px-1.5 py-0.2 rounded border uppercase tracking-wider ${
+                              className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider shrink-0 ${
                                 event.status === "PUBLISHED"
                                   ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
                                   : "bg-slate-500/10 text-slate-500 border-slate-500/20"
@@ -701,9 +929,6 @@ export default function AdminAnalyticsPage() {
                               {event.status === "PUBLISHED" ? "Mở bán" : "Nháp"}
                             </span>
                           </div>
-                          <p className="text-[11px] text-muted-foreground line-clamp-1">
-                            {event.artist}
-                          </p>
                         </div>
                         <span
                           className={`text-xs font-black px-2 py-0.5 rounded-full border ${
@@ -737,9 +962,59 @@ export default function AdminAnalyticsPage() {
                         />
                       </div>
                     </div>
-                  )) || (
+                  ))}
+
+                  {paginatedEvents.length === 0 && (
                     <div className="text-muted-foreground text-center py-6">
                       Không có dữ liệu phân tích
+                    </div>
+                  )}
+
+                  {totalEventPages > 1 && (
+                    <div className="flex items-center justify-between border-t border-border/60 pt-4 mt-2">
+                      <span className="text-xs text-muted-foreground">
+                        Trang{" "}
+                        <strong className="text-foreground">{eventPage}</strong>{" "}
+                        / {totalEventPages}
+                      </span>
+                      <div className="flex gap-1.5">
+                        <button
+                          disabled={eventPage <= 1}
+                          onClick={() => {
+                            const newPage = eventPage - 1;
+                            setEventPage(newPage);
+                            const newPageEvents =
+                              analytics.eventAnalytics.slice(
+                                (newPage - 1) * eventLimit,
+                                newPage * eventLimit,
+                              );
+                            if (newPageEvents.length > 0) {
+                              setSelectedConcertId(newPageEvents[0].id);
+                            }
+                          }}
+                          className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-border bg-card hover:text-primary transition disabled:opacity-40 cursor-pointer"
+                        >
+                          Trước
+                        </button>
+                        <button
+                          disabled={eventPage >= totalEventPages}
+                          onClick={() => {
+                            const newPage = eventPage + 1;
+                            setEventPage(newPage);
+                            const newPageEvents =
+                              analytics.eventAnalytics.slice(
+                                (newPage - 1) * eventLimit,
+                                newPage * eventLimit,
+                              );
+                            if (newPageEvents.length > 0) {
+                              setSelectedConcertId(newPageEvents[0].id);
+                            }
+                          }}
+                          className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-border bg-card hover:text-primary transition disabled:opacity-40 cursor-pointer"
+                        >
+                          Sau
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

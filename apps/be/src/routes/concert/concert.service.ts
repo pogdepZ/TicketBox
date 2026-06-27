@@ -196,6 +196,7 @@ export class ConcertService {
           slug: slugify(createConcertDto.name),
           description: createConcertDto.description,
           type: createConcertDto.type?.trim(),
+          city: createConcertDto.city?.trim(),
           artistName: createConcertDto.artistName,
           venueName: createConcertDto.venueName.trim(),
           venueAddress: createConcertDto.venueAddress.trim(),
@@ -682,6 +683,18 @@ export class ConcertService {
         take: limit,
         // Upcoming concerts are more useful first for ticket browsing and operations.
         orderBy: [{ eventDate: "asc" }, { createdAt: "desc" }],
+        include: {
+          seatZones: {
+            include: {
+              ticketTypes: true,
+            },
+          },
+          _count: {
+            select: {
+              tickets: true,
+            },
+          },
+        },
       }),
       this.prismaService.concert.count({ where }),
     ]);
@@ -722,7 +735,12 @@ export class ConcertService {
           where: {
             status: "ACTIVE"
           }
-        }
+        },
+        _count: {
+          select: {
+            tickets: true,
+          },
+        },
       },
     });
 
@@ -977,6 +995,10 @@ export class ConcertService {
 
       if (dto.type !== undefined) {
         data.type = dto.type ? dto.type.trim() : null;
+      }
+
+      if (dto.city !== undefined) {
+        data.city = dto.city ? dto.city.trim() : null;
       }
 
       if (dto.artistName !== undefined) {

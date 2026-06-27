@@ -594,4 +594,76 @@ export class AdminDashboardService {
 
     return data;
   }
+
+  async getGenreRevenue(startDateStr: string, endDateStr: string) {
+    if (!startDateStr || !endDateStr) {
+      throw new BadRequestException("Vui lòng cung cấp startDate và endDate.");
+    }
+
+    const start = new Date(startDateStr);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(endDateStr);
+    end.setHours(23, 59, 59, 999);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      throw new BadRequestException("Định dạng ngày không hợp lệ.");
+    }
+
+    // Lọc các orders PAID trong khoảng thời gian kèm type của concert
+    const orders = await this.prismaService.order.findMany({
+      where: {
+        status: "PAID",
+        paidAt: {
+          gte: start,
+          lte: end,
+        },
+      },
+      select: {
+        totalAmount: true,
+        concert: {
+          select: {
+            type: true,
+          },
+        },
+      },
+    });
+
+    const genreMap = new Map<string, number>();
+    let totalRevenue = 0;
+
+    for (const order of orders) {
+      const genre = order.concert?.type?.trim() || "Khác";
+      const amount = Number(order.totalAmount);
+      totalRevenue += amount;
+      genreMap.set(genre, (genreMap.get(genre) || 0) + amount);
+    }
+
+    const entries = Array.from(genreMap.entries())
+      .map(([genre, revenue]) => ({ genre, revenue }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    // Largest remainder method: percentages always sum to exactly 100
+    if (totalRevenue > 0 && entries.length > 0) {
+      const rawPercentages = entries.map(e => (e.revenue / totalRevenue) * 100);
+      const floored = rawPercentages.map(p => Math.floor(p));
+      let remainder = 100 - floored.reduce((sum, v) => sum + v, 0);
+      const remainders = rawPercentages.map((p, i) => ({ idx: i, rem: p - floored[i] }));
+      remainders.sort((a, b) => b.rem - a.rem);
+      for (let i = 0; i < remainder; i++) {
+        floored[remainders[i].idx] += 1;
+      }
+      return entries.map((e, i) => ({
+        genre: e.genre,
+        revenue: e.revenue,
+        percentage: floored[i],
+      }));
+    }
+
+    return entries.map(e => ({
+      genre: e.genre,
+      revenue: e.revenue,
+      percentage: 0,
+    }));
+  }
 }

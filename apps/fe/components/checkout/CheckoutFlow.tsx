@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { CheckoutSummary } from '@/components/checkout-summary';
-import { checkoutMock, concerts, paymentMethods } from '@/lib/mock-data';
-import { createDraftReservation, DraftReservation, getDraftReservation } from '@/lib/mock-reservation';
-import { createOrder, createPayment, getFriendlyErrorMessage, getProfile, getOrderById } from '@/lib/api';
+import { paymentMethods } from '@/lib/mock-data';
+import { createDraftReservation, DraftReservation, getDraftReservation } from '@/lib/draft-reservation';
+import { createOrder, createPayment, getFriendlyErrorMessage, getProfile, getOrderById, getConcertById } from '@/lib/api';
 
 interface CheckoutViewModel {
   concertId: string;
@@ -23,43 +23,39 @@ interface CheckoutViewModel {
   items?: any[];
 }
 
-function fallbackCheckout(): CheckoutViewModel {
-  const concert = concerts.find((item) => item.id === checkoutMock.concertId) ?? concerts[0];
-
-  return {
-    concertId: concert.id,
-    concertTitle: concert.title,
-    concertDate: concert.date,
-    ticketType: checkoutMock.ticketType,
-    ticketTypeId: checkoutMock.ticketTypeId,
-    quantity: checkoutMock.quantity,
-    unitPrice: checkoutMock.unitPrice,
-    selectedSeats: checkoutMock.selectedSeats,
-    customerName: checkoutMock.customer.name,
-    expiresAt: checkoutMock.expiresAt,
-  };
-}
+const initialCheckoutState: CheckoutViewModel = {
+  concertId: '',
+  concertTitle: 'Đang tải...',
+  concertDate: '',
+  ticketType: '',
+  ticketTypeId: '',
+  quantity: 0,
+  unitPrice: 0,
+  selectedSeats: [],
+  customerName: '',
+  items: [],
+};
 
 function fromDraftReservation(draft: DraftReservation): CheckoutViewModel {
-  const concert = concerts.find((item) => item.id === draft.concertId);
+  const firstItem = draft.items?.[0];
 
   return {
     concertId: draft.concertId,
     concertTitle: draft.concertTitle,
-    concertDate: concert?.date ?? draft.createdAt,
-    ticketType: draft.item.zoneName,
-    ticketTypeId: draft.item.ticketTypeId,
-    quantity: draft.item.quantity,
-    unitPrice: draft.item.unitPrice,
-    selectedSeats: draft.item.seatLabels,
+    concertDate: draft.createdAt,
+    ticketType: firstItem?.zoneName || 'Vé',
+    ticketTypeId: firstItem?.ticketTypeId || '',
+    quantity: draft.items?.reduce((sum, item) => sum + item.quantity, 0) || 0,
+    unitPrice: firstItem?.unitPrice || 0,
+    selectedSeats: draft.items?.flatMap(item => item.seatLabels) || [],
     customerName: 'Nguyễn Minh Anh',
     expiresAt: draft.expiresAt,
-    items: [{
-      ticketTypeId: draft.item.ticketTypeId,
-      name: draft.item.zoneName,
-      quantity: draft.item.quantity,
-      unitPrice: draft.item.unitPrice,
-    }],
+    items: draft.items?.map(item => ({
+      ticketTypeId: item.ticketTypeId,
+      name: item.zoneName,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+    })) || [],
   };
 }
 
@@ -75,24 +71,46 @@ export function CheckoutFlow() {
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [isLoadingOrder, setIsLoadingOrder] = useState(() => !!existingOrderId);
 
-  const [checkout, setCheckout] = useState<CheckoutViewModel>(() => {
-    if (typeof window !== 'undefined') {
-      const draft = getDraftReservation();
-      if (draft) {
-        return fromDraftReservation(draft);
-      }
-    }
-    return fallbackCheckout();
-  });
-  const [draftReservation, setDraftReservation] = useState<DraftReservation | null>(() => {
-    if (typeof window !== 'undefined') {
-      return getDraftReservation();
-    }
-    return null;
-  });
+  const [checkout, setCheckout] = useState<CheckoutViewModel>(initialCheckoutState);
+  const [draftReservation, setDraftReservation] = useState<DraftReservation | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('momo');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (existingOrderId) return;
+    const draft = getDraftReservation();
+    if (draft) {
+      async function loadConcertForDraft() {
+        try {
+          const concertDetails = await getConcertById(draft.concertId);
+          setCheckout((prev) => ({
+            concertId: draft.concertId,
+            concertTitle: concertDetails?.name || draft.concertTitle,
+            concertDate: concertDetails?.eventDate || draft.createdAt,
+            ticketType: draft.items?.[0]?.zoneName || 'Vé',
+            ticketTypeId: draft.items?.[0]?.ticketTypeId || '',
+            quantity: draft.items?.reduce((sum, item) => sum + item.quantity, 0) || 0,
+            unitPrice: draft.items?.[0]?.unitPrice || 0,
+            selectedSeats: draft.items?.flatMap(item => item.seatLabels) || [],
+            customerName: prev.customerName || 'Nguyễn Minh Anh',
+            expiresAt: draft.expiresAt,
+            items: draft.items?.map(item => ({
+              ticketTypeId: item.ticketTypeId,
+              name: item.zoneName,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+            })) || [],
+          }));
+        } catch (err) {
+          console.warn('Failed to load concert details for draft, using fallback:', err);
+          setCheckout(fromDraftReservation(draft));
+        }
+        setDraftReservation(draft);
+      }
+      loadConcertForDraft();
+    }
+  }, [existingOrderId, searchParams]);
 
   useEffect(() => {
     if (!existingOrderId) return;
@@ -170,13 +188,14 @@ export function CheckoutFlow() {
 
   const expiresAtText = useMemo(() => {
     if (!checkout.expiresAt) {
-      return '5 phút';
+      return 'trong vòng 5 phút';
     }
 
-    return new Date(checkout.expiresAt).toLocaleTimeString('vi-VN', {
+    const timeStr = new Date(checkout.expiresAt).toLocaleTimeString('vi-VN', {
       hour: '2-digit',
       minute: '2-digit',
     });
+    return `trước ${timeStr}`;
   }, [checkout.expiresAt]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -193,15 +212,31 @@ export function CheckoutFlow() {
           ? window.crypto.randomUUID() 
           : `idempotency-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
+        const items = checkout.items && checkout.items.length > 0
+          ? checkout.items.map(item => ({
+              ticketTypeId: item.ticketTypeId,
+              seatNumbers: draftReservation?.items?.find(di => di.ticketTypeId === item.ticketTypeId)?.seatLabels || checkout.selectedSeats,
+            }))
+          : [{
+              ticketTypeId: checkout.ticketTypeId,
+              seatNumbers: checkout.selectedSeats,
+            }];
+
         const orderResponse = await createOrder({
           concertId: checkout.concertId,
+          items,
           ticketTypeId: checkout.ticketTypeId,
           seatNumbers: checkout.selectedSeats,
         }, idempotencyKey);
 
-        orderId = orderResponse.orderId || orderResponse.data?.orderId;
+        orderId = orderResponse.orderId || orderResponse.data?.orderId || orderResponse.id;
         if (!orderId) {
           throw new Error('Không nhận được Mã đơn hàng từ hệ thống.');
+        }
+
+        // Xoá reservation nháp sau khi đã tạo Order thực tế thành công
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem('ticketbox-draft-reservation');
         }
       }
 
@@ -228,7 +263,7 @@ export function CheckoutFlow() {
     }
   }
 
-  if (isLoadingOrder) {
+  if (isLoadingOrder || (!checkout.concertId && !error)) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-10 animate-pulse">
         <div className="mb-8 h-10 w-32 rounded-full bg-muted"></div>
@@ -282,7 +317,7 @@ export function CheckoutFlow() {
               <div>
                 <p className="mb-1 font-black text-foreground">Lưu ý quan trọng</p>
                 <p className="text-sm text-muted-foreground">
-                  Vui lòng hoàn tất thanh toán trước {expiresAtText}. Vé sẽ tự động được mở bán lại nếu đơn hàng quá hạn.
+                  Vui lòng hoàn tất thanh toán {expiresAtText}. Vé sẽ tự động được mở bán lại nếu đơn hàng quá hạn.
                 </p>
               </div>
             </div>
