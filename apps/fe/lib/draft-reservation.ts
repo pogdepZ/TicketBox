@@ -71,7 +71,7 @@ export function createDraftReservation(input: {
   selectedSeats: Seat[];
 }): DraftReservation {
   const createdAt = new Date();
-  const expiresAt = new Date(createdAt.getTime() + 5 * 60 * 1000);
+  const expiresAt = new Date(createdAt.getTime() + (10 * 60 + 10) * 1000);
   const reservationId = `reservation-${input.concertId}-${createdAt.getTime()}`;
 
   // Gom nhóm selectedSeats theo ticketTypeId (hoặc zoneId)

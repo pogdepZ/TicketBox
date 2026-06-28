@@ -199,8 +199,30 @@ function ConcertRow({ groupName, list }: ConcertRowProps) {
 export function ConcertBrowser({ concerts, initialKeyword = '' }: ConcertBrowserProps) {
   const [keyword, setKeyword] = useState(initialKeyword);
   const [city, setCity] = useState('all');
-  const [genre, setGenre] = useState('all');
 
+  // Load initial city from URL search params on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlCity = params.get('city') || 'all';
+      setCity(urlCity);
+    }
+  }, []);
+
+  // Sync cities list to Header
+  const cities = useMemo(
+    () => Array.from(new Set(concerts.map((concert) => concert.city))).filter(Boolean).sort(),
+    [concerts],
+  );
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__ticketbox_cities = cities;
+      window.dispatchEvent(new CustomEvent('ticketbox-cities-loaded', { detail: { cities } }));
+    }
+  }, [cities]);
+
+  // Sync keyword from search parameters
   useEffect(() => {
     const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
     const isReload = navigation?.type === 'reload';
@@ -208,14 +230,19 @@ export function ConcertBrowser({ concerts, initialKeyword = '' }: ConcertBrowser
     if (isReload) {
       setKeyword('');
       setCity('all');
-      setGenre('all');
 
       if (window.location.search || window.location.hash) {
         const url = new URL(window.location.href);
         url.searchParams.delete('q');
+        url.searchParams.delete('city');
         url.hash = '';
         window.history.replaceState(null, '', `${url.pathname}${url.search}`);
       }
+
+      // Sync event to Header
+      window.dispatchEvent(new CustomEvent('ticketbox-filter-change', {
+        detail: { keyword: '', city: 'all' }
+      }));
 
       return;
     }
@@ -229,32 +256,22 @@ export function ConcertBrowser({ concerts, initialKeyword = '' }: ConcertBrowser
     scrollToEvents();
   }, [initialKeyword]);
 
+  // Listen to filter change events from Header
   useEffect(() => {
-    function handleNavbarSearch(event: Event) {
-      const query = (event as CustomEvent<{ query?: string }>).detail?.query ?? '';
-
-      setKeyword(query);
-      setCity('all');
-      setGenre('all');
-      scrollToEvents();
+    function handleFilterChange(event: Event) {
+      const detail = (event as CustomEvent<{ keyword?: string; city?: string }>).detail;
+      if (detail) {
+        if (detail.keyword !== undefined) setKeyword(detail.keyword);
+        if (detail.city !== undefined) setCity(detail.city);
+        scrollToEvents();
+      }
     }
 
-    window.addEventListener('ticketbox-navbar-search', handleNavbarSearch);
-
+    window.addEventListener('ticketbox-filter-change', handleFilterChange);
     return () => {
-      window.removeEventListener('ticketbox-navbar-search', handleNavbarSearch);
+      window.removeEventListener('ticketbox-filter-change', handleFilterChange);
     };
   }, []);
-
-  const cities = useMemo(
-    () => Array.from(new Set(concerts.map((concert) => concert.city))).sort(),
-    [concerts],
-  );
-
-  const genres = useMemo(
-    () => Array.from(new Set(concerts.map((concert) => concert.genre).filter(Boolean))).sort(),
-    [concerts],
-  );
 
   const filteredConcerts = useMemo(() => {
     const normalizedKeyword = normalize(keyword.trim());
@@ -267,15 +284,13 @@ export function ConcertBrowser({ concerts, initialKeyword = '' }: ConcertBrowser
           concert.artist,
           concert.venue,
           concert.city,
-          concert.genre ?? '',
         ].join(' ')).includes(normalizedKeyword);
 
       const matchesCity = city === 'all' || concert.city === city;
-      const matchesGenre = genre === 'all' || concert.genre === genre;
 
-      return matchesKeyword && matchesCity && matchesGenre;
+      return matchesKeyword && matchesCity;
     });
-  }, [city, concerts, genre, keyword]);
+  }, [city, concerts, keyword]);
 
   const groupedConcerts = useMemo(() => {
     const groups: Record<string, typeof concerts> = {};
@@ -289,12 +304,25 @@ export function ConcertBrowser({ concerts, initialKeyword = '' }: ConcertBrowser
     return groups;
   }, [filteredConcerts]);
 
-  const hasFilters = keyword.trim().length > 0 || city !== 'all' || genre !== 'all';
+  const hasFilters = keyword.trim().length > 0 || city !== 'all';
 
   function clearFilters() {
     setKeyword('');
     setCity('all');
-    setGenre('all');
+
+    // Dispatch filter change to sync Header
+    window.dispatchEvent(new CustomEvent('ticketbox-filter-change', {
+      detail: { keyword: '', city: 'all' }
+    }));
+
+    // Update URL search parameters
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      params.delete('q');
+      params.delete('city');
+      const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+      window.history.replaceState(null, '', newUrl);
+    }
   }
 
   return (
@@ -306,63 +334,6 @@ export function ConcertBrowser({ concerts, initialKeyword = '' }: ConcertBrowser
             Tìm show theo nghệ sĩ, địa điểm, hoặc thể loại bạn quan tâm.
           </p>
         </div>
-
-        <div className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-bold text-muted-foreground shadow-sm">
-          <SlidersHorizontal className="size-4 text-primary" />
-          {filteredConcerts.length} / {concerts.length} sự kiện
-        </div>
-      </div>
-
-      <div className="mb-8 grid gap-3 rounded-[2rem] border border-border bg-card p-3 shadow-sm md:grid-cols-[1fr_220px_220px_auto]">
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="search"
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="Tìm concert, nghệ sĩ, địa điểm"
-            aria-label="Tìm kiếm sự kiện"
-            className="h-12 w-full rounded-full border border-border bg-background pl-11 pr-4 text-sm transition focus:outline-none focus:ring-4 focus:ring-primary/15"
-          />
-        </div>
-
-        <select
-          value={city}
-          onChange={(event) => setCity(event.target.value)}
-          aria-label="Lọc theo tỉnh thành"
-          className="h-12 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground transition focus:outline-none focus:ring-4 focus:ring-primary/15"
-        >
-          <option value="all">Tất cả tỉnh/thành</option>
-          {cities.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={genre}
-          onChange={(event) => setGenre(event.target.value)}
-          aria-label="Lọc theo thể loại"
-          className="h-12 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground transition focus:outline-none focus:ring-4 focus:ring-primary/15"
-        >
-          <option value="all">Tất cả thể loại</option>
-          {genres.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-
-        <button
-          type="button"
-          onClick={clearFilters}
-          disabled={!hasFilters}
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-border bg-background px-4 text-sm font-bold text-foreground transition hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          <X className="size-4" />
-          Xóa lọc
-        </button>
       </div>
 
       {filteredConcerts.length > 0 ? (
@@ -383,7 +354,7 @@ export function ConcertBrowser({ concerts, initialKeyword = '' }: ConcertBrowser
         <div className="rounded-[2rem] border border-dashed border-border bg-card p-10 text-center">
           <h3 className="text-2xl font-black text-foreground">Không tìm thấy sự kiện phù hợp</h3>
           <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-            Thử đổi từ khóa, tỉnh/thành hoặc thể loại để xem thêm các show đang mở bán.
+            Thử đổi từ khóa hoặc tỉnh/thành để xem thêm các show đang mở bán.
           </p>
           <button
             type="button"

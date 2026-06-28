@@ -1,8 +1,8 @@
 "use client";
 
-import { Bell, LogOut, Search, Ticket, User } from "lucide-react";
+import { Bell, LogOut, Search, Ticket, User, MapPin, X } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { ThemeToggle } from "./theme-toggle";
 import {
@@ -16,14 +16,23 @@ import {
 
 export function Header() {
   const router = useRouter();
+  const pathname = usePathname();
   const [session, setSession] = useState<any>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const [keyword, setKeyword] = useState("");
+  const [city, setCity] = useState("all");
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+
+  const DEFAULT_CITIES = ["Thành phố Hồ Chí Minh", "Thành phố Hà Nội", "Tỉnh Lâm Đồng"];
+  const [cities, setCities] = useState<string[]>(DEFAULT_CITIES);
+
   const notificationsRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
+  const cityRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -39,10 +48,121 @@ export function Header() {
       ) {
         setShowAccount(false);
       }
+      if (
+        cityRef.current &&
+        !cityRef.current.contains(event.target as Node)
+      ) {
+        setShowCityDropdown(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Read initial filter values from URL on client mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      setKeyword(params.get("q") || "");
+      setCity(params.get("city") || "all");
+    }
+  }, []);
+
+  // Sync cities list from the ConcertBrowser if available
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as any).__ticketbox_cities) {
+      setCities((window as any).__ticketbox_cities);
+    }
+
+    function handleCitiesLoaded(event: Event) {
+      const loadedCities = (event as CustomEvent<{ cities: string[] }>).detail?.cities ?? [];
+      if (loadedCities.length > 0) {
+        setCities(loadedCities);
+      }
+    }
+    window.addEventListener("ticketbox-cities-loaded", handleCitiesLoaded);
+    return () => {
+      window.removeEventListener("ticketbox-cities-loaded", handleCitiesLoaded);
+    };
+  }, []);
+
+  // Listen for filter changes from other components (like clearFilters)
+  useEffect(() => {
+    function handleFilterChange(event: Event) {
+      const detail = (event as CustomEvent<{ keyword?: string; city?: string }>).detail;
+      if (detail) {
+        if (detail.keyword !== undefined) setKeyword(detail.keyword);
+        if (detail.city !== undefined) setCity(detail.city);
+      }
+    }
+
+    window.addEventListener("ticketbox-filter-change", handleFilterChange);
+    return () => {
+      window.removeEventListener("ticketbox-filter-change", handleFilterChange);
+    };
+  }, []);
+
+  const dispatchFilterChange = (newKeyword: string, newCity: string) => {
+    window.dispatchEvent(
+      new CustomEvent("ticketbox-filter-change", {
+        detail: { keyword: newKeyword, city: newCity },
+      })
+    );
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (newKeyword) {
+        params.set("q", newKeyword);
+      } else {
+        params.delete("q");
+      }
+      if (newCity && newCity !== "all") {
+        params.set("city", newCity);
+      } else {
+        params.delete("city");
+      }
+      const newUrl = `${window.location.pathname}${params.toString() ? "?" + params.toString() : ""}`;
+      window.history.replaceState(null, "", newUrl);
+    }
+  };
+
+  const handleKeywordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setKeyword(val);
+    if (pathname === "/") {
+      dispatchFilterChange(val, city);
+    }
+  };
+
+  const handleKeywordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && pathname !== "/") {
+      const params = new URLSearchParams();
+      if (keyword) params.set("q", keyword);
+      if (city !== "all") params.set("city", city);
+      router.push(`/?${params.toString()}`);
+    }
+  };
+
+  const handleCitySelect = (selectedCity: string) => {
+    setCity(selectedCity);
+    setShowCityDropdown(false);
+
+    if (pathname === "/") {
+      dispatchFilterChange(keyword, selectedCity);
+    } else {
+      const params = new URLSearchParams();
+      if (keyword) params.set("q", keyword);
+      if (selectedCity !== "all") params.set("city", selectedCity);
+      router.push(`/?${params.toString()}`);
+    }
+  };
+
+  const clearKeyword = () => {
+    setKeyword("");
+    if (pathname === "/") {
+      dispatchFilterChange("", city);
+    }
+  };
 
   useEffect(() => {
     async function syncSession() {
@@ -146,13 +266,82 @@ export function Header() {
       <div className="mx-auto flex h-18 max-w-7xl items-center justify-between gap-4 px-4">
         <Link
           href="/"
-          className="flex items-center gap-3 text-lg font-black tracking-tight text-foreground"
+          className="flex items-center gap-3 text-lg font-black tracking-tight text-foreground shrink-0"
         >
-          <span className="grid size-10 place-items-center rounded-2xl bg-foreground text-background shadow-sm">
+          <span className="grid size-10 place-items-center rounded-2xl bg-foreground text-background shadow-sm shrink-0">
             <Ticket className="size-5" />
           </span>
-          <span>TicketBox</span>
+          <span className="hidden md:inline">TicketBox</span>
         </Link>
+
+        {/* Global Search and Location filter pill in Header */}
+        <div className="flex-1 max-w-xs md:max-w-md mx-2 md:mx-4">
+          <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-sm w-full focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/15 transition-all duration-300">
+            {/* Search field */}
+            <div className="relative flex-1 flex items-center">
+              <Search className="absolute left-3 size-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={keyword}
+                onChange={handleKeywordChange}
+                onKeyDown={handleKeywordKeyDown}
+                placeholder="Tìm concert, nghệ sĩ, địa điểm..."
+                className="w-full bg-transparent pl-9 pr-6 py-1.5 text-xs md:text-sm focus:outline-none text-foreground placeholder:text-muted-foreground/60"
+              />
+              {keyword && (
+                <button
+                  type="button"
+                  onClick={clearKeyword}
+                  className="absolute right-1 text-muted-foreground hover:text-foreground cursor-pointer p-1"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="w-px h-5 bg-border self-center" />
+
+            {/* City selector dropdown */}
+            <div className="relative" ref={cityRef}>
+              <button
+                type="button"
+                onClick={() => setShowCityDropdown(!showCityDropdown)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-primary rounded-full hover:bg-muted/50 transition cursor-pointer whitespace-nowrap"
+              >
+                <MapPin className="size-4 text-primary shrink-0" />
+                <span className="max-w-[70px] md:max-w-[120px] truncate">
+                  {city === "all" ? "Tỉnh/Thành" : city}
+                </span>
+              </button>
+
+              {showCityDropdown && (
+                <div className="absolute right-0 mt-2 z-50 w-48 md:w-56 rounded-2xl border border-border bg-card p-1.5 md:p-2 shadow-xl shadow-foreground/10">
+                  <button
+                    type="button"
+                    onClick={() => handleCitySelect("all")}
+                    className={`w-full text-left px-2.5 py-1.5 md:px-3 md:py-2 rounded-xl text-xs md:text-sm transition-all duration-200 hover:bg-muted/70 flex items-center justify-between cursor-pointer ${
+                      city === "all" ? "text-primary font-bold bg-primary/10" : "text-foreground"
+                    }`}
+                  >
+                    Tất cả địa điểm
+                  </button>
+                  {cities.map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => handleCitySelect(item)}
+                      className={`w-full text-left px-2.5 py-1.5 md:px-3 md:py-2 rounded-xl text-xs md:text-sm transition-all duration-200 hover:bg-muted/70 flex items-center justify-between cursor-pointer ${
+                        city === item ? "text-primary font-bold bg-primary/10" : "text-foreground"
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
         <div className="flex items-center gap-2">
           {session?.user?.roles?.some((role: any) => role.name === "admin") && (

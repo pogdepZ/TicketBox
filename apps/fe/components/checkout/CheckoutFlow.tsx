@@ -188,7 +188,7 @@ export function CheckoutFlow() {
 
   const expiresAtText = useMemo(() => {
     if (!checkout.expiresAt) {
-      return 'trong vòng 5 phút';
+      return 'trong vòng 10 phút';
     }
 
     const timeStr = new Date(checkout.expiresAt).toLocaleTimeString('vi-VN', {

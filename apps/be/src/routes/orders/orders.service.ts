@@ -116,7 +116,7 @@ export class OrdersService {
       );
 
       // Sau khi DB transaction thành công, set thêm Redis key cho từng ghế
-      const redisTTL = RESERVATION_TTL_MINUTES * 60; // 10 * 60 = 600s
+      const redisTTL = RESERVATION_TTL_MINUTES * 60 + 10; // 10 * 60 + 10 = 610s
       const normalizedSeats = dto.items && dto.items.length > 0
         ? dto.items.flatMap(item => item.seatNumbers.map(s => s.trim().toUpperCase()))
         : dto.seatNumbers!.map(s => s.trim().toUpperCase());
@@ -277,7 +277,7 @@ export class OrdersService {
 
       // ── Bước 11: Tạo Reservation ──
       const expiresAt = new Date(
-        Date.now() + RESERVATION_TTL_MINUTES * 60 * 1000,
+        Date.now() + RESERVATION_TTL_MINUTES * 60 * 1000 + 10 * 1000,
       );
       const paymentGraceUntil = getPaymentGraceUntil(expiresAt);
 

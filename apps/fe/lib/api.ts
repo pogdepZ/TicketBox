@@ -1275,7 +1275,7 @@ export async function getOrderById(orderId: string): Promise<any> {
         paymentMethod: "MOMO",
         paidAt: paidAt.toISOString(),
         createdAt: paidAt.toISOString(),
-        expiresAt: new Date(paidAt.getTime() + 15 * 60 * 1000).toISOString(),
+        expiresAt: new Date(paidAt.getTime() + (10 * 60 + 10) * 1000).toISOString(),
         items: [
           {
             id: `item-${orderId}`,
