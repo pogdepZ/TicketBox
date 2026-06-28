@@ -2,10 +2,11 @@ import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { ConcertBrowser } from '@/components/concert-browser';
 import { HomeBanner } from '@/components/home-banner';
+import { Reveal } from '@/components/reveal';
+import { FeaturedCarousel } from '@/components/featured-carousel';
 import { getConcerts } from '@/lib/api';
-import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, CalendarDays, MapPin, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 
 interface HomePageProps {
   searchParams?: Promise<{
@@ -16,76 +17,52 @@ interface HomePageProps {
 export default async function HomePage({ searchParams }: HomePageProps) {
   const params = await searchParams;
   const initialKeyword = params?.q ?? '';
-  const { items: concerts } = await getConcerts({ keyword: initialKeyword, status: 'published' });
+  const { items: concerts } = await getConcerts({ keyword: initialKeyword, status: 'published', limit: 100 });
   const featured = concerts[0] || null;
 
   return (
     <main className="min-h-screen bg-background">
       <Header />
 
-      <section className="mx-auto grid max-w-7xl gap-10 px-4 pb-16 pt-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-center lg:pb-20 lg:pt-14">
+      <section className="mx-auto grid max-w-7xl gap-10 px-4 pb-16 md:pb-64 lg:pb-72 pt-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-center lg:pt-14">
         <div>
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-bold text-primary">
+          <Reveal className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-bold text-primary shadow-sm shadow-primary/10" variant="scale">
             <Sparkles className="size-4" />
             Mùa diễn 2026 đã mở bán
-          </div>
-          <h1 className="max-w-3xl text-5xl font-black leading-[0.98] tracking-tight text-foreground md:text-6xl">
+          </Reveal>
+          <Reveal delay={90}>
+            <h1 className="max-w-3xl text-5xl font-black leading-[0.98] tracking-tight text-foreground md:text-6xl">
             Chọn show hay. Giữ ghế đẹp.
-          </h1>
-          <p className="mt-6 max-w-xl text-lg leading-8 text-muted-foreground">
-            Đặt vé concert, lễ hội âm nhạc và sân khấu biểu diễn nổi bật tại Việt Nam.
-          </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            </h1>
+          </Reveal>
+          <Reveal delay={170}>
+            <p className="mt-6 max-w-xl text-lg leading-8 text-muted-foreground">
+              Đặt vé concert, lễ hội âm nhạc và sân khấu biểu diễn nổi bật tại Việt Nam.
+            </p>
+          </Reveal>
+          <Reveal delay={250} className="mt-8 flex flex-col gap-3 sm:flex-row">
             {featured && (
               <Link
-                href={`/concert/${featured.id}`}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-px"
+                href={`/concert/${featured.slug}`}
+                className="group inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground shadow-lg shadow-primary/20 transition duration-300 hover:-translate-y-1 hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/25 active:translate-y-px"
               >
                 Xem show nổi bật
-                <ArrowRight className="size-4" />
+                <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" />
               </Link>
             )}
             <Link
               href="#events"
-              className="inline-flex items-center justify-center rounded-full border border-border bg-card px-6 py-3 font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary active:translate-y-px"
+              className="inline-flex items-center justify-center rounded-full border border-border bg-card px-6 py-3 font-bold text-foreground shadow-sm transition duration-300 hover:-translate-y-1 hover:border-primary/40 hover:text-primary hover:shadow-lg hover:shadow-foreground/5 active:translate-y-px"
             >
               Lịch diễn
             </Link>
-          </div>
+          </Reveal>
         </div>
 
-        {featured && (
-          <div className="relative">
-            <div className="relative overflow-hidden rounded-[2rem] border border-border bg-foreground shadow-2xl shadow-foreground/10">
-              <div className="relative aspect-[16/11]">
-                <Image src={featured.image} alt={featured.title} fill priority className="object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-                <div className="absolute bottom-5 left-5 right-5 text-white">
-                  <p className="text-sm font-bold text-white/70">{featured.artist}</p>
-                  <h2 className="mt-1 text-3xl font-black tracking-tight">{featured.title}</h2>
-                </div>
-              </div>
-            </div>
-            <div className="absolute -bottom-8 left-5 right-5 rounded-3xl border border-border bg-card p-5 shadow-xl shadow-foreground/10 md:left-auto md:right-8 md:w-80">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">Featured ticket</p>
-                  <p className="mt-1 text-lg font-black text-foreground">{featured.price.toLocaleString('vi-VN')}đ</p>
-                </div>
-                <span className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-accent px-3 py-1 text-xs font-bold text-accent-foreground">{featured.status}</span>
-              </div>
-              <div className="grid gap-3 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="size-4 text-primary" />
-                  {new Date(featured.date).toLocaleDateString('vi-VN')} · {featured.time}
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="size-4 text-primary" />
-                  {featured.venue}, {featured.city}
-                </div>
-              </div>
-            </div>
-          </div>
+        {concerts.length > 0 && (
+          <Reveal className="relative w-full animate-fade-in" delay={140} variant="scale">
+            <FeaturedCarousel concerts={concerts} />
+          </Reveal>
         )}
       </section>
 

@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { getDraftReservation, createMockOrderFromDraft } from '@/lib/mock-reservation';
+import { getDraftReservation, createMockOrderFromDraft } from '@/lib/draft-reservation';
 import { CheckCircle2, XCircle, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 export default function MockPaymentPage() {

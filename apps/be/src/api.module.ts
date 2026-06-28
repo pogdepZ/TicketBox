@@ -13,6 +13,7 @@ import { NotificationsModule } from './routes/notifications/notifications.module
 import { OrdersModule } from './routes/orders/orders.module';
 import { PaymentsModule } from './routes/payments/payments.module';
 import { TicketsModule } from './routes/tickets/tickets.module';
+import { AdminDashboardModule } from './routes/admin-dashboard/admin-dashboard.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { TicketsModule } from './routes/tickets/tickets.module';
     NotificationsModule,
     AiBioModule,
     GuestListModule,
+    AdminDashboardModule,
   ],
   controllers: [AppController],
   providers: [

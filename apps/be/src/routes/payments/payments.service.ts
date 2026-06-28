@@ -5,24 +5,25 @@ import {
   Logger,
   NotFoundException,
   UnauthorizedException,
-} from '@nestjs/common';
-import { createHash } from 'crypto';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { IdempotencyService } from '../orders/idempotency.service';
-import { OrderTransactionHelper } from '../orders/order-transaction.helper';
-import { PaymentGatewayService } from './payment-gateway.service';
-import { PaymentEventService } from './payment-event.service';
-import { TicketsService } from '../tickets/tickets.service';
-import { PaymentCircuitBreakerService } from './payment-circuit-breaker.service';
-import { OutboxService } from '../../common/outbox/outbox.service';
-import { CreatePaymentDto } from './dto/create-payment.dto';
-import { PaymentWebhookDto } from './dto/payment-webhook.dto';
+} from "@nestjs/common";
+import { createHash } from "crypto";
+import { PrismaService } from "../../common/prisma/prisma.service";
+import { IdempotencyService } from "../orders/idempotency.service";
+import { OrderTransactionHelper } from "../orders/order-transaction.helper";
+import { PaymentGatewayService } from "./payment-gateway.service";
+import { PaymentEventService } from "./payment-event.service";
+import { TicketsService } from "../tickets/tickets.service";
+import { PaymentCircuitBreakerService } from "./payment-circuit-breaker.service";
+import { OutboxService } from "../../common/outbox/outbox.service";
+import { CreatePaymentDto } from "./dto/create-payment.dto";
+import { PaymentWebhookDto } from "./dto/payment-webhook.dto";
 import {
   PaymentStatusResponseDto,
   TicketResponseDto,
-} from './dto/payment-status-response.dto';
-import { AuthUser } from '../auth/dto/user-response.dto';
-import { getPaymentGraceUntil } from '../orders/order-expiration.constants';
+} from "./dto/payment-status-response.dto";
+import { AuthUser } from "../auth/dto/user-response.dto";
+import { getPaymentGraceUntil } from "../orders/order-expiration.constants";
+import { RedisService } from "../../common/redis/redis.service";
 import {
   IdempotencyStatus,
   NotificationChannel,
@@ -30,10 +31,10 @@ import {
   OrderStatus,
   PaymentGateway,
   ReservationStatus,
-} from '../../generated/prisma';
+} from "../../generated/prisma";
 
-type Provider = 'VNPAY' | 'MOMO';
-type WebhookSignatureMode = 'MOCK' | 'GATEWAY_VERIFIED';
+type Provider = "VNPAY" | "MOMO";
+type WebhookSignatureMode = "MOCK" | "GATEWAY_VERIFIED";
 
 @Injectable()
 export class PaymentsService {
@@ -48,6 +49,7 @@ export class PaymentsService {
     private readonly ticketsService: TicketsService,
     private readonly circuitBreaker: PaymentCircuitBreakerService,
     private readonly outboxService: OutboxService,
+    private readonly redis: RedisService,
   ) {}
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -60,7 +62,7 @@ export class PaymentsService {
     idempotencyKey: string | undefined,
   ): Promise<{ status: number; body: unknown }> {
     if (!idempotencyKey?.trim()) {
-      throw new BadRequestException('Idempotency-Key is required');
+      throw new BadRequestException("Idempotency-Key is required");
     }
 
     const scopedKey = this.buildPaymentIdempotencyKey(user.id, idempotencyKey);
@@ -77,7 +79,7 @@ export class PaymentsService {
       await this.idempotency.markProcessing(scopedKey, requestHash, user.id);
     } catch {
       throw new ConflictException({
-        message: 'Request is already being processed',
+        message: "Request is already being processed",
         key: idempotencyKey,
       });
     }
@@ -112,14 +114,14 @@ export class PaymentsService {
       });
 
       if (!order || order.userId !== user.id) {
-        throw new NotFoundException('Order not found');
+        throw new NotFoundException("Order not found");
       }
 
       const now = new Date();
 
       if (order.expiresAt <= now) {
         throw new ConflictException({
-          message: 'Order has expired',
+          message: "Order has expired",
           orderId: order.id,
           expiresAt: order.expiresAt,
         });
@@ -139,7 +141,9 @@ export class PaymentsService {
         });
       }
 
-      const paymentRef = this.gateway.generatePaymentRef(dto.provider as Provider);
+      const paymentRef = this.gateway.generatePaymentRef(
+        dto.provider as Provider,
+      );
       const paymentGraceUntil =
         order.paymentGraceUntil ?? getPaymentGraceUntil(order.expiresAt);
 
@@ -163,7 +167,7 @@ export class PaymentsService {
         paymentStatus: this.toPaymentStatus(updated.status),
         expiresAt: updated.expiresAt.toISOString(),
         amount: updated.totalAmount.toString(),
-        currency: 'VND',
+        currency: "VND",
       };
     });
 
@@ -176,14 +180,18 @@ export class PaymentsService {
         dto.returnUrl,
       );
 
-      await this.circuitBreaker.recordSuccess(paymentRequest.provider as Provider);
+      await this.circuitBreaker.recordSuccess(
+        paymentRequest.provider as Provider,
+      );
 
       return {
         ...paymentRequest,
         paymentUrl,
       };
     } catch (error) {
-      await this.circuitBreaker.recordFailure(paymentRequest.provider as Provider);
+      await this.circuitBreaker.recordFailure(
+        paymentRequest.provider as Provider,
+      );
       throw error;
     }
   }
@@ -195,10 +203,15 @@ export class PaymentsService {
   async handleWebhook(
     provider: Provider,
     dto: PaymentWebhookDto,
-    signatureMode: WebhookSignatureMode = 'MOCK',
-  ): Promise<{ processed: boolean; orderStatus: string; paymentStatus: string; retryAction?: string }> {
+    signatureMode: WebhookSignatureMode = "MOCK",
+  ): Promise<{
+    processed: boolean;
+    orderStatus: string;
+    paymentStatus: string;
+    retryAction?: string;
+  }> {
     // Verify signature
-    if (signatureMode === 'MOCK') {
+    if (signatureMode === "MOCK") {
       this.gateway.assertValidSignature(provider, dto, dto.signature);
     }
 
@@ -213,21 +226,28 @@ export class PaymentsService {
     });
 
     if (!order) {
-      this.logger.warn(`Webhook received for unknown paymentRef: ${dto.paymentRef}`);
-      return { processed: false, orderStatus: 'UNKNOWN', paymentStatus: 'UNKNOWN' };
+      this.logger.warn(
+        `Webhook received for unknown paymentRef: ${dto.paymentRef}`,
+      );
+      return {
+        processed: false,
+        orderStatus: "UNKNOWN",
+        paymentStatus: "UNKNOWN",
+      };
     }
 
     // Insert PaymentEvent idempotently
-    const { isNew, eventId, processedAt, status } = await this.eventService.insertEvent({
-      orderId: order.id,
-      gateway: provider as unknown as PaymentGateway,
-      gatewayTransactionId: dto.gatewayTransactionId,
-      eventType: dto.eventType,
-      rawPayload: dto as unknown as Record<string, unknown>,
-      signatureValid: true,
-    });
+    const { isNew, eventId, processedAt, status } =
+      await this.eventService.insertEvent({
+        orderId: order.id,
+        gateway: provider as unknown as PaymentGateway,
+        gatewayTransactionId: dto.gatewayTransactionId,
+        eventType: dto.eventType,
+        rawPayload: dto as unknown as Record<string, unknown>,
+        signatureValid: true,
+      });
 
-    if (!isNew && (processedAt || status === 'PROCESSED')) {
+    if (!isNew && (processedAt || status === "PROCESSED")) {
       // Đã xử lý xong trước đó → idempotent return
       return {
         processed: true,
@@ -237,13 +257,13 @@ export class PaymentsService {
       };
     }
 
-    if (!isNew && status === 'PROCESSING') {
+    if (!isNew && status === "PROCESSING") {
       // Đang có tiến trình khác xử lý → không xử lý song song
       return {
         processed: false,
         orderStatus: order.status,
         paymentStatus: this.toPaymentStatus(order.status as OrderStatus),
-        retryAction: 'WAIT_AND_RETRY',
+        retryAction: "WAIT_AND_RETRY",
       };
     }
 
@@ -251,13 +271,15 @@ export class PaymentsService {
     let finalStatus: OrderStatus = order.status as OrderStatus;
 
     try {
-      if (dto.eventType === 'SUCCESS') {
+      if (dto.eventType === "SUCCESS") {
         finalStatus = (await this.handleSuccess(order.id, dto)) as OrderStatus;
         await this.circuitBreaker.recordSuccess(provider);
+      } else if (dto.eventType === "CANCELLED") {
+        finalStatus = (await this.handleCancelled(order.id)) as OrderStatus;
       } else {
         // FAILED hoặc TIMEOUT
         finalStatus = (await this.handleFailed(order.id)) as OrderStatus;
-        if (dto.eventType === 'TIMEOUT') {
+        if (dto.eventType === "TIMEOUT") {
           await this.circuitBreaker.recordFailure(provider);
         }
       }
@@ -279,20 +301,32 @@ export class PaymentsService {
   async handleIncomingWebhook(
     provider: Provider,
     payload: Record<string, unknown>,
-  ): Promise<{ processed: boolean; orderStatus: string; paymentStatus: string; retryAction?: string }> {
-    if (provider === 'MOMO' && this.gateway.isMomoIpnPayload(payload)) {
+  ): Promise<{
+    processed: boolean;
+    orderStatus: string;
+    paymentStatus: string;
+    retryAction?: string;
+  }> {
+    if (provider === "MOMO" && this.gateway.isMomoIpnPayload(payload)) {
       if (!this.gateway.verifyMomoSignature(payload)) {
-        throw new UnauthorizedException('Invalid MOMO signature');
+        throw new UnauthorizedException("Invalid MOMO signature");
       }
 
       const dto = this.gateway.normalizeMomoIpnPayload(payload);
-      return this.handleWebhook(provider, {
-        ...dto,
-        signature: String(payload.signature),
-      }, 'GATEWAY_VERIFIED');
+      return this.handleWebhook(
+        provider,
+        {
+          ...dto,
+          signature: String(payload.signature),
+        },
+        "GATEWAY_VERIFIED",
+      );
     }
 
-    return this.handleWebhook(provider, payload as unknown as PaymentWebhookDto);
+    return this.handleWebhook(
+      provider,
+      payload as unknown as PaymentWebhookDto,
+    );
   }
 
   /**
@@ -302,30 +336,43 @@ export class PaymentsService {
   async handleWebhookGet(
     provider: Provider,
     query: any,
-  ): Promise<{ processed: boolean; orderStatus: string; paymentStatus: string }> {
-    if (provider === 'VNPAY') {
+  ): Promise<{
+    processed: boolean;
+    orderStatus: string;
+    paymentStatus: string;
+  }> {
+    if (provider === "VNPAY") {
       const isValid = this.gateway.verifyVnpaySignature(query);
       if (!isValid) {
-        throw new UnauthorizedException('Invalid VNPAY signature');
+        throw new UnauthorizedException("Invalid VNPAY signature");
       }
 
-      const vnpResponseCode = query['vnp_ResponseCode'];
-      // VNPAY uses '00' for success
-      const eventType: 'SUCCESS' | 'FAILED' = vnpResponseCode === '00' ? 'SUCCESS' : 'FAILED';
-      const amountInCents = Number(query['vnp_Amount']);
+      const vnpResponseCode = query["vnp_ResponseCode"];
+      // VNPAY uses '00' for success, '24' for user cancellation
+      let eventType: "SUCCESS" | "FAILED" | "CANCELLED" = "FAILED";
+      if (vnpResponseCode === "00") {
+        eventType = "SUCCESS";
+      } else if (vnpResponseCode === "24") {
+        eventType = "CANCELLED";
+      }
+      const amountInCents = Number(query["vnp_Amount"]);
       const amount = amountInCents / 100;
 
       const mockDto = {
-        paymentRef: query['vnp_TxnRef'],
-        gatewayTransactionId: query['vnp_TransactionNo'],
+        paymentRef: query["vnp_TxnRef"],
+        gatewayTransactionId: query["vnp_TransactionNo"],
         eventType,
         amount,
-        currency: query['vnp_CurrCode'] ?? 'VND',
-        signature: query['vnp_SecureHash'],
-        gatewayPaidAt: query['vnp_PayDate'],
+        currency: query["vnp_CurrCode"] ?? "VND",
+        signature: query["vnp_SecureHash"],
+        gatewayPaidAt: query["vnp_PayDate"],
       };
 
-      const result = await this.handleWebhook(provider, mockDto, 'GATEWAY_VERIFIED');
+      const result = await this.handleWebhook(
+        provider,
+        mockDto,
+        "GATEWAY_VERIFIED",
+      );
       return {
         processed: result.processed,
         orderStatus: result.orderStatus,
@@ -333,7 +380,7 @@ export class PaymentsService {
       };
     }
 
-    if (provider === 'MOMO' && this.gateway.isMomoIpnPayload(query)) {
+    if (provider === "MOMO" && this.gateway.isMomoIpnPayload(query)) {
       const result = await this.handleIncomingWebhook(provider, query);
       return {
         processed: result.processed,
@@ -342,7 +389,9 @@ export class PaymentsService {
       };
     }
 
-    throw new BadRequestException(`HTTP GET Webhook not supported for provider: ${provider}`);
+    throw new BadRequestException(
+      `HTTP GET Webhook not supported for provider: ${provider}`,
+    );
   }
 
   private async handleSuccess(
@@ -401,14 +450,17 @@ export class PaymentsService {
 
       if (!this.amountMatches(order.totalAmount, dto.amount)) {
         throw new ConflictException({
-          message: 'Payment amount mismatch',
+          message: "Payment amount mismatch",
           orderId: order.id,
           expectedAmount: order.totalAmount.toString(),
           actualAmount: this.gateway.normalizeAmount(dto.amount),
         });
       }
 
-      if (gatewayPaidAt && gatewayPaidAt.getTime() > order.expiresAt.getTime()) {
+      if (
+        gatewayPaidAt &&
+        gatewayPaidAt.getTime() > order.expiresAt.getTime()
+      ) {
         this.logger.error(
           `SUCCESS webhook for order ${order.id} was paid after expiresAt. gatewayPaidAt=${gatewayPaidAt.toISOString()}, expiresAt=${order.expiresAt.toISOString()}`,
         );
@@ -460,18 +512,16 @@ export class PaymentsService {
       return { status: OrderStatus.PAID, issuedTickets: true };
     });
 
-    // Queue notification (không block)
+    // Emit payment.completed after the transaction commits so workers can fan out notifications.
     if (result.issuedTickets) {
-      const paidOrder = await this.prisma.order.findUnique({
-        where: { id: orderId },
-        select: { userId: true },
-      });
-
-      if (paidOrder) {
-        this.queueSuccessNotification(paidOrder.userId, orderId).catch((err) => {
-          this.logger.error(`Failed to queue notification for order ${orderId}`, err);
+      this.outboxService
+        .put("notification", "payment.completed", { orderId })
+        .catch((err) => {
+          this.logger.error(
+            `Failed to emit payment.completed for order ${orderId}`,
+            err,
+          );
         });
-      }
     }
 
     return result.status;
@@ -483,7 +533,13 @@ export class PaymentsService {
 
       const order = await tx.order.findUniqueOrThrow({
         where: { id: orderId },
-        select: { id: true, status: true, expiresAt: true },
+        select: {
+          id: true,
+          status: true,
+          expiresAt: true,
+          userId: true,
+          concert: { select: { name: true } },
+        },
       });
 
       if (order.status === OrderStatus.PAID) {
@@ -511,36 +567,116 @@ export class PaymentsService {
           where: { id: orderId },
           data: { status: OrderStatus.PENDING_PAYMENT },
         });
+
+        await tx.inAppNotification.create({
+          data: {
+            userId: order.userId,
+            title: "Thanh toán thất bại",
+            message: `Giao dịch thanh toán cho đơn hàng vé concert "${order.concert.name}" thất bại. Bạn có thể thực hiện thanh toán lại trước khi đơn hàng hết hạn.`,
+            read: false,
+          },
+        });
+
         return OrderStatus.PENDING_PAYMENT;
       }
 
-      await this.txHelper.releaseOrder(
+      const result = await this.txHelper.releaseOrder(
         tx as any,
         orderId,
         OrderStatus.PAYMENT_FAILED,
         ReservationStatus.CANCELLED,
       );
 
+      await tx.inAppNotification.create({
+        data: {
+          userId: order.userId,
+          title: "Thanh toán thất bại - Đơn hàng bị hủy",
+          message: `Giao dịch thanh toán thất bại và thời gian giữ chỗ đã hết hạn. Đơn đặt vé cho concert "${order.concert.name}" của bạn đã bị hủy tự động.`,
+          read: false,
+        },
+      });
+
+      if (result && result.releasedSeats) {
+        for (const seat of result.releasedSeats) {
+          const key = `hold:seat:${seat.concertId}:${seat.seatNumber}`;
+          try {
+            await this.redis.del(key);
+          } catch (err) {
+            this.logger.warn(
+              `Failed to delete Redis key on webhook order payment failure: ${(err as any).message}`,
+            );
+          }
+        }
+      }
+
       return OrderStatus.PAYMENT_FAILED;
     });
   }
 
-  private async queueSuccessNotification(
-    userId: string,
-    orderId: string,
-  ): Promise<void> {
-    const notification = await this.prisma.notification.create({
-      data: {
-        userId,
-        channel: NotificationChannel.EMAIL,
-        template: 'payment_success',
-        payload: { orderId } as any,
-        status: NotificationStatus.PENDING,
-      },
-    });
+  private async handleCancelled(orderId: string): Promise<string> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM orders WHERE id = ${orderId}::uuid FOR UPDATE`;
 
-    await this.outboxService.put('notification', 'send-single', {
-      notificationId: notification.id,
+      const order = await tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        select: {
+          id: true,
+          status: true,
+          expiresAt: true,
+          userId: true,
+          concert: { select: { name: true } },
+        },
+      });
+
+      if (order.status === OrderStatus.PAID) {
+        this.logger.warn(
+          `CANCELLED webhook for already PAID order: ${order.id}. Ignoring.`,
+        );
+        return OrderStatus.PAID;
+      }
+
+      const alreadyReleased: OrderStatus[] = [
+        OrderStatus.PAYMENT_FAILED,
+        OrderStatus.EXPIRED,
+        OrderStatus.CANCELLED,
+        OrderStatus.REFUND_REQUIRED,
+      ];
+
+      if (alreadyReleased.includes(order.status as OrderStatus)) {
+        return order.status;
+      }
+
+      // Hủy order ngay lập tức và giải phóng ghế, không cần kiểm tra expiresAt vì người dùng đã chủ động hủy
+      const result = await this.txHelper.releaseOrder(
+        tx as any,
+        orderId,
+        OrderStatus.CANCELLED,
+        ReservationStatus.CANCELLED,
+      );
+
+      await tx.inAppNotification.create({
+        data: {
+          userId: order.userId,
+          title: "Thanh toán bị hủy",
+          message: `Giao dịch thanh toán cho đơn hàng vé concert "${order.concert.name}" đã bị hủy bỏ.`,
+          read: false,
+        },
+      });
+
+      if (result && result.releasedSeats) {
+        for (const seat of result.releasedSeats) {
+          const key = `hold:seat:${seat.concertId}:${seat.seatNumber}`;
+          try {
+            await this.redis.del(key);
+          } catch (err) {
+            this.logger.warn(
+              `Failed to delete Redis key on webhook order cancellation: ${(err as any).message}`,
+            );
+          }
+        }
+      }
+
+      return OrderStatus.CANCELLED;
     });
   }
 
@@ -565,11 +701,11 @@ export class PaymentsService {
   }
 
   private parseGatewayTimestamp(value: unknown): Date | null {
-    if (value === undefined || value === null || value === '') {
+    if (value === undefined || value === null || value === "") {
       return null;
     }
 
-    if (typeof value === 'number') {
+    if (typeof value === "number") {
       return this.dateFromEpoch(value);
     }
 
@@ -627,10 +763,10 @@ export class PaymentsService {
       where: { paymentRef },
     });
 
-    const isAdmin = requestingUser.roles.some((r) => r.name === 'admin');
+    const isAdmin = requestingUser.roles.some((r) => r.name === "admin");
 
     if (!order || (!isAdmin && order.userId !== requestingUser.id)) {
-      throw new NotFoundException('Payment not found');
+      throw new NotFoundException("Payment not found");
     }
 
     const dbTickets =
@@ -654,41 +790,50 @@ export class PaymentsService {
       paymentStatus: this.toPaymentStatus(order.status as OrderStatus),
       retryAction: this.toRetryAction(order.status as OrderStatus),
       totalAmount: order.totalAmount.toString(),
-      currency: 'VND',
+      currency: "VND",
       paidAt: order.paidAt?.toISOString() ?? null,
       expiresAt: order.expiresAt.toISOString(),
       tickets,
     };
   }
 
-  private buildPaymentIdempotencyKey(userId: string, idempotencyKey: string): string {
-    const digest = createHash('sha256')
+  private buildPaymentIdempotencyKey(
+    userId: string,
+    idempotencyKey: string,
+  ): string {
+    const digest = createHash("sha256")
       .update(`payments:create:${userId}:${idempotencyKey}`)
-      .digest('hex');
+      .digest("hex");
 
     return `pay:${digest}`;
   }
 
-  private amountMatches(expected: { toString(): string }, actual: number | string): boolean {
-    return this.gateway.normalizeAmount(expected.toString()) === this.gateway.normalizeAmount(actual);
+  private amountMatches(
+    expected: { toString(): string },
+    actual: number | string,
+  ): boolean {
+    return (
+      this.gateway.normalizeAmount(expected.toString()) ===
+      this.gateway.normalizeAmount(actual)
+    );
   }
 
   private toPaymentStatus(orderStatus: OrderStatus): string {
     switch (orderStatus) {
       case OrderStatus.PAID:
-        return 'SUCCEEDED';
+        return "SUCCEEDED";
       case OrderStatus.PAYMENT_FAILED:
-        return 'FAILED';
+        return "FAILED";
       case OrderStatus.EXPIRED:
       case OrderStatus.CANCELLED:
-        return 'EXPIRED';
+        return "EXPIRED";
       case OrderStatus.REFUND_REQUIRED:
-        return 'REFUND_REQUIRED';
+        return "REFUND_REQUIRED";
       case OrderStatus.PAYMENT_PROCESSING:
-        return 'PROCESSING';
+        return "PROCESSING";
       case OrderStatus.PENDING_PAYMENT:
       default:
-        return 'PENDING';
+        return "PENDING";
     }
   }
 
@@ -698,7 +843,7 @@ export class PaymentsService {
       orderStatus === OrderStatus.EXPIRED ||
       orderStatus === OrderStatus.CANCELLED
     ) {
-      return 'CREATE_NEW_ORDER';
+      return "CREATE_NEW_ORDER";
     }
 
     return undefined;

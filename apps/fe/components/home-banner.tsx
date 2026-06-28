@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getProfile } from '@/lib/api';
 import { NewsletterSignup } from './newsletter-signup';
+import { Reveal } from './reveal';
 import Link from 'next/link';
 import { Ticket, Sparkles, Compass } from 'lucide-react';
 
@@ -49,7 +50,7 @@ export function HomeBanner() {
         <div className="grid gap-8 rounded-[2rem] bg-foreground p-6 text-background md:grid-cols-[1fr_0.9fr] md:p-10">
           <div>
             <h2 className="max-w-xl text-3xl font-black tracking-tight md:text-4xl">Nhận thông báo khi show mới mở bán</h2>
-            <p className="mt-3 max-w-lg text-background/65">Theo dõi lịch mở bán theo nghệ sĩ và thành phố bạn quan tâm.</p>
+            <p className="mt-3 max-w-lg text-background/65">Theo dõi lịch mở bán theo nghệ sĩ bạn quan tâm.</p>
           </div>
           <div className="min-h-12 w-full bg-white/10 rounded-full animate-pulse self-center" />
         </div>
@@ -59,7 +60,7 @@ export function HomeBanner() {
 
   if (session) {
     return (
-      <section className="mx-auto max-w-7xl px-4 py-10">
+      <Reveal as="section" className="mx-auto max-w-7xl px-4 py-10">
         <div className="grid gap-8 rounded-[2rem] bg-gradient-to-r from-neutral-900 via-stone-900 to-zinc-950 p-6 text-white border border-white/5 md:grid-cols-[1.2fr_0.8fr] md:p-10 shadow-2xl relative overflow-hidden group">
           {/* Subtle glowing lights */}
           <div className="absolute -right-10 -top-10 size-48 rounded-full bg-primary/15 blur-[80px] group-hover:bg-primary/25 transition-all duration-700" />
@@ -95,20 +96,20 @@ export function HomeBanner() {
             </Link>
           </div>
         </div>
-      </section>
+      </Reveal>
     );
   }
 
   // Guest view
   return (
-    <section className="mx-auto max-w-7xl px-4 py-10">
+    <Reveal as="section" className="mx-auto max-w-7xl px-4 py-10">
       <div className="grid gap-8 rounded-[2rem] bg-foreground p-6 text-background md:grid-cols-[1fr_0.9fr] md:p-10">
         <div>
           <h2 className="max-w-xl text-3xl font-black tracking-tight md:text-4xl">Nhận thông báo khi show mới mở bán</h2>
-          <p className="mt-3 max-w-lg text-background/65">Theo dõi lịch mở bán theo nghệ sĩ và thành phố bạn quan tâm.</p>
+          <p className="mt-3 max-w-lg text-background/65">Theo dõi lịch mở bán theo nghệ sĩ bạn quan tâm.</p>
         </div>
         <NewsletterSignup />
       </div>
-    </section>
+    </Reveal>
   );
 }

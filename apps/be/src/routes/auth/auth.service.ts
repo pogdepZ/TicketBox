@@ -54,6 +54,17 @@ export class AuthService {
         },
       });
       await this.authCacheService.invalidateUser(user.id);
+      
+      // Tạo thông báo chào mừng in-app
+      await this.prismaService.inAppNotification.create({
+        data: {
+          userId: user.id,
+          title: "Chào mừng bạn đến với TicketBox",
+          message: "Đăng ký tài khoản thành công! Khám phá các concert và săn vé ngay nhé.",
+          read: false,
+        },
+      });
+
       return new UserResponseDto(user);
     } catch (error: any) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -72,9 +83,18 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
     const { password: userPassword, ...authUser } = user;
-    const isPasswordValid = await this.hashService.comparePassword(password, userPassword);
+        const isPasswordValid = await this.hashService.comparePassword(password, userPassword);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+    if (authUser.status === 'BLOCKED') {
+      throw new UnauthorizedException('User is blocked');
+    }
+    if (authUser.status === 'DELETED') {
+      throw new UnauthorizedException('User is deleted');
+    }
+    if (authUser.status !== 'ACTIVE') {
+      throw new UnauthorizedException('User is not active');
     }
     const payload: JwtPayload = { sub: authUser.id, email: authUser.email };
     const token = await this.generateTokens(payload);
@@ -109,6 +129,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
+    if (user.status === 'BLOCKED') {
+      throw new UnauthorizedException('User is blocked');
+    }
+    if (user.status === 'DELETED') {
+      throw new UnauthorizedException('User is deleted');
+    }
     if (user.status !== 'ACTIVE') {
       throw new UnauthorizedException('User is not active');
     }

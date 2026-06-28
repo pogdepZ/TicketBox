@@ -69,7 +69,7 @@ export class PaymentsController {
       provider: Provider;
       paymentRef: string;
       gatewayTransactionId: string;
-      eventType: 'SUCCESS' | 'FAILED' | 'TIMEOUT';
+      eventType: 'SUCCESS' | 'FAILED' | 'TIMEOUT' | 'CANCELLED';
       amount: number;
     },
   ) {
@@ -153,6 +153,8 @@ export class PaymentsController {
       return {
         RspCode: result.processed ? '00' : '99',
         Message: result.processed ? 'Confirm Success' : 'Confirm Fail',
+        orderStatus: result.orderStatus,
+        paymentStatus: result.paymentStatus,
       };
     }
 

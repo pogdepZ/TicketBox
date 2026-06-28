@@ -10,6 +10,7 @@ interface OrderSummaryProps {
   onPrimaryAction?: () => void;
   onChangeZone?: () => void;
   compact?: boolean;
+  zones?: TicketZone[];
 }
 
 export function OrderSummary({
@@ -21,25 +22,57 @@ export function OrderSummary({
   onPrimaryAction,
   onChangeZone,
   compact,
+  zones = [],
 }: OrderSummaryProps) {
   const quantity = selectedSeats.length;
-  const unitPrice = Number(selectedZone?.price ?? 0);
-  const subtotal = quantity * unitPrice;
-  const fee = 0;
-  const tax = 0;
+
+  // Tính tổng tiền chi tiết dựa trên giá từng ghế
+  const subtotal = selectedSeats.reduce((sum, seat) => {
+    const zone = zones.find((z) => z.id === seat.zoneId) || selectedZone;
+    return sum + Number(zone?.price ?? 0);
+  }, 0);
+
   const total = subtotal;
+
+  // Nhóm các ghế đã chọn theo TicketZone để hiển thị
+  const groupedSeats = selectedSeats.reduce((acc, seat) => {
+    const zone = zones.find((z) => z.id === seat.zoneId) || selectedZone;
+    const zoneId = zone?.id || 'unknown';
+    const zoneName = zone?.name || 'Chưa phân loại';
+    const zoneColor = zone?.color || '#cccccc';
+    const zonePrice = Number(zone?.price ?? 0);
+
+    if (!acc[zoneId]) {
+      acc[zoneId] = {
+        name: zoneName,
+        color: zoneColor,
+        price: zonePrice,
+        seats: [],
+      };
+    }
+    acc[zoneId].seats.push(seat);
+    return acc;
+  }, {} as Record<string, { name: string; color: string; price: number; seats: Seat[] }>);
+
+  const groupedList = Object.values(groupedSeats);
 
   if (compact) {
     return (
       <div className="rounded-t-3xl border border-border bg-card p-4 shadow-2xl shadow-foreground/15">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs text-muted-foreground">{selectedZone ? selectedZone.name : 'Chưa chọn khu'}</p>
-            <p className="font-bold text-foreground">
-              {selectedSeats.length > 0 ? `${selectedSeats.length} ghế: ${selectedSeats.map((seat) => seat.label).join(', ')}` : 'Chọn khu và ghế để tiếp tục'}
+            <p className="text-xs text-muted-foreground">
+              {groupedList.length > 0 
+                ? groupedList.map(g => `${g.name} (${g.seats.length} vé)`).join(', ') 
+                : 'Chưa chọn khu'}
+            </p>
+            <p className="font-bold text-foreground text-xs">
+              {selectedSeats.length > 0 
+                ? `Ghế: ${selectedSeats.map((seat) => seat.label).join(', ')}` 
+                : 'Chọn khu và ghế để tiếp tục'}
             </p>
           </div>
-          <p className="text-lg font-bold text-primary">{total.toLocaleString('vi-VN')}đ</p>
+          <p className="text-lg font-bold text-primary shrink-0">{total.toLocaleString('vi-VN')}đ</p>
         </div>
         {onPrimaryAction && (
           <button
@@ -72,47 +105,30 @@ export function OrderSummary({
         </div>
 
         <div>
-          <p className="text-sm text-muted-foreground">Hạng vé</p>
-          {selectedZone ? (
-            <div className="mt-1 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full" style={{ backgroundColor: selectedZone.color }} />
-                <p className="font-semibold text-foreground">{selectedZone.name}</p>
-              </div>
-              {onChangeZone && (
-                <button type="button" onClick={onChangeZone} className="text-xs font-semibold text-primary hover:text-primary/80">
-                  Đổi
-                </button>
-              )}
-            </div>
-          ) : (
-            <p className="font-semibold text-muted-foreground">Chưa chọn khu</p>
-          )}
-        </div>
-
-        {selectedZone && (
-          <div className="rounded-2xl bg-muted/60 p-3 text-sm text-muted-foreground">
-            <div className="flex justify-between gap-3">
-              <span>Giá vé</span>
-              <span className="font-semibold text-foreground">{Number(selectedZone.price).toLocaleString('vi-VN')}đ</span>
-            </div>
-            {selectedZone.remaining > 0 && (
-              <div className="mt-1 flex justify-between gap-3">
-                <span>Còn lại</span>
-                <span className="font-semibold text-foreground">{selectedZone.remaining.toLocaleString('vi-VN')} vé</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div>
-          <p className="text-sm text-muted-foreground">Ghế đã chọn</p>
-          {selectedSeats.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {selectedSeats.map((seat) => (
-                <span key={seat.id} className="rounded-full bg-primary/12 px-3 py-1 text-sm font-bold text-primary">
-                  {seat.label}
-                </span>
+          <p className="text-sm text-muted-foreground mb-2">Thông tin vé & Hạng vé</p>
+          {groupedList.length > 0 ? (
+            <div className="space-y-3">
+              {groupedList.map((g, idx) => (
+                <div key={idx} className="rounded-2xl bg-muted/60 p-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: g.color }} />
+                      <p className="font-bold text-foreground">{g.name}</p>
+                    </div>
+                    <span className="font-semibold text-muted-foreground">{g.seats.length} vé</span>
+                  </div>
+                  <div className="mt-1.5 flex justify-between text-xs text-muted-foreground">
+                    <span>Đơn giá: {g.price.toLocaleString('vi-VN')}đ</span>
+                    <span>Thành tiền: {(g.price * g.seats.length).toLocaleString('vi-VN')}đ</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5 border-t border-border/40 pt-2">
+                    {g.seats.map((seat) => (
+                      <span key={seat.id} className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">
+                        {seat.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           ) : (

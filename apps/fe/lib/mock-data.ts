@@ -62,6 +62,8 @@ export interface TicketZone {
   concertId?: string;
   seatZoneId?: string;
   ticketTypeId?: string;
+  code?: string;
+  maxPerUser?: number;
 }
 
 export interface Seat {
@@ -73,6 +75,7 @@ export interface Seat {
   zoneId: string;
   concertId?: string;
   seatZoneId?: string;
+  ticketTypeId?: string;
 }
 
 export interface MockReservationItem {
@@ -445,6 +448,7 @@ export function getTicketZonesByConcertId(concertId: string): TicketZone[] {
         concertId,
         seatZoneId: seatZone.id,
         ticketTypeId: ticketType.id,
+        code: seatZone.code,
       };
     });
 }

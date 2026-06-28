@@ -30,6 +30,7 @@ async function bootstrap() {
     const concert = await prisma.concert.create({
       data: {
         id: 'a35ba9c7-89e4-425c-9d00-8016ac4afc3d',
+        slug: 'son-tung-m-tp-sky-tour-2026',
         name: 'Sơn Tùng M-TP - Sky Tour 2026',
         venueName: 'SVĐ',
         venueAddress: 'HN',

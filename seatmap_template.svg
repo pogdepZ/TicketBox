@@ -1,0 +1,851 @@
+<svg width="800" height="1250" viewBox="0 0 800 1250" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background styling and stage glow effects -->
+    <linearGradient id="stageGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2d3748" />
+      <stop offset="50%" stop-color="#4a5568" />
+      <stop offset="100%" stop-color="#2d3748" />
+    </linearGradient>
+    <filter id="stageGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#4a5568" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- BACKGROUND -->
+  <rect width="800" height="1250" fill="#0f172a" />
+
+  <!-- STAGE -->
+  <rect x="200" y="20" width="400" height="60" rx="10" fill="url(#stageGrad)" stroke="#718096" stroke-width="2" filter="url(#stageGlow)" />
+  <text x="400" y="56" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="18" font-weight="black" letter-spacing="4">SÂN KHẤU / STAGE</text>
+  <path d="M 150 90 Q 400 120 650 90" fill="none" stroke="#4a5568" stroke-dasharray="5,5" stroke-width="2" opacity="0.6" />
+
+  <!-- ZONE: SVIP -->
+  <g id="zone-svip" data-zone-code="svip" data-price="2000000" data-ticket-name="SVIP" data-total-quantity="50">
+    <rect x="80" y="130" width="640" height="190" fill="none" stroke="#e5484d" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.4" rx="12" />
+    <text x="400" y="155" text-anchor="middle" fill="#e5484d" font-family="Arial, sans-serif" font-size="15" font-weight="bold">SVIP - 2.000.000 VND</text>
+    <text x="120" y="204" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">A</text>
+    <text x="680" y="204" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">A</text>
+    <rect id="seat-svip-a01" data-zone-code="svip" data-seat-number="A01" x="175" y="190" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế A01 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-a02" data-zone-code="svip" data-seat-number="A02" x="225" y="190" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế A02 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-a03" data-zone-code="svip" data-seat-number="A03" x="275" y="190" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế A03 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-a04" data-zone-code="svip" data-seat-number="A04" x="325" y="190" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế A04 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-a05" data-zone-code="svip" data-seat-number="A05" x="375" y="190" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế A05 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-a06" data-zone-code="svip" data-seat-number="A06" x="425" y="190" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế A06 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-a07" data-zone-code="svip" data-seat-number="A07" x="475" y="190" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế A07 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-a08" data-zone-code="svip" data-seat-number="A08" x="525" y="190" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế A08 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-a09" data-zone-code="svip" data-seat-number="A09" x="575" y="190" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế A09 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-a10" data-zone-code="svip" data-seat-number="A10" x="625" y="190" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế A10 (SVIP)</title>
+    </rect>
+    <text x="120" y="234" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">B</text>
+    <text x="680" y="234" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">B</text>
+    <rect id="seat-svip-b01" data-zone-code="svip" data-seat-number="B01" x="175" y="220" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế B01 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-b02" data-zone-code="svip" data-seat-number="B02" x="225" y="220" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế B02 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-b03" data-zone-code="svip" data-seat-number="B03" x="275" y="220" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế B03 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-b04" data-zone-code="svip" data-seat-number="B04" x="325" y="220" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế B04 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-b05" data-zone-code="svip" data-seat-number="B05" x="375" y="220" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế B05 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-b06" data-zone-code="svip" data-seat-number="B06" x="425" y="220" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế B06 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-b07" data-zone-code="svip" data-seat-number="B07" x="475" y="220" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế B07 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-b08" data-zone-code="svip" data-seat-number="B08" x="525" y="220" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế B08 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-b09" data-zone-code="svip" data-seat-number="B09" x="575" y="220" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế B09 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-b10" data-zone-code="svip" data-seat-number="B10" x="625" y="220" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế B10 (SVIP)</title>
+    </rect>
+    <text x="120" y="264" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">C</text>
+    <text x="680" y="264" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">C</text>
+    <rect id="seat-svip-c01" data-zone-code="svip" data-seat-number="C01" x="175" y="250" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế C01 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-c02" data-zone-code="svip" data-seat-number="C02" x="225" y="250" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế C02 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-c03" data-zone-code="svip" data-seat-number="C03" x="275" y="250" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế C03 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-c04" data-zone-code="svip" data-seat-number="C04" x="325" y="250" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế C04 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-c05" data-zone-code="svip" data-seat-number="C05" x="375" y="250" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế C05 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-c06" data-zone-code="svip" data-seat-number="C06" x="425" y="250" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế C06 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-c07" data-zone-code="svip" data-seat-number="C07" x="475" y="250" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế C07 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-c08" data-zone-code="svip" data-seat-number="C08" x="525" y="250" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế C08 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-c09" data-zone-code="svip" data-seat-number="C09" x="575" y="250" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế C09 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-c10" data-zone-code="svip" data-seat-number="C10" x="625" y="250" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế C10 (SVIP)</title>
+    </rect>
+    <text x="120" y="294" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">D</text>
+    <text x="680" y="294" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">D</text>
+    <rect id="seat-svip-d01" data-zone-code="svip" data-seat-number="D01" x="175" y="280" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế D01 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-d02" data-zone-code="svip" data-seat-number="D02" x="225" y="280" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế D02 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-d03" data-zone-code="svip" data-seat-number="D03" x="275" y="280" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế D03 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-d04" data-zone-code="svip" data-seat-number="D04" x="325" y="280" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế D04 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-d05" data-zone-code="svip" data-seat-number="D05" x="375" y="280" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế D05 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-d06" data-zone-code="svip" data-seat-number="D06" x="425" y="280" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế D06 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-d07" data-zone-code="svip" data-seat-number="D07" x="475" y="280" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế D07 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-d08" data-zone-code="svip" data-seat-number="D08" x="525" y="280" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế D08 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-d09" data-zone-code="svip" data-seat-number="D09" x="575" y="280" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế D09 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-d10" data-zone-code="svip" data-seat-number="D10" x="625" y="280" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế D10 (SVIP)</title>
+    </rect>
+    <text x="120" y="324" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">E</text>
+    <text x="680" y="324" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">E</text>
+    <rect id="seat-svip-e01" data-zone-code="svip" data-seat-number="E01" x="175" y="310" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế E01 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-e02" data-zone-code="svip" data-seat-number="E02" x="225" y="310" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế E02 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-e03" data-zone-code="svip" data-seat-number="E03" x="275" y="310" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế E03 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-e04" data-zone-code="svip" data-seat-number="E04" x="325" y="310" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế E04 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-e05" data-zone-code="svip" data-seat-number="E05" x="375" y="310" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế E05 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-e06" data-zone-code="svip" data-seat-number="E06" x="425" y="310" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế E06 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-e07" data-zone-code="svip" data-seat-number="E07" x="475" y="310" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế E07 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-e08" data-zone-code="svip" data-seat-number="E08" x="525" y="310" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế E08 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-e09" data-zone-code="svip" data-seat-number="E09" x="575" y="310" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế E09 (SVIP)</title>
+    </rect>
+    <rect id="seat-svip-e10" data-zone-code="svip" data-seat-number="E10" x="625" y="310" width="20" height="20" rx="4" fill="#e5484d" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế E10 (SVIP)</title>
+    </rect>
+  </g>
+
+  <!-- ZONE: VIP -->
+  <g id="zone-vip" data-zone-code="vip" data-price="1500000" data-ticket-name="VIP" data-total-quantity="50">
+    <rect x="80" y="340" width="640" height="190" fill="none" stroke="#e0a82e" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.4" rx="12" />
+    <text x="400" y="365" text-anchor="middle" fill="#e0a82e" font-family="Arial, sans-serif" font-size="15" font-weight="bold">VIP - 1.500.000 VND</text>
+    <text x="120" y="414" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">F</text>
+    <text x="680" y="414" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">F</text>
+    <rect id="seat-vip-f01" data-zone-code="vip" data-seat-number="F01" x="175" y="400" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế F01 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-f02" data-zone-code="vip" data-seat-number="F02" x="225" y="400" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế F02 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-f03" data-zone-code="vip" data-seat-number="F03" x="275" y="400" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế F03 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-f04" data-zone-code="vip" data-seat-number="F04" x="325" y="400" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế F04 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-f05" data-zone-code="vip" data-seat-number="F05" x="375" y="400" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế F05 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-f06" data-zone-code="vip" data-seat-number="F06" x="425" y="400" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế F06 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-f07" data-zone-code="vip" data-seat-number="F07" x="475" y="400" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế F07 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-f08" data-zone-code="vip" data-seat-number="F08" x="525" y="400" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế F08 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-f09" data-zone-code="vip" data-seat-number="F09" x="575" y="400" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế F09 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-f10" data-zone-code="vip" data-seat-number="F10" x="625" y="400" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế F10 (VIP)</title>
+    </rect>
+    <text x="120" y="444" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">G</text>
+    <text x="680" y="444" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">G</text>
+    <rect id="seat-vip-g01" data-zone-code="vip" data-seat-number="G01" x="175" y="430" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế G01 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-g02" data-zone-code="vip" data-seat-number="G02" x="225" y="430" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế G02 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-g03" data-zone-code="vip" data-seat-number="G03" x="275" y="430" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế G03 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-g04" data-zone-code="vip" data-seat-number="G04" x="325" y="430" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế G04 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-g05" data-zone-code="vip" data-seat-number="G05" x="375" y="430" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế G05 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-g06" data-zone-code="vip" data-seat-number="G06" x="425" y="430" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế G06 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-g07" data-zone-code="vip" data-seat-number="G07" x="475" y="430" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế G07 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-g08" data-zone-code="vip" data-seat-number="G08" x="525" y="430" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế G08 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-g09" data-zone-code="vip" data-seat-number="G09" x="575" y="430" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế G09 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-g10" data-zone-code="vip" data-seat-number="G10" x="625" y="430" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế G10 (VIP)</title>
+    </rect>
+    <text x="120" y="474" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">H</text>
+    <text x="680" y="474" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">H</text>
+    <rect id="seat-vip-h01" data-zone-code="vip" data-seat-number="H01" x="175" y="460" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế H01 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-h02" data-zone-code="vip" data-seat-number="H02" x="225" y="460" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế H02 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-h03" data-zone-code="vip" data-seat-number="H03" x="275" y="460" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế H03 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-h04" data-zone-code="vip" data-seat-number="H04" x="325" y="460" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế H04 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-h05" data-zone-code="vip" data-seat-number="H05" x="375" y="460" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế H05 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-h06" data-zone-code="vip" data-seat-number="H06" x="425" y="460" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế H06 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-h07" data-zone-code="vip" data-seat-number="H07" x="475" y="460" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế H07 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-h08" data-zone-code="vip" data-seat-number="H08" x="525" y="460" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế H08 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-h09" data-zone-code="vip" data-seat-number="H09" x="575" y="460" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế H09 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-h10" data-zone-code="vip" data-seat-number="H10" x="625" y="460" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế H10 (VIP)</title>
+    </rect>
+    <text x="120" y="504" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">J</text>
+    <text x="680" y="504" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">J</text>
+    <rect id="seat-vip-j01" data-zone-code="vip" data-seat-number="J01" x="175" y="490" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế J01 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-j02" data-zone-code="vip" data-seat-number="J02" x="225" y="490" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế J02 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-j03" data-zone-code="vip" data-seat-number="J03" x="275" y="490" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế J03 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-j04" data-zone-code="vip" data-seat-number="J04" x="325" y="490" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế J04 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-j05" data-zone-code="vip" data-seat-number="J05" x="375" y="490" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế J05 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-j06" data-zone-code="vip" data-seat-number="J06" x="425" y="490" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế J06 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-j07" data-zone-code="vip" data-seat-number="J07" x="475" y="490" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế J07 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-j08" data-zone-code="vip" data-seat-number="J08" x="525" y="490" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế J08 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-j09" data-zone-code="vip" data-seat-number="J09" x="575" y="490" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế J09 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-j10" data-zone-code="vip" data-seat-number="J10" x="625" y="490" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế J10 (VIP)</title>
+    </rect>
+    <text x="120" y="534" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">K</text>
+    <text x="680" y="534" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">K</text>
+    <rect id="seat-vip-k01" data-zone-code="vip" data-seat-number="K01" x="175" y="520" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế K01 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-k02" data-zone-code="vip" data-seat-number="K02" x="225" y="520" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế K02 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-k03" data-zone-code="vip" data-seat-number="K03" x="275" y="520" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế K03 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-k04" data-zone-code="vip" data-seat-number="K04" x="325" y="520" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế K04 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-k05" data-zone-code="vip" data-seat-number="K05" x="375" y="520" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế K05 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-k06" data-zone-code="vip" data-seat-number="K06" x="425" y="520" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế K06 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-k07" data-zone-code="vip" data-seat-number="K07" x="475" y="520" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế K07 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-k08" data-zone-code="vip" data-seat-number="K08" x="525" y="520" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế K08 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-k09" data-zone-code="vip" data-seat-number="K09" x="575" y="520" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế K09 (VIP)</title>
+    </rect>
+    <rect id="seat-vip-k10" data-zone-code="vip" data-seat-number="K10" x="625" y="520" width="20" height="20" rx="4" fill="#e0a82e" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế K10 (VIP)</title>
+    </rect>
+  </g>
+
+  <!-- ZONE: CAT1 -->
+  <g id="zone-cat1" data-zone-code="cat1" data-price="1000000" data-ticket-name="CAT1" data-total-quantity="50">
+    <rect x="80" y="550" width="640" height="190" fill="none" stroke="#3d6f8f" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.4" rx="12" />
+    <text x="400" y="575" text-anchor="middle" fill="#3d6f8f" font-family="Arial, sans-serif" font-size="15" font-weight="bold">CAT1 - 1.000.000 VND</text>
+    <text x="120" y="624" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">L</text>
+    <text x="680" y="624" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">L</text>
+    <rect id="seat-cat1-l01" data-zone-code="cat1" data-seat-number="L01" x="175" y="610" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế L01 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-l02" data-zone-code="cat1" data-seat-number="L02" x="225" y="610" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế L02 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-l03" data-zone-code="cat1" data-seat-number="L03" x="275" y="610" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế L03 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-l04" data-zone-code="cat1" data-seat-number="L04" x="325" y="610" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế L04 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-l05" data-zone-code="cat1" data-seat-number="L05" x="375" y="610" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế L05 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-l06" data-zone-code="cat1" data-seat-number="L06" x="425" y="610" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế L06 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-l07" data-zone-code="cat1" data-seat-number="L07" x="475" y="610" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế L07 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-l08" data-zone-code="cat1" data-seat-number="L08" x="525" y="610" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế L08 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-l09" data-zone-code="cat1" data-seat-number="L09" x="575" y="610" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế L09 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-l10" data-zone-code="cat1" data-seat-number="L10" x="625" y="610" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế L10 (CAT1)</title>
+    </rect>
+    <text x="120" y="654" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">M</text>
+    <text x="680" y="654" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">M</text>
+    <rect id="seat-cat1-m01" data-zone-code="cat1" data-seat-number="M01" x="175" y="640" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế M01 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-m02" data-zone-code="cat1" data-seat-number="M02" x="225" y="640" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế M02 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-m03" data-zone-code="cat1" data-seat-number="M03" x="275" y="640" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế M03 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-m04" data-zone-code="cat1" data-seat-number="M04" x="325" y="640" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế M04 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-m05" data-zone-code="cat1" data-seat-number="M05" x="375" y="640" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế M05 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-m06" data-zone-code="cat1" data-seat-number="M06" x="425" y="640" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế M06 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-m07" data-zone-code="cat1" data-seat-number="M07" x="475" y="640" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế M07 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-m08" data-zone-code="cat1" data-seat-number="M08" x="525" y="640" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế M08 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-m09" data-zone-code="cat1" data-seat-number="M09" x="575" y="640" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế M09 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-m10" data-zone-code="cat1" data-seat-number="M10" x="625" y="640" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế M10 (CAT1)</title>
+    </rect>
+    <text x="120" y="684" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">N</text>
+    <text x="680" y="684" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">N</text>
+    <rect id="seat-cat1-n01" data-zone-code="cat1" data-seat-number="N01" x="175" y="670" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế N01 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-n02" data-zone-code="cat1" data-seat-number="N02" x="225" y="670" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế N02 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-n03" data-zone-code="cat1" data-seat-number="N03" x="275" y="670" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế N03 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-n04" data-zone-code="cat1" data-seat-number="N04" x="325" y="670" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế N04 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-n05" data-zone-code="cat1" data-seat-number="N05" x="375" y="670" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế N05 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-n06" data-zone-code="cat1" data-seat-number="N06" x="425" y="670" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế N06 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-n07" data-zone-code="cat1" data-seat-number="N07" x="475" y="670" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế N07 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-n08" data-zone-code="cat1" data-seat-number="N08" x="525" y="670" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế N08 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-n09" data-zone-code="cat1" data-seat-number="N09" x="575" y="670" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế N09 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-n10" data-zone-code="cat1" data-seat-number="N10" x="625" y="670" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế N10 (CAT1)</title>
+    </rect>
+    <text x="120" y="714" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">P</text>
+    <text x="680" y="714" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">P</text>
+    <rect id="seat-cat1-p01" data-zone-code="cat1" data-seat-number="P01" x="175" y="700" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế P01 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-p02" data-zone-code="cat1" data-seat-number="P02" x="225" y="700" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế P02 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-p03" data-zone-code="cat1" data-seat-number="P03" x="275" y="700" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế P03 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-p04" data-zone-code="cat1" data-seat-number="P04" x="325" y="700" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế P04 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-p05" data-zone-code="cat1" data-seat-number="P05" x="375" y="700" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế P05 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-p06" data-zone-code="cat1" data-seat-number="P06" x="425" y="700" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế P06 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-p07" data-zone-code="cat1" data-seat-number="P07" x="475" y="700" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế P07 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-p08" data-zone-code="cat1" data-seat-number="P08" x="525" y="700" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế P08 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-p09" data-zone-code="cat1" data-seat-number="P09" x="575" y="700" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế P09 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-p10" data-zone-code="cat1" data-seat-number="P10" x="625" y="700" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế P10 (CAT1)</title>
+    </rect>
+    <text x="120" y="744" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">Q</text>
+    <text x="680" y="744" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">Q</text>
+    <rect id="seat-cat1-q01" data-zone-code="cat1" data-seat-number="Q01" x="175" y="730" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Q01 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-q02" data-zone-code="cat1" data-seat-number="Q02" x="225" y="730" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Q02 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-q03" data-zone-code="cat1" data-seat-number="Q03" x="275" y="730" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Q03 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-q04" data-zone-code="cat1" data-seat-number="Q04" x="325" y="730" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Q04 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-q05" data-zone-code="cat1" data-seat-number="Q05" x="375" y="730" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Q05 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-q06" data-zone-code="cat1" data-seat-number="Q06" x="425" y="730" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Q06 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-q07" data-zone-code="cat1" data-seat-number="Q07" x="475" y="730" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Q07 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-q08" data-zone-code="cat1" data-seat-number="Q08" x="525" y="730" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Q08 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-q09" data-zone-code="cat1" data-seat-number="Q09" x="575" y="730" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Q09 (CAT1)</title>
+    </rect>
+    <rect id="seat-cat1-q10" data-zone-code="cat1" data-seat-number="Q10" x="625" y="730" width="20" height="20" rx="4" fill="#3d6f8f" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Q10 (CAT1)</title>
+    </rect>
+  </g>
+
+  <!-- ZONE: CAT2 -->
+  <g id="zone-cat2" data-zone-code="cat2" data-price="700000" data-ticket-name="CAT2" data-total-quantity="50">
+    <rect x="80" y="760" width="640" height="190" fill="none" stroke="#123c3a" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.4" rx="12" />
+    <text x="400" y="785" text-anchor="middle" fill="#123c3a" font-family="Arial, sans-serif" font-size="15" font-weight="bold">CAT2 - 700.000 VND</text>
+    <text x="120" y="834" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">R</text>
+    <text x="680" y="834" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">R</text>
+    <rect id="seat-cat2-r01" data-zone-code="cat2" data-seat-number="R01" x="175" y="820" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế R01 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-r02" data-zone-code="cat2" data-seat-number="R02" x="225" y="820" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế R02 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-r03" data-zone-code="cat2" data-seat-number="R03" x="275" y="820" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế R03 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-r04" data-zone-code="cat2" data-seat-number="R04" x="325" y="820" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế R04 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-r05" data-zone-code="cat2" data-seat-number="R05" x="375" y="820" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế R05 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-r06" data-zone-code="cat2" data-seat-number="R06" x="425" y="820" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế R06 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-r07" data-zone-code="cat2" data-seat-number="R07" x="475" y="820" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế R07 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-r08" data-zone-code="cat2" data-seat-number="R08" x="525" y="820" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế R08 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-r09" data-zone-code="cat2" data-seat-number="R09" x="575" y="820" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế R09 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-r10" data-zone-code="cat2" data-seat-number="R10" x="625" y="820" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế R10 (CAT2)</title>
+    </rect>
+    <text x="120" y="864" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">S</text>
+    <text x="680" y="864" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">S</text>
+    <rect id="seat-cat2-s01" data-zone-code="cat2" data-seat-number="S01" x="175" y="850" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế S01 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-s02" data-zone-code="cat2" data-seat-number="S02" x="225" y="850" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế S02 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-s03" data-zone-code="cat2" data-seat-number="S03" x="275" y="850" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế S03 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-s04" data-zone-code="cat2" data-seat-number="S04" x="325" y="850" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế S04 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-s05" data-zone-code="cat2" data-seat-number="S05" x="375" y="850" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế S05 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-s06" data-zone-code="cat2" data-seat-number="S06" x="425" y="850" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế S06 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-s07" data-zone-code="cat2" data-seat-number="S07" x="475" y="850" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế S07 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-s08" data-zone-code="cat2" data-seat-number="S08" x="525" y="850" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế S08 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-s09" data-zone-code="cat2" data-seat-number="S09" x="575" y="850" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế S09 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-s10" data-zone-code="cat2" data-seat-number="S10" x="625" y="850" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế S10 (CAT2)</title>
+    </rect>
+    <text x="120" y="894" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">T</text>
+    <text x="680" y="894" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">T</text>
+    <rect id="seat-cat2-t01" data-zone-code="cat2" data-seat-number="T01" x="175" y="880" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế T01 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-t02" data-zone-code="cat2" data-seat-number="T02" x="225" y="880" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế T02 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-t03" data-zone-code="cat2" data-seat-number="T03" x="275" y="880" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế T03 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-t04" data-zone-code="cat2" data-seat-number="T04" x="325" y="880" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế T04 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-t05" data-zone-code="cat2" data-seat-number="T05" x="375" y="880" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế T05 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-t06" data-zone-code="cat2" data-seat-number="T06" x="425" y="880" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế T06 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-t07" data-zone-code="cat2" data-seat-number="T07" x="475" y="880" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế T07 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-t08" data-zone-code="cat2" data-seat-number="T08" x="525" y="880" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế T08 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-t09" data-zone-code="cat2" data-seat-number="T09" x="575" y="880" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế T09 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-t10" data-zone-code="cat2" data-seat-number="T10" x="625" y="880" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế T10 (CAT2)</title>
+    </rect>
+    <text x="120" y="924" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">U</text>
+    <text x="680" y="924" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">U</text>
+    <rect id="seat-cat2-u01" data-zone-code="cat2" data-seat-number="U01" x="175" y="910" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế U01 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-u02" data-zone-code="cat2" data-seat-number="U02" x="225" y="910" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế U02 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-u03" data-zone-code="cat2" data-seat-number="U03" x="275" y="910" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế U03 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-u04" data-zone-code="cat2" data-seat-number="U04" x="325" y="910" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế U04 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-u05" data-zone-code="cat2" data-seat-number="U05" x="375" y="910" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế U05 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-u06" data-zone-code="cat2" data-seat-number="U06" x="425" y="910" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế U06 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-u07" data-zone-code="cat2" data-seat-number="U07" x="475" y="910" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế U07 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-u08" data-zone-code="cat2" data-seat-number="U08" x="525" y="910" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế U08 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-u09" data-zone-code="cat2" data-seat-number="U09" x="575" y="910" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế U09 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-u10" data-zone-code="cat2" data-seat-number="U10" x="625" y="910" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế U10 (CAT2)</title>
+    </rect>
+    <text x="120" y="954" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">V</text>
+    <text x="680" y="954" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">V</text>
+    <rect id="seat-cat2-v01" data-zone-code="cat2" data-seat-number="V01" x="175" y="940" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế V01 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-v02" data-zone-code="cat2" data-seat-number="V02" x="225" y="940" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế V02 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-v03" data-zone-code="cat2" data-seat-number="V03" x="275" y="940" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế V03 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-v04" data-zone-code="cat2" data-seat-number="V04" x="325" y="940" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế V04 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-v05" data-zone-code="cat2" data-seat-number="V05" x="375" y="940" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế V05 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-v06" data-zone-code="cat2" data-seat-number="V06" x="425" y="940" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế V06 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-v07" data-zone-code="cat2" data-seat-number="V07" x="475" y="940" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế V07 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-v08" data-zone-code="cat2" data-seat-number="V08" x="525" y="940" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế V08 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-v09" data-zone-code="cat2" data-seat-number="V09" x="575" y="940" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế V09 (CAT2)</title>
+    </rect>
+    <rect id="seat-cat2-v10" data-zone-code="cat2" data-seat-number="V10" x="625" y="940" width="20" height="20" rx="4" fill="#123c3a" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế V10 (CAT2)</title>
+    </rect>
+  </g>
+
+  <!-- ZONE: GA -->
+  <g id="zone-ga" data-zone-code="ga" data-price="400000" data-ticket-name="GA" data-total-quantity="50">
+    <rect x="80" y="970" width="640" height="190" fill="none" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.4" rx="12" />
+    <text x="400" y="995" text-anchor="middle" fill="#64748b" font-family="Arial, sans-serif" font-size="15" font-weight="bold">GA - 400.000 VND</text>
+    <text x="120" y="1044" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">W</text>
+    <text x="680" y="1044" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">W</text>
+    <rect id="seat-ga-w01" data-zone-code="ga" data-seat-number="W01" x="175" y="1030" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế W01 (GA)</title>
+    </rect>
+    <rect id="seat-ga-w02" data-zone-code="ga" data-seat-number="W02" x="225" y="1030" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế W02 (GA)</title>
+    </rect>
+    <rect id="seat-ga-w03" data-zone-code="ga" data-seat-number="W03" x="275" y="1030" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế W03 (GA)</title>
+    </rect>
+    <rect id="seat-ga-w04" data-zone-code="ga" data-seat-number="W04" x="325" y="1030" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế W04 (GA)</title>
+    </rect>
+    <rect id="seat-ga-w05" data-zone-code="ga" data-seat-number="W05" x="375" y="1030" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế W05 (GA)</title>
+    </rect>
+    <rect id="seat-ga-w06" data-zone-code="ga" data-seat-number="W06" x="425" y="1030" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế W06 (GA)</title>
+    </rect>
+    <rect id="seat-ga-w07" data-zone-code="ga" data-seat-number="W07" x="475" y="1030" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế W07 (GA)</title>
+    </rect>
+    <rect id="seat-ga-w08" data-zone-code="ga" data-seat-number="W08" x="525" y="1030" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế W08 (GA)</title>
+    </rect>
+    <rect id="seat-ga-w09" data-zone-code="ga" data-seat-number="W09" x="575" y="1030" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế W09 (GA)</title>
+    </rect>
+    <rect id="seat-ga-w10" data-zone-code="ga" data-seat-number="W10" x="625" y="1030" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế W10 (GA)</title>
+    </rect>
+    <text x="120" y="1074" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">X</text>
+    <text x="680" y="1074" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">X</text>
+    <rect id="seat-ga-x01" data-zone-code="ga" data-seat-number="X01" x="175" y="1060" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế X01 (GA)</title>
+    </rect>
+    <rect id="seat-ga-x02" data-zone-code="ga" data-seat-number="X02" x="225" y="1060" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế X02 (GA)</title>
+    </rect>
+    <rect id="seat-ga-x03" data-zone-code="ga" data-seat-number="X03" x="275" y="1060" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế X03 (GA)</title>
+    </rect>
+    <rect id="seat-ga-x04" data-zone-code="ga" data-seat-number="X04" x="325" y="1060" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế X04 (GA)</title>
+    </rect>
+    <rect id="seat-ga-x05" data-zone-code="ga" data-seat-number="X05" x="375" y="1060" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế X05 (GA)</title>
+    </rect>
+    <rect id="seat-ga-x06" data-zone-code="ga" data-seat-number="X06" x="425" y="1060" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế X06 (GA)</title>
+    </rect>
+    <rect id="seat-ga-x07" data-zone-code="ga" data-seat-number="X07" x="475" y="1060" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế X07 (GA)</title>
+    </rect>
+    <rect id="seat-ga-x08" data-zone-code="ga" data-seat-number="X08" x="525" y="1060" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế X08 (GA)</title>
+    </rect>
+    <rect id="seat-ga-x09" data-zone-code="ga" data-seat-number="X09" x="575" y="1060" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế X09 (GA)</title>
+    </rect>
+    <rect id="seat-ga-x10" data-zone-code="ga" data-seat-number="X10" x="625" y="1060" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế X10 (GA)</title>
+    </rect>
+    <text x="120" y="1104" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">Y</text>
+    <text x="680" y="1104" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">Y</text>
+    <rect id="seat-ga-y01" data-zone-code="ga" data-seat-number="Y01" x="175" y="1090" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Y01 (GA)</title>
+    </rect>
+    <rect id="seat-ga-y02" data-zone-code="ga" data-seat-number="Y02" x="225" y="1090" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Y02 (GA)</title>
+    </rect>
+    <rect id="seat-ga-y03" data-zone-code="ga" data-seat-number="Y03" x="275" y="1090" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Y03 (GA)</title>
+    </rect>
+    <rect id="seat-ga-y04" data-zone-code="ga" data-seat-number="Y04" x="325" y="1090" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Y04 (GA)</title>
+    </rect>
+    <rect id="seat-ga-y05" data-zone-code="ga" data-seat-number="Y05" x="375" y="1090" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Y05 (GA)</title>
+    </rect>
+    <rect id="seat-ga-y06" data-zone-code="ga" data-seat-number="Y06" x="425" y="1090" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Y06 (GA)</title>
+    </rect>
+    <rect id="seat-ga-y07" data-zone-code="ga" data-seat-number="Y07" x="475" y="1090" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Y07 (GA)</title>
+    </rect>
+    <rect id="seat-ga-y08" data-zone-code="ga" data-seat-number="Y08" x="525" y="1090" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Y08 (GA)</title>
+    </rect>
+    <rect id="seat-ga-y09" data-zone-code="ga" data-seat-number="Y09" x="575" y="1090" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Y09 (GA)</title>
+    </rect>
+    <rect id="seat-ga-y10" data-zone-code="ga" data-seat-number="Y10" x="625" y="1090" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Y10 (GA)</title>
+    </rect>
+    <text x="120" y="1134" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">Z</text>
+    <text x="680" y="1134" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">Z</text>
+    <rect id="seat-ga-z01" data-zone-code="ga" data-seat-number="Z01" x="175" y="1120" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Z01 (GA)</title>
+    </rect>
+    <rect id="seat-ga-z02" data-zone-code="ga" data-seat-number="Z02" x="225" y="1120" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Z02 (GA)</title>
+    </rect>
+    <rect id="seat-ga-z03" data-zone-code="ga" data-seat-number="Z03" x="275" y="1120" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Z03 (GA)</title>
+    </rect>
+    <rect id="seat-ga-z04" data-zone-code="ga" data-seat-number="Z04" x="325" y="1120" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Z04 (GA)</title>
+    </rect>
+    <rect id="seat-ga-z05" data-zone-code="ga" data-seat-number="Z05" x="375" y="1120" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Z05 (GA)</title>
+    </rect>
+    <rect id="seat-ga-z06" data-zone-code="ga" data-seat-number="Z06" x="425" y="1120" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Z06 (GA)</title>
+    </rect>
+    <rect id="seat-ga-z07" data-zone-code="ga" data-seat-number="Z07" x="475" y="1120" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Z07 (GA)</title>
+    </rect>
+    <rect id="seat-ga-z08" data-zone-code="ga" data-seat-number="Z08" x="525" y="1120" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Z08 (GA)</title>
+    </rect>
+    <rect id="seat-ga-z09" data-zone-code="ga" data-seat-number="Z09" x="575" y="1120" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Z09 (GA)</title>
+    </rect>
+    <rect id="seat-ga-z10" data-zone-code="ga" data-seat-number="Z10" x="625" y="1120" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế Z10 (GA)</title>
+    </rect>
+    <text x="120" y="1164" text-anchor="end" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">AA</text>
+    <text x="680" y="1164" text-anchor="start" fill="#94a3b8" font-family="Arial, sans-serif" font-size="11" font-weight="bold" opacity="0.7">AA</text>
+    <rect id="seat-ga-aa01" data-zone-code="ga" data-seat-number="AA01" x="175" y="1150" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế AA01 (GA)</title>
+    </rect>
+    <rect id="seat-ga-aa02" data-zone-code="ga" data-seat-number="AA02" x="225" y="1150" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế AA02 (GA)</title>
+    </rect>
+    <rect id="seat-ga-aa03" data-zone-code="ga" data-seat-number="AA03" x="275" y="1150" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế AA03 (GA)</title>
+    </rect>
+    <rect id="seat-ga-aa04" data-zone-code="ga" data-seat-number="AA04" x="325" y="1150" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế AA04 (GA)</title>
+    </rect>
+    <rect id="seat-ga-aa05" data-zone-code="ga" data-seat-number="AA05" x="375" y="1150" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế AA05 (GA)</title>
+    </rect>
+    <rect id="seat-ga-aa06" data-zone-code="ga" data-seat-number="AA06" x="425" y="1150" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế AA06 (GA)</title>
+    </rect>
+    <rect id="seat-ga-aa07" data-zone-code="ga" data-seat-number="AA07" x="475" y="1150" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế AA07 (GA)</title>
+    </rect>
+    <rect id="seat-ga-aa08" data-zone-code="ga" data-seat-number="AA08" x="525" y="1150" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế AA08 (GA)</title>
+    </rect>
+    <rect id="seat-ga-aa09" data-zone-code="ga" data-seat-number="AA09" x="575" y="1150" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế AA09 (GA)</title>
+    </rect>
+    <rect id="seat-ga-aa10" data-zone-code="ga" data-seat-number="AA10" x="625" y="1150" width="20" height="20" rx="4" fill="#64748b" opacity="0.85" stroke="#ffffff" stroke-width="0.5" cursor="pointer">
+      <title>Ghế AA10 (GA)</title>
+    </rect>
+  </g>
+</svg>

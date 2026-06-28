@@ -38,6 +38,13 @@ const environmentSchema = z.object({
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().optional(),
   GEMINI_MAX_TOKENS: z.coerce.number().int().positive().optional(),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_SECURE: z.string().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  MAIL_FROM: z.string().optional(),
+  APP_BASE_URL: z.string().url().optional(),
 });
 
 export function validate(config: Record<string, unknown>) {

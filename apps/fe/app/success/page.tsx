@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { ETicketCard } from '@/components/eticket-card';
-import { getStoredMockOrder, StoredMockOrder } from '@/lib/mock-reservation';
+import { getStoredMockOrder, StoredMockOrder } from '@/lib/draft-reservation';
 import { getOrderById, addLocalNotification } from '@/lib/api';
 import Link from 'next/link';
 import { CheckCircle, XCircle, Download, Share2, HomeIcon, ArrowRight } from 'lucide-react';
@@ -51,7 +51,7 @@ export default function SuccessPage() {
               const concertData = await getConcertById(fetchedOrder.concertId);
               if (concertData) {
                 concertTitle = concertData.title;
-                concertVenue = concertData.venue || concertData.venueAddress || 'TicketBox Arena';
+                concertVenue = concertData.venue || concertData.city || 'TicketBox Arena';
                 concertDate = concertData.date || fetchedOrder.createdAt;
               }
             } catch (err) {
@@ -278,6 +278,7 @@ export default function SuccessPage() {
                 seatNumber={ticket.seatNumber}
                 price={ticket.price}
                 purchaseDate={purchaseDate}
+                qrPayload={ticket.qrPayload}
               />
             ))}
           </div>

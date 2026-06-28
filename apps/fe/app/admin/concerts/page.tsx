@@ -1,37 +1,47 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { AdminLayout } from '@/components/admin-layout';
-import { ConcertTable } from '@/components/concert-table';
-import { getConcerts, cancelConcert, publishConcert } from '@/lib/api';
-import Link from 'next/link';
-import { Plus, Search, RefreshCw } from 'lucide-react';
-import { ConfirmModal } from '@/components/confirm-modal';
+import { useEffect, useState } from "react";
+import { AdminLayout } from "@/components/admin-layout";
+import { ConcertTable } from "@/components/concert-table";
+import {
+  getConcerts,
+  cancelConcert,
+  publishConcert,
+  getFriendlyErrorMessage,
+} from "@/lib/api";
+import Link from "next/link";
+import { Plus, Search, RefreshCw, Calendar } from "lucide-react";
+import { ConfirmModal } from "@/components/confirm-modal";
 
 export default function AdminConcertsPage() {
   const [concertsList, setConcertsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [keyword, setKeyword] = useState('');
+  const [keyword, setKeyword] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmConcertId, setConfirmConcertId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 10;
 
-  async function loadConcerts(searchKeyword = '') {
+  async function loadConcerts(searchKeyword = keyword, targetPage = 1) {
     setLoading(true);
     setError(null);
     try {
-      const res = await getConcerts({ keyword: searchKeyword });
+      const res = await getConcerts({ keyword: searchKeyword, page: targetPage, limit });
       setConcertsList(res.items || []);
+      setTotalPages(res.meta?.totalPages || 1);
+      setPage(res.meta?.page || targetPage);
     } catch (err: any) {
       console.error(err);
-      setError(err?.message || 'Không thể tải danh sách sự kiện.');
+      setError(err?.message || "Không thể tải danh sách sự kiện.");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadConcerts();
+    loadConcerts(keyword, 1);
   }, []);
 
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -39,35 +49,35 @@ export default function AdminConcertsPage() {
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') {
-      loadConcerts(keyword);
+    if (e.key === "Enter") {
+      loadConcerts(keyword, 1);
     }
   }
 
   async function handleToggleActive(id: string, currentStatus: string) {
-    const isActivating = currentStatus !== 'PUBLISHED';
+    const isActivating = currentStatus !== "PUBLISHED";
     if (isActivating) {
       try {
         await publishConcert(id);
         window.dispatchEvent(
-          new CustomEvent('ticketbox-toast', {
+          new CustomEvent("ticketbox-toast", {
             detail: {
-              title: 'Kích hoạt sự kiện thành công',
-              message: 'Sự kiện đã được xuất bản và hiển thị công khai!',
-              type: 'success',
+              title: "Kích hoạt sự kiện thành công",
+              message: "Sự kiện đã được xuất bản và hiển thị công khai!",
+              type: "success",
             },
-          })
+          }),
         );
-        loadConcerts(keyword);
+        loadConcerts(keyword, page);
       } catch (err: any) {
         window.dispatchEvent(
-          new CustomEvent('ticketbox-toast', {
+          new CustomEvent("ticketbox-toast", {
             detail: {
-              title: 'Kích hoạt thất bại',
-              message: err?.message || 'Không thể thay đổi trạng thái sự kiện.',
-              type: 'error',
+              title: "Kích hoạt thất bại",
+              message: getFriendlyErrorMessage(err),
+              type: "error",
             },
-          })
+          }),
         );
       }
     } else {
@@ -82,24 +92,24 @@ export default function AdminConcertsPage() {
     try {
       await cancelConcert(confirmConcertId);
       window.dispatchEvent(
-        new CustomEvent('ticketbox-toast', {
+        new CustomEvent("ticketbox-toast", {
           detail: {
-            title: 'Ngưng kích hoạt thành công',
-            message: 'Sự kiện đã được chuyển sang trạng thái Đã hủy.',
-            type: 'success',
+            title: "Ngưng kích hoạt thành công",
+            message: "Sự kiện đã được chuyển sang trạng thái Đã hủy.",
+            type: "success",
           },
-        })
+        }),
       );
-      loadConcerts(keyword);
+      loadConcerts(keyword, page);
     } catch (err: any) {
       window.dispatchEvent(
-        new CustomEvent('ticketbox-toast', {
+        new CustomEvent("ticketbox-toast", {
           detail: {
-            title: 'Ngưng kích hoạt thất bại',
-            message: err?.message || 'Không thể thay đổi trạng thái sự kiện.',
-            type: 'error',
+            title: "Ngưng kích hoạt thất bại",
+            message: getFriendlyErrorMessage(err),
+            type: "error",
           },
-        })
+        }),
       );
     } finally {
       setConfirmConcertId(null);
@@ -111,8 +121,13 @@ export default function AdminConcertsPage() {
       <div className="space-y-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-black tracking-tight text-foreground">Quản lý sự kiện</h1>
-            <p className="text-muted-foreground mt-1">Tất cả các sự kiện đang có trong hệ thống</p>
+            <h1 className="mb-2 text-4xl font-black tracking-tight text-foreground flex items-center gap-3">
+              <Calendar className="size-9 text-primary" />
+              Quản lý sự kiện
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Tất cả các sự kiện đang có trong hệ thống
+            </p>
           </div>
           <Link
             href="/admin/create-concert"
@@ -136,11 +151,11 @@ export default function AdminConcertsPage() {
             />
           </div>
           <button
-            onClick={() => loadConcerts(keyword)}
+            onClick={() => loadConcerts(keyword, 1)}
             disabled={loading}
             className="flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2 font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary active:scale-95 disabled:opacity-50 cursor-pointer"
           >
-            <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
             Tìm kiếm
           </button>
         </div>
@@ -161,7 +176,36 @@ export default function AdminConcertsPage() {
             Không tìm thấy sự kiện nào phù hợp.
           </div>
         ) : (
-          <ConcertTable concerts={concertsList} onToggleActive={handleToggleActive} />
+          <div className="space-y-6">
+            <ConcertTable
+              concerts={concertsList}
+              onToggleActive={handleToggleActive}
+            />
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-border/80 pt-6">
+                <span className="text-sm text-muted-foreground">
+                  Trang <strong className="text-foreground">{page}</strong> / <strong className="text-foreground">{totalPages}</strong>
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    disabled={page <= 1 || loading}
+                    onClick={() => loadConcerts(keyword, page - 1)}
+                    className="flex items-center gap-1 rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold text-foreground transition hover:border-primary/40 hover:text-primary disabled:opacity-40 cursor-pointer"
+                  >
+                    Trước
+                  </button>
+                  <button
+                    disabled={page >= totalPages || loading}
+                    onClick={() => loadConcerts(keyword, page + 1)}
+                    className="flex items-center gap-1 rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold text-foreground transition hover:border-primary/40 hover:text-primary disabled:opacity-40 cursor-pointer"
+                  >
+                    Sau
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 

@@ -1,43 +1,100 @@
 "use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { AdminLayout } from '@/components/admin-layout';
-import { createConcert, getFriendlyErrorMessage } from '@/lib/api';
-import { ArrowLeft, RefreshCw, AlertCircle, Plus, Trash2, Calendar, Clock } from 'lucide-react';
-import Link from 'next/link';
-import { DatePicker, TimePicker } from '@/components/date-time-picker';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { AdminLayout } from "@/components/admin-layout";
+import {
+  createConcert,
+  getFriendlyErrorMessage,
+  uploadConcertSeatMapSvg,
+  uploadConcertPoster,
+} from "@/lib/api";
+import {
+  ArrowLeft,
+  RefreshCw,
+  AlertCircle,
+  Plus,
+  Trash2,
+  Upload,
+} from "lucide-react";
+import Link from "next/link";
+import { DatePicker, TimePicker } from "@/components/date-time-picker";
+import { VIETNAM_PROVINCES } from "@/lib/constants";
 
 export default function CreateConcertPage() {
   const router = useRouter();
-  const [name, setName] = useState('');
-  const [artistName, setArtistName] = useState('');
-  const [description, setDescription] = useState('');
-  const [eventDate, setEventDate] = useState('');
-  const [eventTime, setEventTime] = useState('');
-  const [venueName, setVenueName] = useState('');
-  const [venueAddress, setVenueAddress] = useState('');
-  const [posterUrl, setPosterUrl] = useState('');
-  const [seatMapSvg, setSeatMapSvg] = useState('');
+  const [name, setName] = useState("");
+  const [artistName, setArtistName] = useState("");
+  const [description, setDescription] = useState("");
+  const [eventDate, setEventDate] = useState("");
+  const [eventTime, setEventTime] = useState("");
+  const [venueName, setVenueName] = useState("");
+  const [venueAddress, setVenueAddress] = useState("");
+  const [city, setCity] = useState("Thành phố Hồ Chí Minh");
+  const [posterUrl, setPosterUrl] = useState("");
+  const [seatMapSvgFile, setSeatMapSvgFile] = useState<File | null>(null);
+  const [uploadingPoster, setUploadingPoster] = useState(false);
 
-  const [ticketTypes, setTicketTypes] = useState<Array<{
-    name: string;
-    price: string;
-    totalQuantity: string;
-    maxPerUser: string;
-  }>>([
-    { name: 'SVIP', price: '1800000', totalQuantity: '50', maxPerUser: '4' },
-    { name: 'VIP', price: '1200000', totalQuantity: '100', maxPerUser: '4' },
-    { name: 'CAT1', price: '850000', totalQuantity: '150', maxPerUser: '4' },
-    { name: 'CAT2', price: '600000', totalQuantity: '200', maxPerUser: '4' },
-    { name: 'GA', price: '450000', totalQuantity: '300', maxPerUser: '4' },
+  async function handlePosterUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
+    if (!allowedTypes.includes(file.type.toLowerCase())) {
+      setError("File poster phải là định dạng hình ảnh (JPEG, PNG, WEBP, GIF).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("File poster không được vượt quá 5 MB.");
+      return;
+    }
+
+    setUploadingPoster(true);
+    setError("");
+    try {
+      const res = await uploadConcertPoster(file);
+      if (res && res.url) {
+        setPosterUrl(res.url);
+        window.dispatchEvent(
+          new CustomEvent("ticketbox-toast", {
+            detail: {
+              title: "Tải ảnh thành công",
+              message: "Poster sự kiện đã được tải lên MinIO.",
+              type: "success",
+            },
+          }),
+        );
+      }
+    } catch (err: any) {
+      setError(getFriendlyErrorMessage(err));
+    } finally {
+      setUploadingPoster(false);
+    }
+  }
+
+  const [ticketTypes, setTicketTypes] = useState<
+    Array<{
+      name: string;
+      price: string;
+      totalQuantity: string;
+      maxPerUser: string;
+    }>
+  >([
+    { name: "SVIP", price: "1800000", totalQuantity: "50", maxPerUser: "4" },
+    { name: "VIP", price: "1200000", totalQuantity: "100", maxPerUser: "4" },
+    { name: "CAT1", price: "850000", totalQuantity: "150", maxPerUser: "4" },
+    { name: "CAT2", price: "600000", totalQuantity: "200", maxPerUser: "4" },
+    { name: "GA", price: "450000", totalQuantity: "300", maxPerUser: "4" },
   ]);
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const addTicketType = () => {
-    setTicketTypes([...ticketTypes, { name: '', price: '', totalQuantity: '', maxPerUser: '4' }]);
+    setTicketTypes([
+      ...ticketTypes,
+      { name: "", price: "", totalQuantity: "", maxPerUser: "4" },
+    ]);
   };
 
   const removeTicketType = (index: number) => {
@@ -51,17 +108,28 @@ export default function CreateConcertPage() {
   };
 
   function validate() {
-    if (!name.trim()) return 'Vui lòng nhập tên sự kiện.';
-    if (!venueName.trim()) return 'Vui lòng nhập tên địa điểm.';
-    if (!venueAddress.trim()) return 'Vui lòng nhập địa chỉ địa điểm.';
-    if (!eventDate || !eventTime) return 'Vui lòng nhập đầy đủ ngày và giờ diễn ra.';
-    
+    if (!name.trim()) return "Vui lòng nhập tên sự kiện.";
+    if (!venueName.trim()) return "Vui lòng nhập tên địa điểm.";
+    if (!venueAddress.trim()) return "Vui lòng nhập địa chỉ địa điểm.";
+    if (!eventDate || !eventTime)
+      return "Vui lòng nhập đầy đủ ngày và giờ diễn ra.";
+
     const parsedDate = new Date(`${eventDate}T${eventTime}`);
     if (Number.isNaN(parsedDate.getTime())) {
-      return 'Thời gian diễn ra sự kiện không hợp lệ.';
+      return "Thời gian diễn ra sự kiện không hợp lệ.";
     }
     if (parsedDate.getTime() <= Date.now()) {
-      return 'Thời gian diễn ra sự kiện phải ở tương lai.';
+      return "Thời gian diễn ra sự kiện phải ở tương lai.";
+    }
+
+    if (seatMapSvgFile) {
+      const isSvg =
+        seatMapSvgFile.name.toLowerCase().endsWith(".svg") ||
+        seatMapSvgFile.type === "image/svg+xml";
+      if (!isSvg) return "File sơ đồ ghế phải là định dạng .svg.";
+      if (seatMapSvgFile.size > 1024 * 1024)
+        return "File SVG không được vượt quá 1 MB.";
+      return "";
     }
 
     for (let i = 0; i < ticketTypes.length; i++) {
@@ -82,13 +150,13 @@ export default function CreateConcertPage() {
         return `Số vé tối đa / user của hạng "${t.name}" không hợp lệ (phải là số nguyên >= 1).`;
       }
     }
-    
-    return '';
+
+    return "";
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    setError("");
 
     const validationMsg = validate();
     if (validationMsg) {
@@ -105,28 +173,37 @@ export default function CreateConcertPage() {
         artistName: artistName.trim() || undefined,
         venueName: venueName.trim(),
         venueAddress: venueAddress.trim(),
+        city: city,
         eventDate: parsedDate.toISOString(),
         posterUrl: posterUrl.trim() || undefined,
-        seatMapSvg: seatMapSvg.trim() || undefined,
-        ticketTypes: ticketTypes.length > 0 ? ticketTypes.map(t => ({
-          name: t.name.trim(),
-          price: Number(t.price),
-          totalQuantity: Number(t.totalQuantity),
-          maxPerUser: Number(t.maxPerUser),
-        })) : undefined
+        ticketTypes:
+          ticketTypes.length > 0
+            ? ticketTypes.map((t) => ({
+                name: t.name.trim(),
+                price: Number(t.price),
+                totalQuantity: Number(t.totalQuantity),
+                maxPerUser: Number(t.maxPerUser),
+              }))
+            : undefined,
       };
 
       const result = await createConcert(payload);
-      
+
+      if (seatMapSvgFile) {
+        await uploadConcertSeatMapSvg(result.id, seatMapSvgFile);
+      }
+
       // Dispatch toast alert
       window.dispatchEvent(
-        new CustomEvent('ticketbox-toast', {
+        new CustomEvent("ticketbox-toast", {
           detail: {
-            title: 'Tạo sự kiện thành công',
-            message: `Sự kiện "${result.name}" đã được khởi tạo thành công dưới dạng nháp!`,
-            type: 'success',
+            title: "Tạo sự kiện thành công",
+            message: seatMapSvgFile
+              ? `Sự kiện "${result.name}" đã được tạo và sơ đồ ghế SVG đã được xử lý.`
+              : `Sự kiện "${result.name}" đã được khởi tạo thành công dưới dạng nháp!`,
+            type: "success",
           },
-        })
+        }),
       );
 
       // Redirect to configure tickets, bio, and guests
@@ -150,15 +227,24 @@ export default function CreateConcertPage() {
         </Link>
 
         <div className="rounded-[2rem] border border-border bg-card p-5 shadow-sm md:p-8">
-          <h1 className="mb-2 text-3xl font-black tracking-tight text-foreground">Tạo sự kiện mới</h1>
-          <p className="text-muted-foreground mb-8">Thêm một sự kiện mới vào hệ thống dưới dạng nháp để bắt đầu cấu hình vé</p>
+          <h1 className="mb-2 text-3xl font-black tracking-tight text-foreground">
+            Tạo sự kiện mới
+          </h1>
+          <p className="text-muted-foreground mb-8">
+            Thêm một sự kiện mới vào hệ thống dưới dạng nháp để bắt đầu cấu hình
+            vé
+          </p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <h3 className="mb-4 text-lg font-black text-foreground">Thông tin cơ bản</h3>
+              <h3 className="mb-4 text-lg font-black text-foreground">
+                Thông tin cơ bản
+              </h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Tên sự kiện <span className="text-destructive">*</span></label>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Tên sự kiện <span className="text-destructive">*</span>
+                  </label>
                   <input
                     type="text"
                     required
@@ -170,7 +256,9 @@ export default function CreateConcertPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Nghệ sĩ biểu diễn</label>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Nghệ sĩ biểu diễn
+                    </label>
                     <input
                       type="text"
                       placeholder="Ví dụ: Hà Anh Tuấn, Mỹ Tâm..."
@@ -180,18 +268,39 @@ export default function CreateConcertPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Đường dẫn Poster sự kiện (URL)</label>
-                    <input
-                      type="url"
-                      placeholder="https://example.com/poster.jpg"
-                      value={posterUrl}
-                      onChange={(e) => setPosterUrl(e.target.value)}
-                      className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15"
-                    />
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Poster sự kiện (URL hoặc tải lên)
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input
+                        type="text"
+                        placeholder="https://example.com/poster.jpg"
+                        value={posterUrl}
+                        onChange={(e) => setPosterUrl(e.target.value)}
+                        className="h-11 flex-1 rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15"
+                      />
+                      <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 font-bold text-foreground transition hover:border-primary/40 hover:bg-primary/5 active:translate-y-px">
+                        {uploadingPoster ? (
+                          <RefreshCw className="size-4 animate-spin text-primary" />
+                        ) : (
+                          <Upload className="size-4 text-primary" />
+                        )}
+                        <span>Tải ảnh lên</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={uploadingPoster}
+                          onChange={handlePosterUpload}
+                        />
+                      </label>
+                    </div>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Mô tả sự kiện</label>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Mô tả sự kiện
+                  </label>
                   <textarea
                     placeholder="Nhập thông tin giới thiệu chi tiết về đêm nhạc..."
                     value={description}
@@ -204,11 +313,15 @@ export default function CreateConcertPage() {
             </div>
 
             <div className="border-t border-border pt-6">
-              <h3 className="mb-4 text-lg font-black text-foreground">Thời gian & Địa điểm</h3>
+              <h3 className="mb-4 text-lg font-black text-foreground">
+                Thời gian & Địa điểm
+              </h3>
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Ngày diễn ra <span className="text-destructive">*</span></label>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Ngày diễn ra <span className="text-destructive">*</span>
+                    </label>
                     <DatePicker
                       value={eventDate}
                       onChange={setEventDate}
@@ -216,7 +329,9 @@ export default function CreateConcertPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Giờ bắt đầu <span className="text-destructive">*</span></label>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Giờ bắt đầu <span className="text-destructive">*</span>
+                    </label>
                     <TimePicker
                       value={eventTime}
                       onChange={setEventTime}
@@ -224,28 +339,54 @@ export default function CreateConcertPage() {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Tên địa điểm <span className="text-destructive">*</span></label>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Tên địa điểm <span className="text-destructive">*</span>
+                    </label>
                     <input
                       type="text"
                       required
-                      placeholder="Ví dụ: Sân vận động Quân khu 7, Nhà hát Hòa Bình..."
+                      placeholder="Ví dụ: Sân vận động Quân khu 7..."
                       value={venueName}
                       onChange={(e) => setVenueName(e.target.value)}
                       className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Địa chỉ chi tiết địa điểm <span className="text-destructive">*</span></label>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Địa chỉ chi tiết địa điểm <span className="text-destructive">*</span>
+                    </label>
                     <input
                       type="text"
                       required
-                      placeholder="Ví dụ: 202 Hoàng Văn Thụ, Phường 9, Phú Nhuận..."
+                      placeholder="Ví dụ: 202 Hoàng Văn Thụ, Phường 9..."
                       value={venueAddress}
                       onChange={(e) => setVenueAddress(e.target.value)}
                       className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Tỉnh/Thành phố <span className="text-destructive">*</span>
+                    </label>
+                    <select
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15 cursor-pointer appearance-none"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
+                        backgroundPosition: "right 1rem center",
+                        backgroundSize: "1.25rem",
+                        backgroundRepeat: "no-repeat",
+                      }}
+                    >
+                      {VIETNAM_PROVINCES.map((c) => (
+                        <option key={c} value={c} className="bg-card text-foreground">
+                          {c}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -254,8 +395,13 @@ export default function CreateConcertPage() {
             <div className="border-t border-border pt-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-black text-foreground">Cấu hình hạng vé</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Cấu hình các hạng vé của sự kiện, giá bán, số lượng phát hành và số vé tối đa mỗi khách hàng được mua.</p>
+                  <h3 className="text-lg font-black text-foreground">
+                    Cấu hình hạng vé
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Cấu hình các hạng vé của sự kiện, giá bán, số lượng phát
+                    hành và số vé tối đa mỗi khách hàng được mua.
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -269,59 +415,84 @@ export default function CreateConcertPage() {
 
               {ticketTypes.length === 0 ? (
                 <div className="rounded-2xl border-2 border-dashed border-border p-6 text-center">
-                  <p className="text-sm text-muted-foreground">Chưa cấu hình hạng vé nào. Click "Thêm hạng vé" để cấu hình.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Chưa cấu hình hạng vé nào. Click "Thêm hạng vé" để cấu hình.
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {ticketTypes.map((t, idx) => (
-                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end rounded-2xl border border-border bg-card p-4 relative group hover:border-primary/30 transition">
+                    <div
+                      key={idx}
+                      className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end rounded-2xl border border-border bg-card p-4 relative group hover:border-primary/30 transition"
+                    >
                       <div className="sm:col-span-4">
-                        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Tên hạng vé (Ví dụ: VIP, GA...)</label>
+                        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                          Tên hạng vé (Ví dụ: VIP, GA...)
+                        </label>
                         <input
                           type="text"
                           required
                           placeholder="Tên hạng vé"
                           value={t.name}
-                          onChange={(e) => updateTicketType(idx, 'name', e.target.value)}
+                          onChange={(e) =>
+                            updateTicketType(idx, "name", e.target.value)
+                          }
                           className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                         />
                       </div>
-                      
+
                       <div className="sm:col-span-3">
-                        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Giá bán (VNĐ)</label>
+                        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                          Giá bán (VNĐ)
+                        </label>
                         <input
                           type="number"
                           required
                           min="0"
                           placeholder="Giá bán"
                           value={t.price}
-                          onChange={(e) => updateTicketType(idx, 'price', e.target.value)}
+                          onChange={(e) =>
+                            updateTicketType(idx, "price", e.target.value)
+                          }
                           className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                         />
                       </div>
 
                       <div className="sm:col-span-2">
-                        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Tổng số lượng</label>
+                        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                          Tổng số lượng
+                        </label>
                         <input
                           type="number"
                           required
                           min="1"
                           placeholder="Ví dụ: 100"
                           value={t.totalQuantity}
-                          onChange={(e) => updateTicketType(idx, 'totalQuantity', e.target.value)}
+                          onChange={(e) =>
+                            updateTicketType(
+                              idx,
+                              "totalQuantity",
+                              e.target.value,
+                            )
+                          }
                           className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                         />
                       </div>
 
                       <div className="sm:col-span-2">
-                        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Tối đa/người mua</label>
+                        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                          Tối đa/người mua
+                        </label>
                         <input
                           type="number"
                           required
                           min="1"
                           placeholder="Ví dụ: 4"
                           value={t.maxPerUser}
-                          onChange={(e) => updateTicketType(idx, 'maxPerUser', e.target.value)}
+                          onChange={(e) =>
+                            updateTicketType(idx, "maxPerUser", e.target.value)
+                          }
                           className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                         />
                       </div>
@@ -343,17 +514,43 @@ export default function CreateConcertPage() {
             </div>
 
             <div className="border-t border-border pt-6">
-              <h3 className="mb-2 text-lg font-black text-foreground">Sơ đồ chỗ ngồi (Tùy chọn)</h3>
-              <p className="text-xs text-muted-foreground mb-4">Bạn có thể dán đoạn mã SVG thiết kế sơ đồ ghế vào ô dưới đây (ví dụ: &lt;svg&gt;...&lt;/svg&gt;).</p>
-              <div>
-                <textarea
-                  placeholder="Dán mã SVG sơ đồ ghế tại đây..."
-                  value={seatMapSvg}
-                  onChange={(e) => setSeatMapSvg(e.target.value)}
-                  rows={3}
-                  className="w-full font-mono text-xs rounded-2xl border border-border bg-background px-4 py-3 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15"
+              <h3 className="mb-2 text-lg font-black text-foreground">
+                Sơ đồ chỗ ngồi SVG (Tùy chọn)
+              </h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                Upload file .svg có metadata vùng ghế để hệ thống tự tạo hạng vé
+                và ghế. Hệ thống sẽ tạo record concert trước, sau đó mới upload
+                SVG cho concert vừa tạo.
+              </p>
+              <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-background px-4 py-6 text-center transition hover:border-primary/50 hover:bg-primary/5">
+                <Upload className="size-7 text-primary" />
+                <span className="text-sm font-bold text-foreground">
+                  {seatMapSvgFile
+                    ? seatMapSvgFile.name
+                    : "Chọn file .svg từ máy"}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Tối đa 1 MB. Cần có cả zone và ghế trong cùng SVG:
+                  data-zone-code, data-price, data-seat-number.
+                </span>
+                <input
+                  type="file"
+                  accept=".svg,image/svg+xml"
+                  className="hidden"
+                  onChange={(e) =>
+                    setSeatMapSvgFile(e.target.files?.[0] ?? null)
+                  }
                 />
-              </div>
+              </label>
+              {seatMapSvgFile && (
+                <button
+                  type="button"
+                  onClick={() => setSeatMapSvgFile(null)}
+                  className="mt-3 text-sm font-bold text-destructive hover:underline"
+                >
+                  Xóa file SVG và nhập hạng vé thủ công
+                </button>
+              )}
             </div>
 
             {error && (

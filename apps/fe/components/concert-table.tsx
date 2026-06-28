@@ -4,6 +4,7 @@ import Link from "next/link";
 interface ConcertTableProps {
   concerts: Array<{
     id: string;
+    slug?: string;
     title: string;
     artist: string;
     date: string;
@@ -86,7 +87,7 @@ export function ConcertTable({ concerts, onToggleActive }: ConcertTableProps) {
               <td className="px-6 py-3">
                 <div className="flex gap-3 items-center">
                   <Link
-                    href={`/concert/${concert.id}`}
+                    href={`/concert/${concert.slug || concert.id}`}
                     target="_blank"
                     className="rounded-full p-2 text-muted-foreground transition hover:bg-primary/10 hover:text-primary flex items-center justify-center"
                     aria-label="Xem sự kiện"

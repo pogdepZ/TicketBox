@@ -10,6 +10,8 @@ export const createConcertSchema = z
   .object({
     name: z.string().min(1).max(200),
     description: z.string().optional(),
+    type: z.string().max(50).optional(),
+    city: z.string().max(100).optional(),
     artistName: z.string().max(200).optional(),
     venueName: z.string().min(1).max(200),
     venueAddress: z.string().min(1),

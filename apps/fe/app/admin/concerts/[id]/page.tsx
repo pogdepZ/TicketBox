@@ -14,7 +14,10 @@ import {
   updateConcertBio,
   importGuestList,
   updateConcert,
+  uploadConcertPoster,
+  getGuestList,
 } from "@/lib/api";
+import { VIETNAM_PROVINCES } from "@/lib/constants";
 import {
   ArrowLeft,
   Plus,
@@ -33,7 +36,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { ConfirmModal } from "@/components/confirm-modal";
-import { DatePicker, TimePicker, DateTimePicker } from "@/components/date-time-picker";
+import {
+  DatePicker,
+  TimePicker,
+  DateTimePicker,
+} from "@/components/date-time-picker";
 
 interface AdminConcertDetailPageProps {
   params: Promise<{
@@ -67,10 +74,48 @@ export default function AdminConcertDetailPage({
   const [editEventTime, setEditEventTime] = useState("");
   const [editVenueName, setEditVenueName] = useState("");
   const [editVenueAddress, setEditVenueAddress] = useState("");
+  const [editCity, setEditCity] = useState("Thành phố Hồ Chí Minh");
   const [editPosterUrl, setEditPosterUrl] = useState("");
-  const [editSeatMapSvg, setEditSeatMapSvg] = useState("");
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
+  const [uploadingPoster, setUploadingPoster] = useState(false);
+
+  async function handlePosterUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
+    if (!allowedTypes.includes(file.type.toLowerCase())) {
+      setEditError("File poster phải là định dạng hình ảnh (JPEG, PNG, WEBP, GIF).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setEditError("File poster không được vượt quá 5 MB.");
+      return;
+    }
+
+    setUploadingPoster(true);
+    setEditError("");
+    try {
+      const res = await uploadConcertPoster(file);
+      if (res && res.url) {
+        setEditPosterUrl(res.url);
+        window.dispatchEvent(
+          new CustomEvent("ticketbox-toast", {
+            detail: {
+              title: "Tải ảnh thành công",
+              message: "Poster sự kiện đã được tải lên MinIO.",
+              type: "success",
+            },
+          }),
+        );
+      }
+    } catch (err: any) {
+      setEditError(getFriendlyErrorMessage(err));
+    } finally {
+      setUploadingPoster(false);
+    }
+  }
 
   // Ticket Form State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -95,9 +140,24 @@ export default function AdminConcertDetailPage({
   const [guestLoading, setGuestLoading] = useState(false);
   const [guestError, setGuestError] = useState("");
   const [importResult, setImportResult] = useState<any>(null);
+  const [guestsList, setGuestsList] = useState<any[]>([]);
+  const [loadingGuests, setLoadingGuests] = useState(false);
 
-  const isPublished = concert?.status === 'PUBLISHED';
-  const isCancelledOrCompleted = concert?.status === 'CANCELLED' || concert?.status === 'COMPLETED';
+  async function fetchGuestList() {
+    setLoadingGuests(true);
+    try {
+      const list = await getGuestList(concertId);
+      setGuestsList(list || []);
+    } catch (err) {
+      console.error("Failed to fetch guest list:", err);
+    } finally {
+      setLoadingGuests(false);
+    }
+  }
+
+  const isPublished = concert?.rawStatus === "PUBLISHED";
+  const isCancelledOrCompleted =
+    concert?.rawStatus === "CANCELLED" || concert?.rawStatus === "COMPLETED";
   const isBasicInfoReadOnly = isPublished || isCancelledOrCompleted;
 
   async function refreshTicketTypes() {
@@ -143,9 +203,9 @@ export default function AdminConcertDetailPage({
         setEditArtistName(concertData.artist || "");
         setEditDescription(concertData.description || "");
         setEditVenueName(concertData.venue || "");
-        setEditVenueAddress(concertData.city || "");
+        setEditVenueAddress(concertData.address || "");
+        setEditCity(concertData.city || "Hồ Chí Minh");
         setEditPosterUrl(concertData.image || "");
-        setEditSeatMapSvg(concertData.seatMapSvgUrl || "");
 
         if (concertData.date) {
           const d = new Date(concertData.date);
@@ -191,6 +251,9 @@ export default function AdminConcertDetailPage({
         const bioData = await getAiBioStatus(concertId);
         setBioStatus(bioData.status);
         setBioText(bioData.bio || "");
+
+        // Load Guest List
+        await fetchGuestList();
       } catch (err) {
         setError(getFriendlyErrorMessage(err));
       } finally {
@@ -276,7 +339,6 @@ export default function AdminConcertDetailPage({
         payload = {
           description: editDescription.trim() || undefined,
           posterUrl: editPosterUrl.trim() || undefined,
-          seatMapSvg: editSeatMapSvg.trim() || undefined,
         };
       } else {
         const parsedDate = new Date(`${editEventDate}T${editEventTime}`);
@@ -286,9 +348,9 @@ export default function AdminConcertDetailPage({
           artistName: editArtistName.trim() || undefined,
           venueName: editVenueName.trim(),
           venueAddress: editVenueAddress.trim(),
+          city: editCity,
           eventDate: parsedDate.toISOString(),
           posterUrl: editPosterUrl.trim() || undefined,
-          seatMapSvg: editSeatMapSvg.trim() || undefined,
         };
       }
 
@@ -342,6 +404,13 @@ export default function AdminConcertDetailPage({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (isBasicInfoReadOnly) {
+      setError(
+        "Không thể thêm hoặc chỉnh sửa hạng vé của sự kiện đã xuất bản, đã hủy hoặc đã hoàn thành.",
+      );
+      return;
+    }
 
     const validationMsg = validate();
     if (validationMsg) {
@@ -402,12 +471,24 @@ export default function AdminConcertDetailPage({
   }
 
   function handleDelete(ticketTypeId: string) {
+    if (isBasicInfoReadOnly) {
+      setError(
+        "Không thể xóa hạng vé của sự kiện đã xuất bản, đã hủy hoặc đã hoàn thành.",
+      );
+      return;
+    }
     setDeleteTicketTypeId(ticketTypeId);
     setDeleteConfirmOpen(true);
   }
 
   async function confirmDeleteTicketType() {
     if (!deleteTicketTypeId) return;
+    if (isBasicInfoReadOnly) {
+      setError(
+        "Không thể xóa hạng vé của sự kiện đã xuất bản, đã hủy hoặc đã hoàn thành.",
+      );
+      return;
+    }
     setDeleteConfirmOpen(false);
     setError("");
     try {
@@ -529,6 +610,7 @@ export default function AdminConcertDetailPage({
       );
       setImportResult(res);
       setGuestFile(null);
+      await fetchGuestList();
     } catch (err) {
       setGuestError(getFriendlyErrorMessage(err));
     } finally {
@@ -564,22 +646,24 @@ export default function AdminConcertDetailPage({
                 <h1 className="text-3xl font-black text-foreground">
                   {concert.title}
                 </h1>
-                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
-                  concert.status === 'PUBLISHED' 
-                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                    : concert.status === 'DRAFT'
-                    ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                    : concert.status === 'CANCELLED'
-                    ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
-                    : 'bg-zinc-500/10 text-zinc-500 border border-zinc-500/20'
-                }`}>
-                  {concert.status === 'PUBLISHED' 
-                    ? 'Đã xuất bản' 
-                    : concert.status === 'DRAFT' 
-                    ? 'Bản nháp' 
-                    : concert.status === 'CANCELLED'
-                    ? 'Đã hủy'
-                    : 'Đã hoàn thành'}
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                    concert.rawStatus === "PUBLISHED"
+                      ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                      : concert.rawStatus === "DRAFT"
+                        ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                        : concert.rawStatus === "CANCELLED"
+                          ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                          : "bg-zinc-500/10 text-zinc-500 border border-zinc-500/20"
+                  }`}
+                >
+                  {concert.rawStatus === "PUBLISHED"
+                    ? "Đã xuất bản"
+                    : concert.rawStatus === "DRAFT"
+                      ? "Bản nháp"
+                      : concert.rawStatus === "CANCELLED"
+                        ? "Đã hủy"
+                        : "Đã hoàn thành"}
                 </span>
               </div>
               <p className="text-muted-foreground mt-1">
@@ -696,15 +780,32 @@ export default function AdminConcertDetailPage({
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">
-                        Đường dẫn Poster sự kiện (URL)
+                        Poster sự kiện (URL hoặc tải lên)
                       </label>
-                      <input
-                        type="url"
-                        placeholder="https://example.com/poster.jpg"
-                        value={editPosterUrl}
-                        onChange={(e) => setEditPosterUrl(e.target.value)}
-                        className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15"
-                      />
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <input
+                          type="text"
+                          placeholder="https://example.com/poster.jpg"
+                          value={editPosterUrl}
+                          onChange={(e) => setEditPosterUrl(e.target.value)}
+                          className="h-11 flex-1 rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15"
+                        />
+                        <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 font-bold text-foreground transition hover:border-primary/40 hover:bg-primary/5 active:translate-y-px">
+                          {uploadingPoster ? (
+                            <RefreshCw className="size-4 animate-spin text-primary" />
+                          ) : (
+                            <Upload className="size-4 text-primary" />
+                          )}
+                          <span>Tải ảnh lên</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={uploadingPoster}
+                            onChange={handlePosterUpload}
+                          />
+                        </label>
+                      </div>
                     </div>
                   </div>
                   <div>
@@ -751,7 +852,7 @@ export default function AdminConcertDetailPage({
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">
                         Tên địa điểm <span className="text-destructive">*</span>
@@ -760,7 +861,7 @@ export default function AdminConcertDetailPage({
                         type="text"
                         required
                         disabled={isBasicInfoReadOnly}
-                        placeholder="Ví dụ: Sân vận động Quân khu 7, Nhà hát Hòa Bình..."
+                        placeholder="Ví dụ: Sân vận động Quân khu 7..."
                         value={editVenueName}
                         onChange={(e) => setEditVenueName(e.target.value)}
                         className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
@@ -768,39 +869,42 @@ export default function AdminConcertDetailPage({
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">
-                        Địa chỉ chi tiết địa điểm{" "}
-                        <span className="text-destructive">*</span>
+                        Địa chỉ chi tiết địa điểm <span className="text-destructive">*</span>
                       </label>
                       <input
                         type="text"
                         required
                         disabled={isBasicInfoReadOnly}
-                        placeholder="Ví dụ: 202 Hoàng Văn Thụ, Phường 9, Phú Nhuận..."
+                        placeholder="Ví dụ: 202 Hoàng Văn Thụ, Phường 9..."
                         value={editVenueAddress}
                         onChange={(e) => setEditVenueAddress(e.target.value)}
                         className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
                       />
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Tỉnh/Thành phố <span className="text-destructive">*</span>
+                      </label>
+                      <select
+                        value={editCity}
+                        onChange={(e) => setEditCity(e.target.value)}
+                        disabled={isBasicInfoReadOnly}
+                        className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed cursor-pointer appearance-none"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
+                          backgroundPosition: "right 1rem center",
+                          backgroundSize: "1.25rem",
+                          backgroundRepeat: "no-repeat",
+                        }}
+                      >
+                        {VIETNAM_PROVINCES.map((c) => (
+                          <option key={c} value={c} className="bg-card text-foreground">
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                </div>
-              </div>
-
-              <div className="border-t border-border pt-6">
-                <h3 className="mb-2 text-base font-black text-foreground">
-                  Sơ đồ chỗ ngồi (Tùy chọn)
-                </h3>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Bạn có thể dán đoạn mã SVG thiết kế sơ đồ ghế vào ô dưới đây
-                  (ví dụ: &lt;svg&gt;...&lt;/svg&gt;).
-                </p>
-                <div>
-                  <textarea
-                    placeholder="Dán mã SVG sơ đồ ghế tại đây..."
-                    value={editSeatMapSvg}
-                    onChange={(e) => setEditSeatMapSvg(e.target.value)}
-                    rows={3}
-                    className="w-full font-mono text-xs rounded-2xl border border-border bg-background px-4 py-3 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15"
-                  />
                 </div>
               </div>
 
@@ -818,7 +922,9 @@ export default function AdminConcertDetailPage({
                     disabled={editLoading}
                     className="rounded-full bg-primary px-8 py-3 font-bold text-primary-foreground transition hover:bg-primary/90 active:translate-y-px disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    {editLoading && <RefreshCw className="size-4 animate-spin" />}
+                    {editLoading && (
+                      <RefreshCw className="size-4 animate-spin" />
+                    )}
                     Lưu thay đổi
                   </button>
                 )}
@@ -835,6 +941,16 @@ export default function AdminConcertDetailPage({
                 {editingId ? "Sửa hạng vé" : "Thêm hạng vé mới"}
               </h2>
 
+              {isBasicInfoReadOnly && (
+                <div className="mb-6 rounded-2xl border border-border bg-muted/30 p-4 text-xs font-semibold text-muted-foreground flex gap-2">
+                  <AlertCircle className="size-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <span>
+                    Không thể thêm hoặc chỉnh sửa hạng vé khi sự kiện đã xuất
+                    bản, đã hủy hoặc đã hoàn thành.
+                  </span>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-bold text-foreground mb-2">
@@ -842,10 +958,11 @@ export default function AdminConcertDetailPage({
                   </label>
                   <input
                     type="text"
+                    disabled={isBasicInfoReadOnly}
                     placeholder="Ví dụ: Vé VIP, Vé GA..."
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="h-11 w-full rounded-2xl border border-border bg-background px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
+                    className="h-11 w-full rounded-2xl border border-border bg-background px-4 focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -857,6 +974,7 @@ export default function AdminConcertDetailPage({
                     <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                     <input
                       type="text"
+                      disabled={isBasicInfoReadOnly}
                       placeholder="Mệnh giá"
                       value={
                         price
@@ -869,7 +987,7 @@ export default function AdminConcertDetailPage({
                         const raw = e.target.value.replace(/\D/g, "");
                         setPrice(raw);
                       }}
-                      className="h-11 w-full rounded-2xl border border-border bg-background pl-10 pr-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
+                      className="h-11 w-full rounded-2xl border border-border bg-background pl-10 pr-4 focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:opacity-60 disabled:cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -883,10 +1001,11 @@ export default function AdminConcertDetailPage({
                       <Users className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                       <input
                         type="number"
+                        disabled={isBasicInfoReadOnly}
                         placeholder="Tổng số vé"
                         value={totalQuantity}
                         onChange={(e) => setTotalQuantity(e.target.value)}
-                        className="h-11 w-full rounded-2xl border border-border bg-background pl-10 pr-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
+                        className="h-11 w-full rounded-2xl border border-border bg-background pl-10 pr-4 focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:opacity-60 disabled:cursor-not-allowed"
                       />
                     </div>
                   </div>
@@ -896,10 +1015,11 @@ export default function AdminConcertDetailPage({
                     </label>
                     <input
                       type="number"
+                      disabled={isBasicInfoReadOnly}
                       placeholder="4"
                       value={maxPerUser}
                       onChange={(e) => setMaxPerUser(e.target.value)}
-                      className="h-11 w-full rounded-2xl border border-border bg-background px-4 focus:outline-none focus:ring-4 focus:ring-primary/15"
+                      className="h-11 w-full rounded-2xl border border-border bg-background px-4 focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:opacity-60 disabled:cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -911,6 +1031,7 @@ export default function AdminConcertDetailPage({
                   <DateTimePicker
                     value={saleStartAt}
                     onChange={setSaleStartAt}
+                    disabled={isBasicInfoReadOnly}
                     placeholder="Chọn thời gian mở bán"
                   />
                 </div>
@@ -922,6 +1043,7 @@ export default function AdminConcertDetailPage({
                   <DateTimePicker
                     value={saleEndAt}
                     onChange={setSaleEndAt}
+                    disabled={isBasicInfoReadOnly}
                     placeholder="Chọn thời gian đóng bán"
                   />
                 </div>
@@ -942,21 +1064,65 @@ export default function AdminConcertDetailPage({
                       Hủy sửa
                     </button>
                   )}
-                  <button
-                    type="submit"
-                    className="flex-1 rounded-full bg-primary py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition cursor-pointer"
-                  >
-                    {editingId ? "Lưu thay đổi" : "Tạo hạng vé"}
-                  </button>
+                  {!isBasicInfoReadOnly && (
+                    <button
+                      type="submit"
+                      className="flex-1 rounded-full bg-primary py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition cursor-pointer"
+                    >
+                      {editingId ? "Lưu thay đổi" : "Tạo hạng vé"}
+                    </button>
+                  )}
                 </div>
               </form>
             </div>
 
             {/* List */}
             <div className="lg:col-span-2 rounded-[2rem] border border-border bg-card p-6 shadow-sm overflow-hidden">
-              <h2 className="text-xl font-black text-foreground mb-6">
-                Các hạng vé hiện có
-              </h2>
+              <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-black text-foreground">
+                    Các hạng vé hiện có
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {concert?.seatMapSvgUrl
+                      ? "Hạng vé được đồng bộ từ sơ đồ SVG đã tải lên."
+                      : "Chưa có sơ đồ SVG, bạn có thể cấu hình hạng vé thủ công."}
+                  </p>
+                </div>
+                {concert?.seatMapSvgUrl && (
+                  <a
+                    href={concert.seatMapSvgUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full border border-border px-4 py-2 text-sm font-bold text-foreground transition hover:border-primary/50 hover:text-primary"
+                  >
+                    Mở SVG
+                  </a>
+                )}
+              </div>
+
+              {concert?.seatMapSvgUrl && (
+                <div className="mb-6 overflow-hidden rounded-3xl border border-border bg-muted/30 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-foreground">
+                        Preview sơ đồ ghế SVG
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Dùng để đối chiếu các zone và số ghế đã import.
+                      </p>
+                    </div>
+                    <FileText className="size-5 text-muted-foreground" />
+                  </div>
+                  <div className="max-h-[420px] overflow-auto rounded-2xl bg-background p-3">
+                    <img
+                      src={concert.seatMapSvgUrl}
+                      alt={`Sơ đồ ghế ${concert.title || "sự kiện"}`}
+                      className="mx-auto max-h-[380px] w-full object-contain"
+                    />
+                  </div>
+                </div>
+              )}
 
               {ticketTypes.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
@@ -989,20 +1155,28 @@ export default function AdminConcertDetailPage({
                           <td className="py-4 text-center">{t.maxPerUser}</td>
                           <td className="py-4 text-right">
                             <div className="flex gap-1 justify-end">
-                              <button
-                                onClick={() => handleEdit(t)}
-                                className="rounded-full p-2 text-muted-foreground hover:bg-primary/10 hover:text-primary transition cursor-pointer"
-                                aria-label="Sửa hạng vé"
-                              >
-                                <Edit className="size-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(t.id)}
-                                className="rounded-full p-2 text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
-                                aria-label="Xóa hạng vé"
-                              >
-                                <Trash2 className="size-4" />
-                              </button>
+                              {!isBasicInfoReadOnly ? (
+                                <>
+                                  <button
+                                    onClick={() => handleEdit(t)}
+                                    className="rounded-full p-2 text-muted-foreground hover:bg-primary/10 hover:text-primary transition cursor-pointer"
+                                    aria-label="Sửa hạng vé"
+                                  >
+                                    <Edit className="size-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(t.id)}
+                                    className="rounded-full p-2 text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
+                                    aria-label="Xóa hạng vé"
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="text-xs text-muted-foreground italic px-2">
+                                  Đã khóa
+                                </span>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1213,71 +1387,88 @@ export default function AdminConcertDetailPage({
               </div>
             </div>
 
-            {/* Results & Statistics Area */}
-            <div className="lg:col-span-2 rounded-[2rem] border border-border bg-card p-6 shadow-sm flex flex-col h-full min-h-[420px]">
+            {/* Guest List Display Area */}
+            <div className="lg:col-span-2 rounded-[2rem] border border-border bg-card p-6 shadow-sm flex flex-col h-full min-h-[480px]">
               <h2 className="text-xl font-black text-foreground mb-4 flex items-center gap-2">
-                <FileText className="size-5 text-primary" />
-                Kết quả xử lý tệp khách mời
+                <Users className="size-5 text-primary" />
+                Danh sách khách mời sự kiện ({guestsList.length})
               </h2>
 
-              {importResult ? (
-                <div className="space-y-6 flex-grow flex flex-col justify-center">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="rounded-2xl border border-border bg-card p-5 text-center shadow-sm">
-                      <p className="text-sm text-muted-foreground mb-1">
-                        Thành công (Imported)
-                      </p>
-                      <p className="text-3xl font-black text-emerald-500">
-                        {importResult.imported ?? 0}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-border bg-card p-5 text-center shadow-sm">
-                      <p className="text-sm text-muted-foreground mb-1">
-                        Bị trùng lặp (Duplicates)
-                      </p>
-                      <p className="text-3xl font-black text-amber-500">
-                        {importResult.duplicates ?? 0}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-border bg-card p-5 text-center shadow-sm">
-                      <p className="text-sm text-muted-foreground mb-1">
-                        Lỗi dòng dữ liệu (Errors)
-                      </p>
-                      <p className="text-3xl font-black text-rose-500">
-                        {importResult.errors ?? 0}
-                      </p>
-                    </div>
+              {/* Show import summary if recently imported */}
+              {importResult && (
+                <div className="mb-5 p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-sm text-muted-foreground flex flex-wrap items-center justify-between gap-3 animate-fade-in">
+                  <div>
+                    <span className="font-bold text-emerald-500">Kết quả import gần nhất:</span>{" "}
+                    Thêm mới <strong className="text-foreground">{importResult.imported ?? 0}</strong>,{" "}
+                    Trùng lặp <strong className="text-foreground">{importResult.duplicates ?? 0}</strong>,{" "}
+                    Lỗi <strong className="text-foreground">{importResult.errors ?? 0}</strong>.
                   </div>
+                  <button 
+                    onClick={() => setImportResult(null)}
+                    className="text-xs font-semibold text-primary hover:text-primary/80 cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              )}
 
-                  <div className="rounded-2xl bg-muted/30 border border-border p-5 text-sm leading-relaxed text-muted-foreground">
-                    <p className="font-bold text-foreground mb-2">
-                      Tóm tắt tiến trình:
-                    </p>
-                    <ul className="list-disc pl-5 space-y-1">
-                      <li>
-                        Hệ thống đã nhận diện và phân tích toàn bộ các dòng dữ
-                        liệu trong file CSV.
-                      </li>
-                      <li>
-                        Các khách mời hợp lệ đã được gửi thư mời và phát hành vé
-                        điện tử (E-ticket) trực tiếp trong hệ thống.
-                      </li>
-                      <li>
-                        Các dòng bị trùng lặp hoặc lỗi định dạng email/số điện
-                        thoại đã bị bỏ qua để bảo đảm tính nhất quán dữ liệu.
-                      </li>
-                    </ul>
+              {loadingGuests ? (
+                <div className="flex-grow flex items-center justify-center">
+                  <RefreshCw className="size-8 animate-spin text-primary" />
+                </div>
+              ) : guestsList.length > 0 ? (
+                <div className="flex-grow overflow-hidden flex flex-col">
+                  <div className="overflow-y-auto max-h-[420px] rounded-2xl border border-border/80">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-muted/40 text-xs font-black uppercase tracking-wider text-muted-foreground border-b border-border">
+                          <th className="p-3 pl-4">Họ và tên</th>
+                          <th className="p-3">Email</th>
+                          <th className="p-3">Số điện thoại</th>
+                          <th className="p-3">Phân loại</th>
+                          <th className="p-3">Mã vé</th>
+                          <th className="p-3 pr-4 text-center">Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guestsList.map((guest: any) => (
+                          <tr key={guest.id} className="text-sm border-b border-border/60 hover:bg-muted/10 transition">
+                            <td className="p-3 pl-4 font-bold text-foreground truncate max-w-[150px]">{guest.fullName}</td>
+                            <td className="p-3 text-muted-foreground truncate max-w-[180px]">{guest.email || "—"}</td>
+                            <td className="p-3 text-muted-foreground">{guest.phone || "—"}</td>
+                            <td className="p-3">
+                              <span className={`inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                                (guest.guestType || "").toLowerCase() === "sponsor" 
+                                  ? "bg-amber-500/10 text-amber-500 border border-amber-500/15" 
+                                  : "bg-primary/10 text-primary border border-primary/15"
+                              }`}>
+                                {guest.guestType || "Guest"}
+                              </span>
+                            </td>
+                            <td className="p-3 font-mono text-xs text-muted-foreground">{guest.guestCode}</td>
+                            <td className="p-3 pr-4 text-center">
+                              <span className={`inline-block text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                                guest.status === "ACTIVE" 
+                                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
+                                  : "bg-zinc-500/10 text-zinc-500 border border-zinc-500/20"
+                              }`}>
+                                {guest.status === "ACTIVE" ? "Hoạt động" : "Đã check-in"}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               ) : (
                 <div className="flex-grow flex flex-col items-center justify-center text-center p-12 text-muted-foreground">
-                  <Users className="size-16 text-muted-foreground/35 mb-4 animate-pulse" />
+                  <Users className="size-16 text-muted-foreground/35 mb-4" />
                   <p className="font-bold text-foreground mb-1">
-                    Chưa có dữ liệu nhập
+                    Chưa có khách mời nào được tải lên
                   </p>
-                  <p className="text-sm max-w-sm">
-                    Tải lên file danh sách khách mời CSV ở cột bên trái để xem
-                    kết quả thống kê chi tiết tại đây.
+                  <p className="text-xs max-w-sm">
+                    Tải lên file danh sách khách mời CSV ở cột bên trái để cấp vé mời và hiển thị danh sách tại đây.
                   </p>
                 </div>
               )}

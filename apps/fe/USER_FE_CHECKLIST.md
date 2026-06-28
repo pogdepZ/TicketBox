@@ -27,9 +27,9 @@ Scope: user-facing frontend only. Current implementation should continue using m
 - [x] Seat selection flow: create a mock draft reservation and carry it into checkout.
 - [x] Checkout page: read selected reservation, choose payment method, and validate payment form basics.
 - [x] Checkout submit: create a mock order and navigate to success by order id.
-- [ ] Success/e-ticket page: render the selected mock order and tickets, including download/share mock behavior.
-- [ ] Verify user flow end to end: home -> concert detail -> seat selection -> checkout -> success.
-- [ ] Footer/static links: replace placeholder `#` links with real routes or intentional disabled/placeholder states.
+- [x] Success/e-ticket page: render the selected mock order and tickets, including download/share mock behavior.
+- [x] Verify user flow end to end: home -> concert detail -> seat selection -> checkout -> success.
+- [x] Footer/static links: replace placeholder `#` links with real routes or intentional disabled/placeholder states.
 
 ## Backend Reference
 

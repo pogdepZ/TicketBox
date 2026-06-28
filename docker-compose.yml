@@ -22,6 +22,14 @@ services:
       - ticketbox_redis_data:/data
     command: redis-server --appendonly yes
 
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: ticketbox-mailhog
+    restart: always
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   minio:
     image: minio/minio
     container_name: ticketbox-minio
@@ -54,4 +62,3 @@ volumes:
   nest_prisma_pg_data:
   ticketbox_redis_data:
   ticketbox_minio_data:
-

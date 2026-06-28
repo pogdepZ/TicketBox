@@ -51,6 +51,17 @@ export class OrdersController {
   }
 
   /**
+   * GET /orders
+   * Lấy danh sách order của user hiện tại.
+   */
+  @Get()
+  async findAll(
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.ordersService.getUserOrders(user);
+  }
+
+  /**
    * GET /orders/:id
    * Owner hoặc admin.
    */

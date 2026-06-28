@@ -21,31 +21,31 @@ export function Footer() {
           <div>
             <h4 className="mb-4 font-semibold text-background">Công ty</h4>
             <ul className="space-y-2 text-sm text-background/60">
-              <li><Link href="#" className="transition hover:text-primary">Về chúng tôi</Link></li>
-              <li><Link href="#" className="transition hover:text-primary">Liên hệ</Link></li>
-              <li><Link href="#" className="transition hover:text-primary">Sự nghiệp</Link></li>
+              <li><Link href="/about" className="transition hover:text-primary">Về chúng tôi</Link></li>
+              <li><Link href="/contact" className="transition hover:text-primary">Liên hệ</Link></li>
+              <li><Link href="/careers" className="transition hover:text-primary">Sự nghiệp</Link></li>
             </ul>
           </div>
 
           <div>
             <h4 className="mb-4 font-semibold text-background">Pháp lý</h4>
             <ul className="space-y-2 text-sm text-background/60">
-              <li><Link href="#" className="transition hover:text-primary">Điều khoản</Link></li>
-              <li><Link href="#" className="transition hover:text-primary">Chính sách</Link></li>
-              <li><Link href="#" className="transition hover:text-primary">Cookie</Link></li>
+              <li><Link href="/terms" className="transition hover:text-primary">Điều khoản</Link></li>
+              <li><Link href="/privacy" className="transition hover:text-primary">Chính sách bảo mật</Link></li>
+              <li><Link href="/cookie" className="transition hover:text-primary">Chính sách Cookie</Link></li>
             </ul>
           </div>
 
           <div>
             <h4 className="mb-4 font-semibold text-background">Theo dõi</h4>
             <div className="flex gap-4">
-              <a href="#" className="grid size-10 place-items-center rounded-full border border-background/15 text-background/65 transition hover:border-primary hover:text-primary" aria-label="Kênh cộng đồng">
+              <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="grid size-10 place-items-center rounded-full border border-background/15 text-background/65 transition hover:border-primary hover:text-primary" aria-label="Kênh cộng đồng">
                 <Code2 className="size-5" />
               </a>
-              <a href="#" className="grid size-10 place-items-center rounded-full border border-background/15 text-background/65 transition hover:border-primary hover:text-primary" aria-label="Yêu thích">
+              <a href="/" className="grid size-10 place-items-center rounded-full border border-background/15 text-background/65 transition hover:border-primary hover:text-primary" aria-label="Yêu thích">
                 <Heart className="size-5" />
               </a>
-              <a href="#" className="grid size-10 place-items-center rounded-full border border-background/15 text-background/65 transition hover:border-primary hover:text-primary" aria-label="Email">
+              <a href="mailto:support@ticketbox.vn" className="grid size-10 place-items-center rounded-full border border-background/15 text-background/65 transition hover:border-primary hover:text-primary" aria-label="Email">
                 <Mail className="size-5" />
               </a>
             </div>

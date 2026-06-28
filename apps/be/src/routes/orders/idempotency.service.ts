@@ -1,12 +1,8 @@
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
-import { createHash } from 'crypto';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { RedisService } from '../../common/redis/redis.service';
-import { IdempotencyStatus } from '../../generated/prisma';
+import { ConflictException, Injectable, Logger } from "@nestjs/common";
+import { createHash } from "crypto";
+import { PrismaService } from "../../common/prisma/prisma.service";
+import { RedisService } from "../../common/redis/redis.service";
+import { IdempotencyStatus } from "../../generated/prisma";
 
 /** TTL cho idempotency cache trong Redis (24 giờ) */
 const IDEMPOTENCY_REDIS_TTL_SECONDS = 24 * 60 * 60;
@@ -32,9 +28,9 @@ export class IdempotencyService {
    * Tạo hash từ body request để phát hiện conflict khi dùng cùng key với body khác.
    */
   computeRequestHash(userId: string, payload: unknown): string {
-    return createHash('sha256')
+    return createHash("sha256")
       .update(userId + JSON.stringify(payload))
-      .digest('hex');
+      .digest("hex");
   }
 
   /**
@@ -59,7 +55,7 @@ export class IdempotencyService {
     if (cached) {
       if (cached.hash !== requestHash) {
         throw new ConflictException({
-          message: 'Idempotency key conflict',
+          message: "Idempotency key conflict",
           key,
         });
       }
@@ -78,17 +74,24 @@ export class IdempotencyService {
 
     if (record.requestHash !== requestHash) {
       throw new ConflictException({
-        message: 'Idempotency key conflict',
+        message: "Idempotency key conflict",
         key,
       });
     }
 
     if (record.status === IdempotencyStatus.PROCESSING) {
-      // Request đang được xử lý ở instance khác
-      throw new ConflictException({
-        message: 'Request is already being processed',
-        key,
-      });
+      if (record.expiresAt.getTime() > Date.now()) {
+        // Request đang được xử lý ở instance khác
+        throw new ConflictException({
+          message: "Request is already being processed",
+          key,
+        });
+      }
+
+      this.logger.warn(
+        `Stale PROCESSING idempotency record detected, allowing retry: ${key}`,
+      );
+      return null;
     }
 
     if (
@@ -98,7 +101,11 @@ export class IdempotencyService {
       // Hydrate lại Redis để lần sau nhanh hơn
       await this.redis.setJson(
         redisKey,
-        { hash: requestHash, status: record.responseStatus, body: record.responseBody },
+        {
+          hash: requestHash,
+          status: record.responseStatus,
+          body: record.responseBody,
+        },
         IDEMPOTENCY_REDIS_TTL_SECONDS,
       );
       this.logger.debug(`Idempotency cache HIT (DB): ${key}`);
@@ -118,7 +125,7 @@ export class IdempotencyService {
   async markProcessing(
     key: string,
     requestHash: string,
-    userId: string,
+    userId?: string | null,
   ): Promise<void> {
     const expiresAt = new Date(
       Date.now() + IDEMPOTENCY_DB_TTL_HOURS * 60 * 60 * 1000,
@@ -133,15 +140,18 @@ export class IdempotencyService {
       });
 
       if (record) {
-        if (record.status === IdempotencyStatus.PROCESSING) {
+        if (
+          record.status === IdempotencyStatus.PROCESSING &&
+          record.expiresAt.getTime() > Date.now()
+        ) {
           throw new ConflictException({
-            message: 'Request is already being processed',
+            message: "Request is already being processed",
             key,
           });
         }
         if (record.status === IdempotencyStatus.COMPLETED) {
           throw new ConflictException({
-            message: 'Request has already been completed',
+            message: "Request has already been completed",
             key,
           });
         }
@@ -151,7 +161,7 @@ export class IdempotencyService {
           where: { key },
           data: {
             requestHash,
-            userId,
+            userId: userId ?? null,
             status: IdempotencyStatus.PROCESSING,
             expiresAt,
           },
@@ -161,7 +171,7 @@ export class IdempotencyService {
           data: {
             key,
             requestHash,
-            userId,
+            userId: userId ?? null,
             status: IdempotencyStatus.PROCESSING,
             expiresAt,
           },
@@ -210,7 +220,26 @@ export class IdempotencyService {
         data: { status: IdempotencyStatus.FAILED },
       })
       .catch((err) => {
-        this.logger.error(`Failed to mark idempotency record as FAILED: ${key}`, err);
+        this.logger.error(
+          `Failed to mark idempotency record as FAILED: ${key}`,
+          err,
+        );
       });
+  }
+
+  async releaseStaleProcessing(
+    key: string,
+    olderThanMs: number,
+  ): Promise<void> {
+    await this.prisma.idempotencyRecord.updateMany({
+      where: {
+        key,
+        status: IdempotencyStatus.PROCESSING,
+        createdAt: {
+          lt: new Date(Date.now() - olderThanMs),
+        },
+      },
+      data: { status: IdempotencyStatus.FAILED },
+    });
   }
 }

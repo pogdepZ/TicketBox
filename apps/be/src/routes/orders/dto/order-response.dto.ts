@@ -19,6 +19,18 @@ export interface OrderResponseDto {
   items: OrderItemResponseDto[];
 }
 
+export interface TicketResponseDto {
+  id: string;
+  ticketCode: string;
+  ticketTypeId: string;
+  seatNumber?: string | null;
+  qrPayload: string;
+  status: string;
+  createdAt: string;
+  seatZone: string;
+  price: number;
+}
+
 export interface OrderDetailResponseDto extends OrderResponseDto {
   userId: string;
   reservationId: string;
@@ -28,6 +40,7 @@ export interface OrderDetailResponseDto extends OrderResponseDto {
   concertTitle: string;
   concertDate: string;
   selectedSeats: string[];
+  tickets: TicketResponseDto[];
 }
 
 /**

@@ -1,3 +1,5 @@
+"use client";
+
 import { Download, Share2 } from 'lucide-react';
 
 interface ETicketCardProps {
@@ -10,6 +12,7 @@ interface ETicketCardProps {
   seatNumber: string;
   price: number;
   purchaseDate: string;
+  qrPayload?: string;
 }
 
 export function ETicketCard({
@@ -22,6 +25,7 @@ export function ETicketCard({
   seatNumber,
   price,
   purchaseDate,
+  qrPayload,
 }: ETicketCardProps) {
   const formattedDate = new Date(date).toLocaleDateString('vi-VN', {
     weekday: 'long',
@@ -29,6 +33,88 @@ export function ETicketCard({
     month: 'long',
     day: 'numeric',
   });
+
+  function handleDownload() {
+    const ticketText = `
+========================================
+             TICKETBOX E-TICKET
+========================================
+Mã vé: ${ticketNumber}
+Sự kiện: ${concertTitle}
+Khu vực: ${seatZone}
+Số ghế: ${seatNumber}
+Giá vé: ${price.toLocaleString('vi-VN')}đ
+Ngày diễn: ${formattedDate}
+Thời gian: ${time}
+Địa điểm: ${venue}
+Ngày mua: ${purchaseDate}
+========================================
+Vui lòng xuất trình mã QR này tại quầy soát vé.
+Cảm ơn bạn đã lựa chọn TicketBox!
+    `.trim();
+
+    const blob = new Blob([ticketText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ticket-${ticketNumber}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    window.dispatchEvent(
+      new CustomEvent('ticketbox-toast', {
+        detail: {
+          title: 'Tải xuống thành công',
+          message: `Đã tải xuống thông tin vé điện tử ${ticketNumber}.`,
+          type: 'success',
+        },
+      })
+    );
+  }
+
+  function handleShare() {
+    const shareData = {
+      title: `Vé điện tử TicketBox - ${concertTitle}`,
+      text: `Tôi vừa mua vé xem ${concertTitle} ghế ${seatNumber} khu vực ${seatZone}!`,
+      url: window.location.href,
+    };
+
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      navigator.share(shareData)
+        .then(() => {
+          window.dispatchEvent(
+            new CustomEvent('ticketbox-toast', {
+              detail: {
+                title: 'Chia sẻ thành công',
+                message: 'Thông tin vé đã được chia sẻ.',
+                type: 'success',
+              },
+            })
+          );
+        })
+        .catch((err) => {
+          console.error('Error sharing:', err);
+        });
+    } else {
+      navigator.clipboard.writeText(window.location.href)
+        .then(() => {
+          window.dispatchEvent(
+            new CustomEvent('ticketbox-toast', {
+              detail: {
+                title: 'Đã sao chép liên kết',
+                message: 'Liên kết xem vé đã được sao chép vào clipboard.',
+                type: 'success',
+              },
+            })
+          );
+        })
+        .catch((err) => {
+          console.error('Error copying text:', err);
+        });
+    }
+  }
 
   return (
     <div className="overflow-hidden rounded-[2rem] border border-dashed border-primary/55 bg-card shadow-xl shadow-foreground/5 max-w-full">
@@ -79,20 +165,35 @@ export function ETicketCard({
         </div>
 
         <div className="mb-6 flex items-center justify-center rounded-3xl bg-muted/60 p-4">
-          <div className="h-32 w-32 rounded-2xl bg-white p-2 shadow-inner">
-            <svg viewBox="0 0 100 100" className="w-full h-full">
-              <rect width="100" height="100" fill="white" />
-              <path d="M8 8h24v24H8zM14 14v12h12V14zM68 8h24v24H68zM74 14v12h12V14zM8 68h24v24H8zM14 74v12h12V74zM44 10h8v8h-8zM56 18h8v8h-8zM40 32h24v8H40zM72 44h8v8h-8zM84 52h8v8h-8zM40 52h8v8h-8zM52 60h16v8H52zM72 72h20v8H72zM40 78h8v14h-8zM56 84h8v8h-8z" fill="black" />
-            </svg>
+          <div className="h-32 w-32 rounded-2xl bg-white p-2 shadow-inner flex items-center justify-center overflow-hidden">
+            {qrPayload ? (
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrPayload)}`}
+                alt="QR Code"
+                className="w-full h-full object-contain"
+                loading="lazy"
+              />
+            ) : (
+              <svg viewBox="0 0 100 100" className="w-full h-full">
+                <rect width="100" height="100" fill="white" />
+                <path d="M8 8h24v24H8zM14 14v12h12V14zM68 8h24v24H68zM74 14v12h12V14zM8 68h24v24H8zM14 74v12h12V74zM44 10h8v8h-8zM56 18h8v8h-8zM40 32h24v8H40zM72 44h8v8h-8zM84 52h8v8h-8zM40 52h8v8h-8zM52 60h16v8H52zM72 72h20v8H72zM40 78h8v14h-8zM56 84h8v8h-8z" fill="black" />
+              </svg>
+            )}
           </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <button className="flex-1 flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2 font-bold text-primary-foreground transition hover:bg-primary/90 active:translate-y-px cursor-pointer">
+          <button
+            onClick={handleDownload}
+            className="flex-1 flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2 font-bold text-primary-foreground transition hover:bg-primary/90 hover:-translate-y-0.5 active:translate-y-px cursor-pointer"
+          >
             <Download className="w-4 h-4" />
             Tải xuống
           </button>
-          <button className="flex-1 flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-card px-4 py-2 font-bold text-foreground transition hover:border-primary/40 hover:text-primary active:translate-y-px cursor-pointer">
+          <button
+            onClick={handleShare}
+            className="flex-1 flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-card px-4 py-2 font-bold text-foreground transition hover:border-primary/40 hover:text-primary hover:-translate-y-0.5 active:translate-y-px cursor-pointer"
+          >
             <Share2 className="w-4 h-4" />
             Chia sẻ
           </button>

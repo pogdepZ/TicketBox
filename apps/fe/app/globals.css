@@ -151,6 +151,61 @@
   animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+.reveal-motion {
+  opacity: 0;
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.reveal-motion-up {
+  transform: translate3d(0, 24px, 0);
+}
+
+.reveal-motion-fade {
+  transform: none;
+}
+
+.reveal-motion-scale {
+  transform: translate3d(0, 18px, 0) scale(0.97);
+}
+
+.reveal-motion.is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.hero-card-float::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.18) 36%, transparent 58%);
+  transform: translateX(-120%);
+  transition: transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hero-card-float:hover::after {
+  transform: translateX(120%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .reveal-motion {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Custom browser date/time picker indicator styling */
 input::-webkit-calendar-picker-indicator {
   filter: invert(0.4);

@@ -174,6 +174,7 @@ model User {
   scannedGuests      GuestList[]          @relation("GuestScannedBy")
   uploadedAssets     ArtistAsset[]        @relation("ArtistAssetUploadedBy")
   notifications      Notification[]
+  inAppNotifications InAppNotification[]
   idempotencyRecords IdempotencyRecord[]
   auditLogs          AuditLog[]           @relation("AuditActor")
   waitingRooms       WaitingRoomSession[]
@@ -236,8 +237,11 @@ model UserRole {
 model Concert {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
+  slug        String? @unique @db.VarChar(200)
   name        String  @db.VarChar(200)
   description String?
+  type        String? @db.VarChar(50)
+  city        String? @db.VarChar(100)
 
   artistName      String?         @map("artist_name") @db.VarChar(200)
   artistBio       String?         @map("artist_bio")
@@ -269,6 +273,7 @@ model Concert {
   waitingRoomSessions WaitingRoomSession[]
   tickets             Ticket[]
   reservationSeats    ReservationSeat[]
+  notifications       Notification[]
 
   @@index([status, eventDate])
   @@map("concerts")
@@ -759,10 +764,12 @@ model ArtistAsset {
 model Notification {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  userId String? @map("user_id") @db.Uuid
+  userId    String? @map("user_id") @db.Uuid
+  concertId String? @map("concert_id") @db.Uuid
 
-  channel  NotificationChannel
-  template String              @db.VarChar(50)
+  channel   NotificationChannel
+  template  String              @db.VarChar(50)
+  dedupeKey String?             @unique @map("dedupe_key") @db.VarChar(200)
 
   payload Json?
 
@@ -774,9 +781,11 @@ model Notification {
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user User? @relation(fields: [userId], references: [id])
+  user    User?    @relation(fields: [userId], references: [id])
+  concert Concert? @relation(fields: [concertId], references: [id])
 
   @@index([userId])
+  @@index([concertId])
   @@index([status])
   @@map("notifications")
 }
@@ -872,4 +881,19 @@ model OutboxMessage {
   @@index([status])
   @@index([createdAt])
   @@map("outbox_messages")
+}
+
+model InAppNotification {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  title     String   @db.VarChar(200)
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+  @@map("in_app_notifications")
 }

@@ -1,4 +1,4 @@
-import { Controller, Logger, Param, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Logger, Param, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadedFileDto } from './dto/uploaded-file.dto';
 import { GuestListService } from './guest-list.service';
@@ -15,5 +15,10 @@ export class GuestListController {
     @UploadedFile() file: UploadedFileDto,
   ) {
     return this.guestListService.importFromCsv(concertId, file);
+  }
+
+  @Get(':id/guest-list')
+  async getGuestList(@Param('id') concertId: string) {
+    return this.guestListService.findAllForConcert(concertId);
   }
 }
