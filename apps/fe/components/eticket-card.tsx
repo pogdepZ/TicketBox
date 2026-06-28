@@ -1,6 +1,8 @@
 "use client";
 
+import { useRef } from 'react';
 import { Download, Share2 } from 'lucide-react';
+import { toPng } from 'html-to-image';
 
 interface ETicketCardProps {
   ticketNumber: string;
@@ -27,6 +29,9 @@ export function ETicketCard({
   purchaseDate,
   qrPayload,
 }: ETicketCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const downloadRef = useRef<HTMLDivElement>(null);
+
   const formattedDate = new Date(date).toLocaleDateString('vi-VN', {
     weekday: 'long',
     year: 'numeric',
@@ -35,43 +40,43 @@ export function ETicketCard({
   });
 
   function handleDownload() {
-    const ticketText = `
-========================================
-             TICKETBOX E-TICKET
-========================================
-Mã vé: ${ticketNumber}
-Sự kiện: ${concertTitle}
-Khu vực: ${seatZone}
-Số ghế: ${seatNumber}
-Giá vé: ${price.toLocaleString('vi-VN')}đ
-Ngày diễn: ${formattedDate}
-Thời gian: ${time}
-Địa điểm: ${venue}
-Ngày mua: ${purchaseDate}
-========================================
-Vui lòng xuất trình mã QR này tại quầy soát vé.
-Cảm ơn bạn đã lựa chọn TicketBox!
-    `.trim();
+    if (!downloadRef.current) return;
 
-    const blob = new Blob([ticketText], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `ticket-${ticketNumber}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    toPng(downloadRef.current, {
+      backgroundColor: 'rgb(3, 7, 18)', // Khớp nền tối slate-950 của dự án
+      style: {
+        borderRadius: '2.5rem',
+      },
+      cacheBust: true,
+    })
+      .then((dataUrl) => {
+        const link = document.createElement('a');
+        link.download = `ticket-${ticketNumber}.png`;
+        link.href = dataUrl;
+        link.click();
 
-    window.dispatchEvent(
-      new CustomEvent('ticketbox-toast', {
-        detail: {
-          title: 'Tải xuống thành công',
-          message: `Đã tải xuống thông tin vé điện tử ${ticketNumber}.`,
-          type: 'success',
-        },
+        window.dispatchEvent(
+          new CustomEvent('ticketbox-toast', {
+            detail: {
+              title: 'Tải xuống thành công',
+              message: `Đã tải xuống vé điện tử ${ticketNumber} dưới dạng hình ảnh PNG.`,
+              type: 'success',
+            },
+          })
+        );
       })
-    );
+      .catch((err) => {
+        console.error('Error generating image:', err);
+        window.dispatchEvent(
+          new CustomEvent('ticketbox-toast', {
+            detail: {
+              title: 'Tải xuống thất bại',
+              message: 'Có lỗi xảy ra khi tạo file ảnh vé.',
+              type: 'error',
+            },
+          })
+        );
+      });
   }
 
   function handleShare() {
@@ -117,7 +122,7 @@ Cảm ơn bạn đã lựa chọn TicketBox!
   }
 
   return (
-    <div className="overflow-hidden rounded-[2rem] border border-dashed border-primary/55 bg-card shadow-xl shadow-foreground/5 max-w-full">
+    <div ref={cardRef} className="overflow-hidden rounded-[2rem] border border-dashed border-primary/55 bg-card shadow-xl shadow-foreground/5 max-w-full">
       <div className="border-b border-dashed border-primary/30 bg-foreground p-6 text-background">
         <div className="flex flex-col sm:flex-row justify-between items-start gap-4 sm:gap-0 mb-2">
           <div>
@@ -172,6 +177,7 @@ Cảm ơn bạn đã lựa chọn TicketBox!
                 alt="QR Code"
                 className="w-full h-full object-contain"
                 loading="lazy"
+                crossOrigin="anonymous"
               />
             ) : (
               <svg viewBox="0 0 100 100" className="w-full h-full">
@@ -197,6 +203,69 @@ Cảm ơn bạn đã lựa chọn TicketBox!
             <Share2 className="w-4 h-4" />
             Chia sẻ
           </button>
+        </div>
+      </div>
+
+      {/* Hidden container used ONLY for generating the PNG image */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', pointerEvents: 'none' }}>
+        <div
+          ref={downloadRef}
+          className="w-[400px] bg-slate-950 p-8 flex flex-col items-center text-center rounded-[2.5rem] border-2 border-primary/30"
+        >
+          {/* Header */}
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+            TicketBox E-Pass
+          </span>
+          <h2 className="mt-4 text-xl font-black text-white leading-tight line-clamp-2">
+            {concertTitle}
+          </h2>
+          <p className="mt-1.5 text-xs text-slate-400">{formattedDate} · {time}</p>
+
+          {/* Main Focus: Massive QR Code */}
+          <div className="my-6 p-5 bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center">
+            <div className="w-60 h-60 flex items-center justify-center overflow-hidden">
+              {qrPayload ? (
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrPayload)}`}
+                  alt="QR Code"
+                  className="w-full h-full object-contain"
+                  crossOrigin="anonymous"
+                />
+              ) : (
+                <svg viewBox="0 0 100 100" className="w-full h-full">
+                  <rect width="100" height="100" fill="white" />
+                  <path d="M8 8h24v24H8zM14 14v12h12V14zM68 8h24v24H68zM74 14v12h12V14zM8 68h24v24H8zM14 74v12h12V74zM44 10h8v8h-8zM56 18h8v8h-8zM40 32h24v8H40zM72 44h8v8h-8zM84 52h8v8h-8zM40 52h8v8h-8zM52 60h16v8H52zM72 72h20v8H72zM40 78h8v14h-8zM56 84h8v8h-8z" fill="black" />
+                </svg>
+              )}
+            </div>
+          </div>
+
+          {/* Ticket Info */}
+          <div className="w-full border-t border-dashed border-white/20 pt-4 mt-2">
+            <p className="font-mono text-sm font-bold text-primary tracking-widest uppercase mb-4">
+              {ticketNumber}
+            </p>
+            
+            <div className="grid grid-cols-2 gap-4 text-left bg-slate-900/60 p-4 rounded-2xl border border-white/5">
+              <div>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Khu vực</p>
+                <p className="text-base font-black text-primary truncate" title={seatZone}>{seatZone}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Ghế</p>
+                <p className="text-base font-black text-white">{seatNumber}</p>
+              </div>
+              <div className="col-span-2 border-t border-white/5 pt-2 mt-1">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Địa điểm</p>
+                <p className="text-xs font-semibold text-slate-300 line-clamp-1">{venue}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-6 text-[9px] font-bold text-slate-500 tracking-wider">
+            VUI LÒNG XUẤT TRÌNH VÉ NÀY TẠI CỬA BÀN SOÁT VÉ
+          </div>
         </div>
       </div>
     </div>

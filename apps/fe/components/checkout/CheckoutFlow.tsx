@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { CheckoutSummary } from '@/components/checkout-summary';
-import { paymentMethods } from '@/lib/mock-data';
+import { paymentMethods } from '@/lib/types';
 import { createDraftReservation, DraftReservation, getDraftReservation } from '@/lib/draft-reservation';
 import { createOrder, createPayment, getFriendlyErrorMessage, getProfile, getOrderById, getConcertById } from '@/lib/api';
 

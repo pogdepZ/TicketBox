@@ -258,16 +258,19 @@ export class AdminDashboardService {
       const ticketsSold = soldTickets.length;
       const sellThroughRate = capacity > 0 ? Math.round((ticketsSold / capacity) * 100) : 0;
 
-      // Generate dates from concert creation (sales open) to today
+      // Generate dates from concert creation (sales open) to 1 day before event
+      const endDate = new Date(new Date(concert.eventDate).getTime() - 24 * 60 * 60 * 1000);
       const startDate = new Date(concert.createdAt);
 
-      const endDate = new Date();
+      if (startDate >= endDate) {
+        startDate.setTime(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+      }
 
       // Tính số ngày chênh lệch thực tế để đảm bảo có tối thiểu 7 ngày hiển thị
-      const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+      const diffTime = endDate.getTime() - startDate.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       if (diffDays < 7) {
-        startDate.setDate(startDate.getDate() - (7 - diffDays));
+        startDate.setTime(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
       }
 
       const dateList: string[] = [];

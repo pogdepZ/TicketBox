@@ -1,5 +1,5 @@
 import { ArrowRight, Ticket } from 'lucide-react';
-import type { Seat, TicketZone } from '@/lib/mock-data';
+import type { Seat, TicketZone } from '@/lib/types';
 
 interface OrderSummaryProps {
   concertTitle: string;

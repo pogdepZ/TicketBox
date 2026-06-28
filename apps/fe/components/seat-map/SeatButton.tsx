@@ -1,4 +1,4 @@
-import type { Seat, SeatStatus } from '@/lib/mock-data';
+import type { Seat, SeatStatus } from '@/lib/types';
 
 interface SeatButtonProps {
   seat: Seat;

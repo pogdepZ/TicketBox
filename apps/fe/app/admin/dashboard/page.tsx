@@ -20,6 +20,16 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 
+const getTicketColor = (label: string) => {
+  const normalized = label.toLowerCase();
+  if (normalized.includes("svip")) return "#e5484d";
+  if (normalized.includes("vip")) return "#e0a82e";
+  if (normalized.includes("cat1") || normalized.includes("cat 1")) return "#3d6f8f";
+  if (normalized.includes("cat2") || normalized.includes("cat 2")) return "#123c3a";
+  if (normalized.includes("ga")) return "#64748b";
+  return "#8b5e83"; // default
+};
+
 function DailySalesChart({ data }: { data: any[] }) {
   if (!data || data.length === 0) {
     return (
@@ -728,8 +738,8 @@ export default function AdminDashboardPage() {
                       </div>
                       <div className="h-2.5 bg-muted rounded-full overflow-hidden">
                         <div
-                          className={`h-full ${item.color || "bg-primary"}`}
-                          style={{ width: `${item.value}%` }}
+                          className="h-full"
+                          style={{ width: `${item.value}%`, backgroundColor: getTicketColor(item.label) }}
                         />
                       </div>
                     </div>

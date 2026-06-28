@@ -22,33 +22,33 @@ Nhân sự soát vé (vai trò `checker`) dùng mobile app/PWA để quét QR e-
 
 ## 3. Luồng offline
 
-1. Trước sự kiện, app đồng bộ public key và tải danh sách vé (cấu hình concert/gate) để lưu offline.
+1. Trước sự kiện, app đồng bộ khoá bí mật dùng chung (ticketSecret/publicKey) và tải danh sách vé (ticket/guest snapshot) để lưu vào SQLite local.
 2. Khi mất mạng, `checker` vẫn quét QR.
-3. App verify chữ ký QR offline.
-4. App kiểm tra local database đã quét ticket này chưa.
-5. App lưu check-in event vào local queue.
-6. App hiển thị trạng thái “Tạm chấp nhận offline”.
-7. Khi có mạng, app gửi batch sync.
+3. App verify chữ ký QR offline sử dụng thuật toán đối xứng HMAC-SHA256 (HS256) với khoá bí mật đã tải về.
+4. App kiểm tra local database SQLite (`ticket_snapshot`) xem vé đã ở trạng thái `USED` hoặc `TEMP_ACCEPTED` chưa.
+5. App lưu check-in event vào local queue trong AsyncStorage (key `offline_checkin_queue`).
+6. App hiển thị trạng thái “Tạm chấp nhận offline” (Result với trạng thái `TEMP_ACCEPTED`).
+7. Khi có mạng, app gửi batch sync lên endpoint `/checkin/sync`.
 8. Server xử lý từng event idempotently.
 9. Server trả kết quả accepted/rejected/conflict.
-10. App cập nhật local status.
+10. App cập nhật local status trong SQLite (`ticket_snapshot` thành `USED` nếu sync thành công hoặc conflict) và xóa item khỏi AsyncStorage queue.
 
 ## 4. Kịch bản lỗi
 
 | Tình huống | Xử lý |
 |---|---|
-| QR sai chữ ký | Từ chối ngay |
+| QR sai chữ ký | Từ chối ngay (verify HMAC-SHA256 thất bại) |
 | QR hết hạn/sai concert | Từ chối |
-| Ticket đã quét trên cùng thiết bị | Cảnh báo trùng |
-| Ticket đã used trên server | Reject khi sync |
-| Hai thiết bị offline cùng quét một vé | Server accept event đầu tiên sync, event sau conflict |
-| App mất mạng khi sync | Giữ local queue và retry sau |
+| Ticket đã quét trên cùng thiết bị | Cảnh báo trùng (trạng thái `TEMP_ACCEPTED` hoặc `USED` trong SQLite) |
+| Ticket đã used trên server | Reject/Conflict khi sync |
+| Hai thiết bị offline cùng quét một vé | Server accept event đầu tiên sync, event sau báo CONFLICT |
+| App mất mạng khi sync | Giữ local queue trong AsyncStorage và retry sau |
 
 ## 5. Ràng buộc
 
-- Mỗi local event có `client_event_id`.
-- Server dùng `(device_id, client_event_id)` để idempotency.
-- Không xóa local queue cho đến khi server ACK.
+- Mỗi local event có `client_event_id` (được sinh ngẫu nhiên hoặc theo dạng `scan-timestamp`).
+- Server dùng `(device_id, client_event_id)` trên bảng `CheckinEvent` để thực hiện idempotency.
+- Không xóa local queue trong AsyncStorage cho đến khi server ACK (sync thành công hoặc báo conflict/reject rõ ràng).
 - Offline không thể chống double-scan tuyệt đối giữa nhiều thiết bị; hệ thống phát hiện và ghi log khi sync.
 - Quyền truy cập API check-in của `checker` bao gồm các permission:
   * `ticket:verify`

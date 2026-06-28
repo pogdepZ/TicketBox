@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Seat, TicketZone, TicketZoneStatus } from '@/lib/mock-data';
+import type { Seat, TicketZone, TicketZoneStatus } from '@/lib/types';
 import { OrderSummary } from '@/components/checkout/OrderSummary';
 import { VenueMapOverview } from '@/components/seat-map/VenueMapOverview';
 import { ZoneSeatMap } from '@/components/seat-map/ZoneSeatMap';

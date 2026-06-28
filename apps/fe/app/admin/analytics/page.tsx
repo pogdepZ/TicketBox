@@ -350,153 +350,237 @@ function UserAnalyticsChart({ data }: { data: any[] }) {
   const height = 240;
   const graphHeight = height - top - bottom;
 
+  const [hoveredDayIdx, setHoveredDayIdx] = useState<number | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0, showLeft: false });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const getX = (i: number) => left + i * dayWidth + dayWidth / 2;
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const svgEl = e.currentTarget;
+    const rect = svgEl.getBoundingClientRect();
+    const clientX = e.clientX - rect.left;
+
+    const scaleX = width / rect.width;
+    const svgX = clientX * scaleX;
+
+    const xInGraph = svgX - left;
+    const dayIdx = Math.floor(xInGraph / dayWidth);
+
+    if (dayIdx >= 0 && dayIdx < numDays) {
+      setHoveredDayIdx(dayIdx);
+
+      if (containerRef.current) {
+        const cRect = containerRef.current.getBoundingClientRect();
+        const x = e.clientX - cRect.left;
+        const y = e.clientY - cRect.top;
+        const showLeft = x > cRect.width - 190;
+
+        setTooltipPos({
+          x,
+          y: y - 12,
+          showLeft,
+        });
+      }
+    } else {
+      setHoveredDayIdx(null);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredDayIdx(null);
+  };
+
   const formatDate = (str: string) => {
     const parts = str.split("-");
     if (parts.length >= 3) return `${parts[2]}/${parts[1]}`;
     return str;
   };
 
+  const formatDateTooltip = (str: string) => {
+    const parts = str.split("-");
+    if (parts.length >= 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    return str;
+  };
+
   return (
-    <div className="w-full overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
-      <div
-        style={{
-          height: "240px",
-          width: numDays <= 12 ? "100%" : `${width}px`,
-          minWidth: "100%",
-        }}
-      >
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-full select-none"
+    <div ref={containerRef} className="relative w-full">
+      <div className="w-full overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+        <div
+          style={{
+            height: "240px",
+            width: numDays <= 12 ? "100%" : `${width}px`,
+            minWidth: "100%",
+          }}
         >
-          {/* Y Axis Grid lines */}
-          {Array.from({ length: 5 }).map((_, idx) => {
-            const y = top + (idx / 4) * graphHeight;
-            const val = Math.round(maxCount - (idx / 4) * maxCount);
-            return (
-              <g key={idx}>
-                <line
-                  x1={left}
-                  y1={y}
-                  x2={left + graphWidth}
-                  y2={y}
-                  stroke="var(--color-border)"
-                  strokeWidth={1}
-                  strokeDasharray="4 4"
-                  opacity={0.5}
-                />
-                <text
-                  x={left - 8}
-                  y={y + 4}
-                  textAnchor="end"
-                  className="fill-muted-foreground text-[10px] font-medium"
-                >
-                  {val} user
-                </text>
-              </g>
-            );
-          })}
-
-          {/* X Axis line */}
-          <line
-            x1={left}
-            y1={top + graphHeight}
-            x2={left + graphWidth}
-            y2={top + graphHeight}
-            stroke="var(--color-border)"
-            strokeWidth={1.5}
-          />
-
-          {/* X Axis Date Labels */}
-          {data.map((s: any, idx: number) => {
-            const step = Math.max(Math.ceil(numDays / 12), 1);
-            const isLast = idx === numDays - 1;
-            if (idx % step !== 0 && !isLast) return null;
-            if (isLast && idx % step > 0 && idx % step < step * 0.4)
-              return null;
-
-            const x = left + idx * dayWidth + dayWidth / 2;
-            return (
-              <g key={idx}>
-                <line
-                  x1={x}
-                  y1={top + graphHeight}
-                  x2={x}
-                  y2={top + graphHeight + 4}
-                  stroke="var(--color-border)"
-                  strokeWidth={1}
-                />
-                <text
-                  x={x}
-                  y={top + graphHeight + 18}
-                  textAnchor="middle"
-                  className="fill-muted-foreground text-[9px] font-bold"
-                >
-                  {formatDate(s.date)}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Bars */}
-          {data.map((item: any, idx: number) => {
-            const x = left + idx * dayWidth + (dayWidth - barWidth) / 2;
-            const barHeight = (item.count / maxCount) * graphHeight;
-            const y = top + graphHeight - barHeight;
-
-            return (
-              <g
-                key={idx}
-                className="group hover:brightness-110 transition-all duration-150"
-              >
-                {/* Invisible wide bar for easier hover */}
-                <rect
-                  x={x - 4}
-                  y={top}
-                  width={barWidth + 8}
-                  height={graphHeight}
-                  fill="transparent"
-                  className="cursor-pointer"
-                />
-                {item.count > 0 && (
-                  <rect
-                    x={x}
-                    y={y}
-                    width={barWidth}
-                    height={Math.max(barHeight, 2)}
-                    fill="#e5484d" // Đỏ thương hiệu / Neon
-                    rx={2}
-                  >
-                    <title>{`Ngày ${formatDate(item.date)}: ${item.count} người đăng ký mới`}</title>
-                  </rect>
-                )}
-                {item.count === 0 && (
-                  <rect
-                    x={x}
-                    y={top + graphHeight - 1}
-                    width={barWidth}
-                    height={1}
-                    fill="var(--color-border)"
-                    opacity={0.3}
-                    rx={0.5}
+          <svg
+            viewBox={`0 0 ${width} ${height}`}
+            className="w-full h-full select-none"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
+            {/* Y Axis Grid lines */}
+            {Array.from({ length: 5 }).map((_, idx) => {
+              const y = top + (idx / 4) * graphHeight;
+              const val = Math.round(maxCount - (idx / 4) * maxCount);
+              return (
+                <g key={idx}>
+                  <line
+                    x1={left}
+                    y1={y}
+                    x2={left + graphWidth}
+                    y2={y}
+                    stroke="var(--color-border)"
+                    strokeWidth={1}
+                    strokeDasharray="4 4"
+                    opacity={0.5}
                   />
-                )}
-                {/* Label count on hover */}
-                {item.count > 0 && (
                   <text
-                    x={x + barWidth / 2}
-                    y={y - 5}
-                    textAnchor="middle"
-                    className="fill-foreground text-[9px] font-black opacity-0 group-hover:opacity-100 transition-opacity"
+                    x={left - 8}
+                    y={y + 4}
+                    textAnchor="end"
+                    className="fill-muted-foreground text-[10px] font-medium"
                   >
-                    {item.count}
+                    {val} user
                   </text>
-                )}
-              </g>
-            );
-          })}
-        </svg>
+                </g>
+              );
+            })}
+
+            {/* X Axis line */}
+            <line
+              x1={left}
+              y1={top + graphHeight}
+              x2={left + graphWidth}
+              y2={top + graphHeight}
+              stroke="var(--color-border)"
+              strokeWidth={1.5}
+            />
+
+            {/* X Axis Date Labels */}
+            {data.map((s: any, idx: number) => {
+              const step = Math.max(Math.ceil(numDays / 12), 1);
+              const isLast = idx === numDays - 1;
+              if (idx % step !== 0 && !isLast) return null;
+              if (isLast && idx % step > 0 && idx % step < step * 0.4)
+                return null;
+
+              const x = getX(idx);
+              return (
+                <g key={idx}>
+                  <line
+                    x1={x}
+                    y1={top + graphHeight}
+                    x2={x}
+                    y2={top + graphHeight + 4}
+                    stroke="var(--color-border)"
+                    strokeWidth={1}
+                  />
+                  <text
+                    x={x}
+                    y={top + graphHeight + 18}
+                    textAnchor="middle"
+                    className="fill-muted-foreground text-[9px] font-bold"
+                  >
+                    {formatDate(s.date)}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Vertical Guide Line on hover */}
+            {hoveredDayIdx !== null && (
+              <line
+                x1={getX(hoveredDayIdx)}
+                y1={top}
+                x2={getX(hoveredDayIdx)}
+                y2={top + graphHeight}
+                stroke="#e5484d"
+                strokeWidth={1.5}
+                strokeDasharray="3 3"
+                className="transition-all duration-75"
+                opacity={0.4}
+              />
+            )}
+
+            {/* Bars */}
+            {data.map((item: any, idx: number) => {
+              const x = left + idx * dayWidth + (dayWidth - barWidth) / 2;
+              const barHeight = (item.count / maxCount) * graphHeight;
+              const y = top + graphHeight - barHeight;
+
+              const isHovered = hoveredDayIdx === idx;
+
+              return (
+                <g
+                  key={idx}
+                  className="group transition-all duration-150"
+                >
+                  {/* Invisible wide bar for easier hover */}
+                  <rect
+                    x={x - 4}
+                    y={top}
+                    width={barWidth + 8}
+                    height={graphHeight}
+                    fill="transparent"
+                    className="cursor-pointer"
+                  />
+                  {item.count > 0 && (
+                    <rect
+                      x={x}
+                      y={y}
+                      width={barWidth}
+                      height={Math.max(barHeight, 2)}
+                      fill={isHovered ? "#ff6b6f" : "#e5484d"} // Hover highlight
+                      rx={2}
+                      className="transition-all duration-150"
+                    />
+                  )}
+                  {item.count === 0 && (
+                    <rect
+                      x={x}
+                      y={top + graphHeight - 1}
+                      width={barWidth}
+                      height={1}
+                      fill="var(--color-border)"
+                      opacity={0.3}
+                      rx={0.5}
+                    />
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+        </div>
       </div>
+
+      {/* Floating Hover Tooltip */}
+      {hoveredDayIdx !== null && (
+        <div
+          style={{
+            left: tooltipPos.showLeft ? "auto" : `${tooltipPos.x + 15}px`,
+            right: tooltipPos.showLeft
+              ? `${containerRef.current ? containerRef.current.clientWidth - tooltipPos.x + 15 : 0}px`
+              : "auto",
+            top: `${tooltipPos.y}px`,
+            transform: "translateY(-100%)",
+          }}
+          className="pointer-events-none absolute z-30 flex flex-col gap-1.5 rounded-xl border border-white/10 bg-slate-950/95 p-3 text-xs shadow-2xl backdrop-blur-md transition-all duration-75"
+        >
+          <p className="font-bold text-white mb-0.5">
+            Ngày {formatDateTooltip(data[hoveredDayIdx].date)}
+          </p>
+          <div className="flex flex-col gap-1 text-[11px]">
+            <div className="flex items-center gap-2 text-slate-300">
+              <span className="size-2 rounded-full bg-[#e5484d] shrink-0" />
+              <span className="font-medium">Người dùng mới:</span>
+              <strong className="text-white ml-auto">
+                {data[hoveredDayIdx].count.toLocaleString("vi-VN")} thành viên
+              </strong>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -923,10 +1007,20 @@ export default function AdminAnalyticsPage() {
                               className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider shrink-0 ${
                                 event.status === "PUBLISHED"
                                   ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                                  : "bg-slate-500/10 text-slate-500 border-slate-500/20"
+                                  : event.status === "COMPLETED"
+                                    ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                                    : event.status === "CANCELLED"
+                                      ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                                      : "bg-slate-500/10 text-slate-500 border-slate-500/20"
                               }`}
                             >
-                              {event.status === "PUBLISHED" ? "Mở bán" : "Nháp"}
+                              {event.status === "PUBLISHED"
+                                ? "Mở bán"
+                                : event.status === "COMPLETED"
+                                  ? "Đã kết thúc"
+                                  : event.status === "CANCELLED"
+                                    ? "Đã hủy"
+                                    : "Nháp"}
                             </span>
                           </div>
                         </div>

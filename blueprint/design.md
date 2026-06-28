@@ -147,25 +147,30 @@ sequenceDiagram
     Note over MobileApp, PostgresDB: LUỒNG SOÁT VÉ OFFLINE & ĐỒNG BỘ (OFFLINE CHECK-IN & SYNC)
     Note over MobileApp: Mất kết nối mạng (Offline)
     Checker->>MobileApp: Quét QR e-ticket
-    MobileApp->>MobileApp: Xác thực chữ ký QR Code (JWS/Asymmetric) bằng Public Key
-    MobileApp->>SQLiteDB: Check local duplicate (ticketId, sourceDeviceId)
+    MobileApp->>MobileApp: Xác thực chữ ký QR Code (JWS/Symmetric) bằng ticketSecret/publicKey (HS256)
+    MobileApp->>SQLiteDB: Check local duplicate trong ticket_snapshot (status = 'USED'/'TEMP_ACCEPTED')
     SQLiteDB-->>MobileApp: Chưa quét (Chấp nhận quét offline)
-    MobileApp->>SQLiteDB: INSERT INTO checkin_log (syncStatus = 'PENDING', id = UUID)
+    MobileApp->>SQLiteDB: UPDATE ticket_snapshot SET status = 'TEMP_ACCEPTED'
+    MobileApp->>AsyncStorage: Enqueue check-in event (syncStatus = 'PENDING', clientEventId = q-UUID)
     MobileApp-->>Checker: ✅ Tạm chấp nhận (Offline Mode)
     
     Note over MobileApp: Khôi phục kết nối mạng (Online)
-    MobileApp->>SQLiteDB: Lấy các bản ghi check-in pending (syncStatus = 'PENDING'/'FAILED')
+    MobileApp->>AsyncStorage: Lấy các bản ghi check-in pending
     MobileApp->>APIServer: POST /checkin/sync { items: [{ ticketId, qrCodeData, concertId, staffId, sourceDeviceId, checkedAt, clientEventId }] }
     APIServer->>PostgresDB: Bắt đầu Transaction cho từng bản ghi trong Batch
     APIServer->>PostgresDB: Kiểm tra unique(deviceId, clientEventId) trên checkin_events và ticket.status
     alt Sync Thành Công (ticket.status === 'active')
         APIServer->>PostgresDB: Tạo CheckinEvent (status = 'ACCEPTED'), cập nhật ticket.status = 'used'
         APIServer-->>MobileApp: Phản hồi item: { ticketId, status: 'SYNCED', serverId }
-        MobileApp->>SQLiteDB: UPDATE checkin_log SET syncStatus = 'SYNCED', serverCheckinId = serverId WHERE id = clientEventId
+        MobileApp->>SQLiteDB: UPDATE ticket_snapshot SET status = 'USED'
+        MobileApp->>SQLiteDB: INSERT INTO sync_log (status = 'SUCCESS')
+        MobileApp->>AsyncStorage: Xóa item khỏi queue
     else Sync Thất bại (Conflict - Vé đã quét ở máy khác trước đó)
         APIServer->>PostgresDB: Tạo CheckinEvent (status = 'CONFLICT'), ghi log Audit cảnh báo gian lận và realtime push alert tới Admin
         APIServer-->>MobileApp: Phản hồi item: { ticketId, status: 'REJECTED', reason: 'Conflict' }
-        MobileApp->>SQLiteDB: UPDATE checkin_log SET syncStatus = 'FAILED', lastSyncError = 'Conflict' WHERE id = clientEventId
+        MobileApp->>SQLiteDB: UPDATE ticket_snapshot SET status = 'USED' (giữ trạng thái used của vé)
+        MobileApp->>SQLiteDB: INSERT INTO sync_log (status = 'FAILED')
+        MobileApp->>AsyncStorage: Xóa item khỏi queue (hoặc đánh dấu conflict tùy cấu hình)
     end
 
     %% Nhập CSV VIP
@@ -411,18 +416,18 @@ Giảm tải truy vấn cho PostgreSQL:
 
 ### 7. Soát vé offline và đồng bộ (Offline Check-in & Sync)
 *   **Xác thực offline tại Client (Mobile App):**
-    *   Khi có mạng, thiết bị soát vé gọi API tải snapshot dữ liệu vé hợp lệ của concert về lưu vào SQLite local. Đồng thời tải Public Key của hệ thống.
-    *   QR code trên e-ticket thực chất là một chuỗi ký số chứa: `ticketId`, `ticketCode`, `concertId`, `ticketTypeId` và thời gian hết hạn (`exp`), được backend ký bằng Private Key (sử dụng thuật toán mã hóa bất đối xứng như RS256 hoặc ES256) khi xuất vé.
-    *   Khi quét offline: App verify chữ ký của QR Code bằng Public Key để phát hiện vé giả mạo mà không cần gọi API (và không lo bị lộ khóa Private Key như khi dùng mã hóa đối xứng).
-    *   Kiểm tra trạng thái quét trong SQLite local: `SELECT * FROM checkin_log WHERE ticketId = ?`. Nếu đã có bản ghi -> Cảnh báo vé đã quét. Nếu chưa, tiến hành ghi nhận check-in tạm thời: `INSERT INTO checkin_log` với trạng thái `syncStatus = 'PENDING'`, `id` tự sinh bằng UUID v4, và thời gian quét `checkedAt`.
+    *   Khi có mạng, thiết bị soát vé gọi API tải snapshot dữ liệu vé hợp lệ của concert về lưu vào SQLite local. Đồng thời tải khoá bí mật dùng chung (ticketSecret/publicKey) của hệ thống.
+    *   QR code trên e-ticket thực chất là một chuỗi ký số chứa: `ticketId`, `ticketCode`, `concertId`, `ticketTypeId` và thời gian hết hạn (`exp`), được backend ký bằng thuật toán đối xứng HMAC-SHA256 (HS256) sử dụng khóa bí mật `ticketSecret`.
+    *   Khi quét offline: App verify chữ ký của QR Code bằng `CryptoJS.HmacSHA256` với khóa bí mật để phát hiện vé giả mạo mà không cần gọi API (lưu ý: cách tiếp cận đối xứng này cần được nâng cấp lên bất đối xứng trong môi trường sản xuất để tránh lộ khóa ký trên thiết bị khách).
+    *   Kiểm tra trạng thái quét trong SQLite local: `SELECT * FROM ticket_snapshot WHERE ticketCode = ?`. Nếu trạng thái là `USED` hoặc `TEMP_ACCEPTED` -> Cảnh báo vé đã quét. Nếu chưa, tiến hành ghi nhận trạng thái tạm thời trong SQLite: `UPDATE ticket_snapshot SET status = 'TEMP_ACCEPTED'` và đẩy check-in event vào local queue trong `AsyncStorage` (key `offline_checkin_queue`).
 *   **Đồng bộ Bulk Sync & Xử lý Conflict trên Server:**
-    *   Khi thiết bị khôi phục kết nối mạng, app tự động lấy toàn bộ log check-in ở trạng thái `PENDING` và gọi API `/checkin/sync` gửi mảng check-in lên server.
+    *   Khi thiết bị khôi phục kết nối mạng, app tự động lấy toàn bộ log check-in ở trạng thái pending trong `AsyncStorage` và gọi API `/checkin/sync` gửi mảng check-in lên server.
     *   Server mở transaction, xử lý từng sự kiện check-in gửi lên:
         *   Duyệt tính duy nhất để tránh gửi trùng lặp nhờ constraint `unique(deviceId, client_event_id)` trên bảng `CheckinEvent`.
         *   Truy vấn trạng thái vé trong PostgreSQL:
             *   Nếu `ticket.status === 'active'`: Cập nhật trạng thái vé thành `used`, cập nhật `scannedAt` và tạo bản ghi `CheckinEvent` với kết quả `ACCEPTED`. Trả về client trạng thái `SYNCED`.
             *   Nếu `ticket.status === 'used'` (Vé đã bị quét trước đó ở một thiết bị khác trực tuyến hoặc đã sync trước): Server từ chối bản ghi check-in này, tạo `CheckinEvent` với kết quả `CONFLICT` kèm lý do lỗi, đồng thời ghi log Audit cảnh báo gian lận. Trả về client trạng thái `CONFLICT` để checker biết và xử lý.
-        *   Client nhận phản hồi cập nhật trạng thái log local tương ứng (`SYNCED` hoặc `FAILED` kèm lý do lỗi).
+        *   Client nhận phản hồi cập nhật trạng thái log local tương ứng (`SYNCED` hoặc `CONFLICT` / `FAILED` kèm lý do lỗi), cập nhật trạng thái `ticket_snapshot` trong SQLite thành `USED`, thêm bản ghi vào `sync_log`, và xóa item khỏi queue trong `AsyncStorage`.
 *   **Xử lý Cảnh báo Conflict muộn (Late Conflict Resolution):**
     *   Do tính chất check-in offline, hệ thống không thể ngăn chặn hoàn toàn việc một vé QR giả/trùng lặp được quét thành công ở hai thiết bị offline khác nhau tại thời điểm mất mạng.
     *   Khi thiết bị thực hiện sync dữ liệu và server phát hiện ra trạng thái `CONFLICT`, hệ thống sẽ kích hoạt một sự kiện bất đồng bộ gửi thông báo Realtime (qua WebSockets) đến bảng điều khiển của Admin (Admin Dashboard).

@@ -54,12 +54,12 @@ Ban tổ chức có thể upload PDF hồ sơ nghệ sĩ hoặc press kit. Hệ 
 
 ## 7. API Endpoints
 
-### `POST /ai-bio/upload`
+### `POST /admin/concerts/:id/artist-bio/upload`
 
 - **Mô tả:** Upload PDF để trích xuất tiểu sử nghệ sĩ.
 - **Request:** `multipart/form-data`
+  - Param `:id`: concertId (UUID)
   - Header `Idempotency-Key`: chuỗi duy nhất cho mỗi lần admin bấm tạo bio
-  - `concertId`: UUID
   - `file`: PDF file
 - **Response:**
   ```json

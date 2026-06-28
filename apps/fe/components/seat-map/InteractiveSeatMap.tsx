@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, MouseEvent } from "react";
-import type { TicketZone } from "@/lib/mock-data";
+import type { TicketZone } from "@/lib/types";
 import { ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 
 interface InteractiveSeatMapProps {

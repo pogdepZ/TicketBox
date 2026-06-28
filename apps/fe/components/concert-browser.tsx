@@ -78,9 +78,6 @@ function ConcertRow({ groupName, list }: ConcertRowProps) {
   const scroll = (direction: 'left' | 'right') => {
     const container = scrollRef.current;
     if (container) {
-      // Temporarily disable scroll-snap to prevent browser layout conflicts during custom animation
-      container.style.scrollSnapType = 'none';
-
       const scrollAmount = container.clientWidth * 0.75;
       const targetScrollLeft =
         direction === 'left'
@@ -109,8 +106,6 @@ function ConcertRow({ groupName, list }: ConcertRowProps) {
         if (progress < 1) {
           requestAnimationFrame(animate);
         } else {
-          // Re-enable scroll snap after animation finishes to support manual touch gestures
-          container.style.scrollSnapType = 'x mandatory';
           // Ensure arrow states and gradient masks update correctly after navigation completion
           updateArrows();
         }
@@ -185,13 +180,13 @@ function ConcertRow({ groupName, list }: ConcertRowProps) {
         {/* Horizontal scroll content wrapper */}
         <div
           ref={scrollRef}
-          className="w-full overflow-x-auto pb-4 scrollbar-none snap-x snap-mandatory"
+          className="w-full overflow-x-auto pb-4 scrollbar-none"
         >
           <div className="flex gap-6 w-max">
             {list.map((concert, index) => (
               <Reveal
                 key={concert.id}
-                className="w-[280px] sm:w-[320px] md:w-[360px] shrink-0 snap-start"
+                className="w-[280px] sm:w-[320px] md:w-[360px] shrink-0"
                 delay={Math.min(index, 5) * 55}
                 variant="scale"
               >

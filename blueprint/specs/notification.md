@@ -65,3 +65,20 @@ Nếu notification với dedupe key này đã ở trạng thái `sent` hoặc `q
   - `channel`: 'EMAIL' | 'PUSH' | 'SMS' | 'ZALO'
   - `payload`: Record<string, unknown>
 - **Trả về:** `{ notificationId: string, status: string }`
+
+## 9. API Endpoints (In-App Notifications)
+
+### `GET /notifications`
+- **Mô tả:** Lấy danh sách thông báo in-app của user đang đăng nhập.
+- **Headers:** `Authorization: Bearer <access_token>`
+- **Response:** Danh sách các thông báo in-app của user.
+
+### `PATCH /notifications/:id/read`
+- **Mô tả:** Đánh dấu một thông báo là đã đọc.
+- **Headers:** `Authorization: Bearer <access_token>`
+- **Response:** `{ success: true }`
+
+### `POST /notifications/read-all`
+- **Mô tả:** Đánh dấu toàn bộ thông báo của user là đã đọc.
+- **Headers:** `Authorization: Bearer <access_token>`
+- **Response:** `{ success: true }`

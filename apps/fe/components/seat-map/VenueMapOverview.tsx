@@ -1,4 +1,4 @@
-import type { TicketZone } from '@/lib/mock-data';
+import type { TicketZone } from '@/lib/types';
 import { ZoneInfoCard } from './ZoneInfoCard';
 
 interface VenueMapOverviewProps {

@@ -22,13 +22,18 @@ export default function AdminConcertsPage() {
   const [confirmConcertId, setConfirmConcertId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [statusFilter, setStatusFilter] = useState("all");
   const limit = 10;
 
-  async function loadConcerts(searchKeyword = keyword, targetPage = 1) {
+  async function loadConcerts(searchKeyword = keyword, targetPage = 1, currentStatus = statusFilter) {
     setLoading(true);
     setError(null);
     try {
-      const res = await getConcerts({ keyword: searchKeyword, page: targetPage, limit });
+      const params: any = { keyword: searchKeyword, page: targetPage, limit };
+      if (currentStatus !== "all") {
+        params.status = currentStatus;
+      }
+      const res = await getConcerts(params);
       setConcertsList(res.items || []);
       setTotalPages(res.meta?.totalPages || 1);
       setPage(res.meta?.page || targetPage);
@@ -41,8 +46,8 @@ export default function AdminConcertsPage() {
   }
 
   useEffect(() => {
-    loadConcerts(keyword, 1);
-  }, []);
+    loadConcerts(keyword, 1, statusFilter);
+  }, [statusFilter]);
 
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
     setKeyword(e.target.value);
@@ -50,7 +55,7 @@ export default function AdminConcertsPage() {
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
-      loadConcerts(keyword, 1);
+      loadConcerts(keyword, 1, statusFilter);
     }
   }
 
@@ -138,7 +143,7 @@ export default function AdminConcertsPage() {
           </Link>
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -150,10 +155,32 @@ export default function AdminConcertsPage() {
               className="h-12 w-full rounded-full border border-border bg-card pl-11 pr-4 shadow-sm focus:outline-none focus:ring-4 focus:ring-primary/15 text-foreground text-sm"
             />
           </div>
+
+          <div className="w-full sm:w-48">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="h-12 w-full rounded-full border border-border bg-card px-4 shadow-sm focus:outline-none focus:ring-4 focus:ring-primary/15 text-foreground text-sm cursor-pointer appearance-none"
+              style={{
+                backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 16px center',
+                backgroundSize: '16px',
+                paddingRight: '40px'
+              }}
+            >
+              <option value="all">Tất cả trạng thái</option>
+              <option value="draft">Bản nháp</option>
+              <option value="published">Đang mở bán</option>
+              <option value="cancelled">Đã hủy</option>
+              <option value="completed">Đã kết thúc</option>
+            </select>
+          </div>
+
           <button
-            onClick={() => loadConcerts(keyword, 1)}
+            onClick={() => loadConcerts(keyword, 1, statusFilter)}
             disabled={loading}
-            className="flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2 font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary active:scale-95 disabled:opacity-50 cursor-pointer"
+            className="flex items-center justify-center gap-2 rounded-full border border-border bg-card px-6 h-12 font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
           >
             <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
             Tìm kiếm
@@ -190,14 +217,14 @@ export default function AdminConcertsPage() {
                 <div className="flex gap-2">
                   <button
                     disabled={page <= 1 || loading}
-                    onClick={() => loadConcerts(keyword, page - 1)}
+                    onClick={() => loadConcerts(keyword, page - 1, statusFilter)}
                     className="flex items-center gap-1 rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold text-foreground transition hover:border-primary/40 hover:text-primary disabled:opacity-40 cursor-pointer"
                   >
                     Trước
                   </button>
                   <button
                     disabled={page >= totalPages || loading}
-                    onClick={() => loadConcerts(keyword, page + 1)}
+                    onClick={() => loadConcerts(keyword, page + 1, statusFilter)}
                     className="flex items-center gap-1 rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold text-foreground transition hover:border-primary/40 hover:text-primary disabled:opacity-40 cursor-pointer"
                   >
                     Sau

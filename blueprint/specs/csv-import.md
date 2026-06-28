@@ -49,10 +49,10 @@ Tran Thi B,b@example.com,0900000002,Sponsor,VIP002
 
 ## 7. API Endpoints
 
-### `POST /guest-list/import`
+### `POST /admin/concerts/:id/guest-list/import`
 - **Mô tả:** Import danh sách khách mời từ file CSV.
 - **Request:** `multipart/form-data`
-  - `concertId`: UUID
+  - Param `:id`: concertId (UUID)
   - `file`: CSV file
 - **Response:**
   ```json

@@ -4,7 +4,7 @@
 // DESIGN_VARIANCE: 8 | MOTION_INTENSITY: 8 | VISUAL_DENSITY: 4
 // Reading this as: Event ticket booking homepage for design-conscious consumers, with a premium cinematic/dark-tech vibe, leaning toward 3D parallax hover cards + smooth physics transitions.
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { CalendarDays, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -22,6 +22,7 @@ interface ConcertItem {
   price: number;
   status: string;
   soldOut: boolean;
+  createdAt?: string;
 }
 
 interface FeaturedCarouselProps {
@@ -31,29 +32,60 @@ interface FeaturedCarouselProps {
 export function FeaturedCarousel({ concerts }: FeaturedCarouselProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [playDirection, setPlayDirection] = useState<'forward' | 'backward'>('forward');
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // We feature the top 5 concerts
-  const featuredConcerts = concerts.slice(0, 5);
+  // Sắp xếp lấy ra 5 concert được tạo mới nhất dựa trên createdAt
+  const featuredConcerts = useMemo(() => {
+    return [...concerts]
+      .sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      })
+      .slice(0, 5);
+  }, [concerts]);
 
   const handleNext = () => {
     if (featuredConcerts.length <= 1) return;
-    setActiveIndex((prev) => (prev + 1) % featuredConcerts.length);
+    
+    setActiveIndex((prev) => {
+      if (playDirection === 'forward') {
+        if (prev === featuredConcerts.length - 1) {
+          setPlayDirection('backward');
+          return prev - 1;
+        }
+        return prev + 1;
+      } else {
+        if (prev === 0) {
+          setPlayDirection('forward');
+          return prev + 1;
+        }
+        return prev - 1;
+      }
+    });
   };
 
   const handlePrev = () => {
     if (featuredConcerts.length <= 1) return;
-    setActiveIndex((prev) => (prev - 1 + featuredConcerts.length) % featuredConcerts.length);
+    setActiveIndex((prev) => {
+      if (prev === 0) {
+        setPlayDirection('forward');
+        return 1;
+      }
+      setPlayDirection('backward');
+      return prev - 1;
+    });
   };
 
-  // Autoplay
+  // Autoplay tịnh tiến qua lại
   useEffect(() => {
     if (isHovered || featuredConcerts.length <= 1) return;
     const interval = setInterval(handleNext, 5000);
     return () => clearInterval(interval);
-  }, [isHovered, featuredConcerts.length]);
+  }, [isHovered, featuredConcerts.length, playDirection]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.targetTouches[0].clientX;
@@ -127,7 +159,7 @@ export function FeaturedCarousel({ concerts }: FeaturedCarouselProps) {
 
   return (
     <div
-      className="relative group w-full"
+      className="relative group w-full mb-12 md:mb-24"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => {
         setIsHovered(false);
@@ -148,17 +180,20 @@ export function FeaturedCarousel({ concerts }: FeaturedCarouselProps) {
         onTouchEnd={handleTouchEnd}
       >
         <div 
-          className="flex h-full w-full transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          className="relative h-full w-full"
           style={{ 
-            transform: `translateX(-${activeIndex * 100}%)`,
             transformStyle: 'preserve-3d'
           }}
         >
-          {featuredConcerts.map((concert) => (
+          {featuredConcerts.map((concert, index) => (
             <Link 
               key={concert.id}
               href={`/concert/${concert.slug}`}
-              className="relative w-full h-full shrink-0 block focus:outline-none"
+              className={`absolute inset-0 w-full h-full block focus:outline-none transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                index === activeIndex 
+                  ? 'opacity-100 scale-100 pointer-events-auto z-10' 
+                  : 'opacity-0 scale-95 pointer-events-none z-0'
+              }`}
               style={{ transformStyle: 'preserve-3d' }}
             >
               {/* Background Image - translateZ(0px) */}
@@ -263,7 +298,7 @@ export function FeaturedCarousel({ concerts }: FeaturedCarouselProps) {
       <Link 
         key={activeIndex} // Resetting key triggers the CSS entry animation automatically on change
         href={`/concert/${activeConcert.slug}`}
-        className="block relative mt-6 left-0 right-0 rounded-3xl border border-border bg-card/95 p-5 shadow-xl shadow-foreground/10 backdrop-blur-xl transition duration-500 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10 md:absolute md:-bottom-[148px] md:left-auto md:right-8 md:w-80 md:mt-0 animate-slide-in cursor-pointer z-20"
+        className="block relative mt-6 left-0 right-0 rounded-3xl border border-border bg-card/95 p-5 shadow-xl shadow-foreground/10 backdrop-blur-xl transition duration-500 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10 md:absolute md:-bottom-12 md:left-auto md:right-8 md:w-80 md:mt-0 animate-slide-in cursor-pointer z-20"
       >
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>

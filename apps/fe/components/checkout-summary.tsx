@@ -1,5 +1,5 @@
 import { OrderSummary } from '@/components/checkout/OrderSummary';
-import type { Seat, TicketZone } from '@/lib/mock-data';
+import type { Seat, TicketZone } from '@/lib/types';
 
 interface CheckoutSummaryProps {
   concertTitle: string;

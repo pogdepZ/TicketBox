@@ -2,11 +2,10 @@
 
 import { useState } from 'react';
 import { AdminLayout } from '@/components/admin-layout';
-import { adminUsers } from '@/lib/mock-data';
 import { Settings, Shield, Bell, CreditCard, Mail, Key, Save } from 'lucide-react';
 
 export default function AdminSettingsPage() {
-  const admin = adminUsers[0] || { name: 'Admin', role: 'Super Admin' };
+  const admin = { name: 'Admin', role: 'Super Admin' };
   
   const [activeTab, setActiveTab] = useState<'general' | 'payment' | 'email' | 'security'>('general');
   const [companyName, setCompanyName] = useState('TicketBox Việt Nam');

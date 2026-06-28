@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
-import type { Seat, SeatStatus, TicketZone } from '@/lib/mock-data';
+import type { Seat, SeatStatus, TicketZone } from '@/lib/types';
 import { SeatButton } from './SeatButton';
 import { SeatLegend } from './SeatLegend';
 

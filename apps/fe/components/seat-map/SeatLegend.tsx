@@ -1,4 +1,4 @@
-import type { SeatStatus } from '@/lib/mock-data';
+import type { SeatStatus } from '@/lib/types';
 
 const legendItems: Array<{ label: string; status: SeatStatus; className: string }> = [
   { label: 'Còn trống', status: 'available', className: 'border-accent/25 bg-card' },

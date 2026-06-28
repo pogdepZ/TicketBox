@@ -1,6 +1,3 @@
-import { getStoredMockOrder, getStoredMockOrders } from "./draft-reservation";
-import { adminStats, concerts as mockConcerts } from "./mock-data";
-
 export const API_BASE_URL =
   typeof window !== "undefined" ? "/api" : "http://127.0.0.1:3001";
 
@@ -550,33 +547,8 @@ export async function getConcerts(params?: {
       meta: data.meta,
     };
   } catch (error) {
-    console.warn(
-      "Backend API /concerts failed, falling back to mock data:",
-      error,
-    );
-    let items = mockConcerts.map((c) =>
-      mapConcertToDisplay(mapLocalMockToBEConcert(c), true),
-    );
-
-    if (params?.keyword) {
-      const kw = params.keyword.toLowerCase();
-      items = items.filter(
-        (c) =>
-          c.title.toLowerCase().includes(kw) ||
-          c.artist.toLowerCase().includes(kw) ||
-          c.venue.toLowerCase().includes(kw),
-      );
-    }
-
-    return {
-      items,
-      meta: {
-        page: params?.page || 1,
-        limit: params?.limit || 10,
-        total: items.length,
-        totalPages: 1,
-      },
-    };
+    console.error("Backend API /concerts failed:", error);
+    throw error;
   }
 }
 
@@ -632,15 +604,8 @@ export async function getConcertById(id: string) {
     const concert = await fetchApi(url, options);
     return mapConcertToDisplay(concert, false);
   } catch (error) {
-    console.warn(
-      `Backend API /concerts/${id} failed, falling back to mock data:`,
-      error,
-    );
-    const mock = mockConcerts.find((c) => c.id === id || slugify(c.title || "") === id);
-    if (!mock) {
-      throw error;
-    }
-    return mapConcertToDisplay(mapLocalMockToBEConcert(mock), true);
+    console.error(`Backend API /concerts/${id} failed:`, error);
+    throw error;
   }
 }
 
@@ -772,6 +737,7 @@ function mapConcertToDisplay(concert: any, useLocalOverride = false) {
     artistBio: concert.artistBio,
     artistBioStatus: concert.artistBioStatus,
     guestList: concert.guestList || [],
+    createdAt: concert.createdAt,
   };
 }
 
@@ -856,10 +822,7 @@ export async function logout() {
 // MOCKED SEATS & TICKET ZONES (Not in BE yet)
 // ----------------------------------------------------
 
-// Import these locally inside functions or handle in mock-data.ts
-// to avoid circular dependency for now, or just expose async mock functions.
-import { getTicketZonesByConcertId, getSeatsByConcertId } from "./mock-data";
-import type { TicketZone, TicketZoneStatus } from "./mock-data";
+import type { TicketZone, TicketZoneStatus } from "./types";
 
 export async function getTicketZonesAsync(
   concertId: string,
@@ -900,7 +863,7 @@ export async function getTicketZonesAsync(
           code: ["svip", "vip", "premium", "standard", "economy"][idx % 5],
         }));
       }
-      return getTicketZonesByConcertId(concertId); // fallback if no real zones
+      return [];
     }
 
     const processedZones = seatZones.flatMap((zone: any) => {
@@ -970,7 +933,7 @@ export async function getTicketZonesAsync(
     return processedZones;
   } catch (error) {
     console.error("Error fetching ticket zones:", error);
-    return getTicketZonesByConcertId(concertId);
+    throw error;
   }
 }
 
@@ -988,7 +951,7 @@ export async function getSeatsAsync(
     }
 
     if (!seatZones || seatZones.length === 0) {
-      return getSeatsByConcertId(concertId);
+      return [];
     }
 
     // Fetch real-time reserved/held seats from backend
@@ -1095,7 +1058,8 @@ export async function getSeatsAsync(
 
     return seats;
   } catch (error) {
-    return getSeatsByConcertId(concertId);
+    console.error("Error fetching seats:", error);
+    throw error;
   }
 }
 
@@ -1223,98 +1187,11 @@ export async function deleteTicketType(
 // ----------------------------------------------------
 
 export async function getOrderById(orderId: string): Promise<any> {
-  try {
-    return await fetchApi(`/orders/${orderId}`);
-  } catch (error) {
-    console.warn(
-      `Failed to fetch order ${orderId} from backend, using LocalStorage fallback`,
-      error,
-    );
-    let stored = getStoredMockOrder(orderId);
-
-    // 1. Try to recover using draft reservation if available in localStorage
-    if (!stored && typeof window !== "undefined") {
-      const draftStr = window.localStorage.getItem(
-        "ticketbox-draft-reservation",
-      );
-      if (draftStr) {
-        try {
-          const draft = JSON.parse(draftStr);
-          const { createMockOrderFromDraft } =
-            await import("./draft-reservation");
-          stored = createMockOrderFromDraft({
-            draft,
-            paymentMethod: "MOMO",
-            orderId,
-          });
-          console.log("Successfully recovered order from draft reservation");
-        } catch (e) {
-          console.error("Failed to reconstruct order from draft", e);
-        }
-      }
-    }
-
-    // 2. Ultimate fallback: generate a beautiful mock order so the UI never crashes
-    if (!stored) {
-      const paidAt = new Date();
-      const concert = mockConcerts[0] || {
-        id: "default",
-        title: "Đêm Nhạc Ánh Sao",
-        price: 1500000,
-      };
-      const price = concert.price || 1500000;
-      stored = {
-        id: orderId,
-        orderNumber: `ORD-${paidAt.getFullYear()}-${orderId.substring(0, 6).toUpperCase()}`,
-        userId: "user-demo",
-        concertId: concert.id,
-        concertTitle: concert.title,
-        reservationId: `res-${orderId}`,
-        status: "PAID",
-        totalAmount: price,
-        paymentMethod: "MOMO",
-        paidAt: paidAt.toISOString(),
-        createdAt: paidAt.toISOString(),
-        expiresAt: new Date(paidAt.getTime() + (10 * 60 + 10) * 1000).toISOString(),
-        items: [
-          {
-            id: `item-${orderId}`,
-            ticketTypeId: "type-vip",
-            quantity: 1,
-            unitPrice: price,
-            seatLabels: ["A01"],
-          },
-        ],
-        tickets: [
-          {
-            id: `ticket-${orderId}-1`,
-            orderId,
-            ticketTypeId: "type-vip",
-            ticketCode: `TBX-${paidAt.getFullYear()}-${orderId.substring(0, 5).toUpperCase()}`,
-            qrPayload: `mock-qr:TBX-${orderId}`,
-            seatZone: "VIP Zone",
-            seatNumber: "A01",
-            price: price,
-            status: "ACTIVE",
-            createdAt: paidAt.toISOString(),
-          },
-        ],
-      };
-    }
-    return stored;
-  }
+  return await fetchApi(`/orders/${orderId}`);
 }
 
 export async function getUserOrders(): Promise<any[]> {
-  try {
-    return await fetchApi("/orders");
-  } catch (error) {
-    console.warn(
-      "Failed to fetch user orders from backend, using LocalStorage fallback",
-      error,
-    );
-    return getStoredMockOrders();
-  }
+  return await fetchApi("/orders");
 }
 
 // ----------------------------------------------------
@@ -1322,69 +1199,15 @@ export async function getUserOrders(): Promise<any[]> {
 // ----------------------------------------------------
 
 export async function getRevenueSummary(): Promise<any> {
-  try {
-    return await fetchApi("/admin/revenue/summary");
-  } catch (error) {
-    console.warn("Failed to fetch revenue summary, using mock fallback", error);
-    return adminStats;
-  }
+  return await fetchApi("/admin/revenue/summary");
 }
 
 export async function getConcertRevenue(concertId: string): Promise<any> {
-  try {
-    return await fetchApi(`/admin/concerts/${concertId}/revenue`);
-  } catch (error) {
-    console.warn(
-      `Failed to fetch revenue for concert ${concertId}, using mock fallback`,
-      error,
-    );
-    const mockConcert = mockConcerts.find((c) => c.id === concertId);
-    return {
-      concertId,
-      revenue: mockConcert?.revenue ?? 150000000,
-      ticketsSold: mockConcert?.ticketsSold ?? 250,
-      capacity: mockConcert?.capacity ?? 1000,
-      ticketsSoldByType: [
-        { label: "SVIP", sold: 40, total: 100 },
-        { label: "VIP", sold: 60, total: 200 },
-        { label: "Premium", sold: 80, total: 300 },
-        { label: "Standard", sold: 70, total: 400 },
-      ],
-      orders: [
-        {
-          id: "1",
-          orderNumber: "ORD-2026-001",
-          customerName: "Nguyễn Văn A",
-          amount: 5000000,
-          status: "PAID",
-          date: new Date().toISOString(),
-        },
-        {
-          id: "2",
-          orderNumber: "ORD-2026-002",
-          customerName: "Trần Thị B",
-          amount: 3000000,
-          status: "PAID",
-          date: new Date().toISOString(),
-        },
-      ],
-    };
-  }
+  return await fetchApi(`/admin/concerts/${concertId}/revenue`);
 }
 
 export async function getDashboardAnalytics(): Promise<any> {
-  try {
-    return await fetchApi("/admin/dashboard/analytics");
-  } catch (error) {
-    console.warn(
-      "Failed to fetch dashboard analytics, using mock fallback",
-      error,
-    );
-    return {
-      newUsersLastMonth: 120,
-      eventAnalytics: [],
-    };
-  }
+  return await fetchApi("/admin/dashboard/analytics");
 }
 
 export async function getGenreRevenueAnalytics(
@@ -1487,88 +1310,38 @@ export async function uploadArtistBioPdf(
   concertId: string,
   file: File,
 ): Promise<any> {
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
-    const idempotencyKey =
-      typeof window !== "undefined" && window.crypto?.randomUUID
-        ? window.crypto.randomUUID()
-        : `bio-${concertId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const formData = new FormData();
+  formData.append("file", file);
+  const idempotencyKey =
+    typeof window !== "undefined" && window.crypto?.randomUUID
+      ? window.crypto.randomUUID()
+      : `bio-${concertId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-    return await fetchApi(`/admin/concerts/${concertId}/artist-bio/upload`, {
-      method: "POST",
-      headers: {
-        "Idempotency-Key": idempotencyKey,
-      },
-      body: formData,
-    });
-  } catch (error) {
-    console.warn(
-      `Failed to upload bio PDF to backend, running LocalStorage mock simulation`,
-      error,
-    );
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(
-        `${BIO_STATUS_LOCAL_PREFIX}${concertId}`,
-        "PROCESSING",
-      );
-      // Simulate backend AI generation after 5 seconds
-      setTimeout(() => {
-        const generatedBio = `Tiểu sử nghệ sĩ được sinh ra tự động từ file ${file.name}.\n\nĐây là một ca sĩ/nhóm nhạc tài năng với phong cách âm nhạc độc đáo, đã gặt hái được nhiều giải thưởng lớn và sở hữu lượng người hâm mộ vô cùng đông đảo toàn quốc. Tour diễn lần này hứa hẹn sẽ mang đến những khoảnh khắc bùng nổ cùng công nghệ âm thanh ánh sáng hiện đại hàng đầu.`;
-        window.localStorage.setItem(
-          `${BIO_STATUS_LOCAL_PREFIX}${concertId}`,
-          "DONE",
-        );
-        window.localStorage.setItem(
-          `${BIO_LOCAL_PREFIX}${concertId}`,
-          generatedBio,
-        );
-      }, 5000);
-    }
-    return { success: true, message: "PDF uploaded successfully (simulated)" };
-  }
+  return await fetchApi(`/admin/concerts/${concertId}/artist-bio/upload`, {
+    method: "POST",
+    headers: {
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: formData,
+  });
 }
 
 export async function getAiBioStatus(concertId: string): Promise<any> {
-  try {
-    const concert = await getConcertById(concertId);
-    return {
-      status: (concert.artistBioStatus || "empty").toUpperCase(),
-      bio: concert.artistBio,
-    };
-  } catch (error) {
-    if (typeof window !== "undefined") {
-      const status =
-        window.localStorage.getItem(`${BIO_STATUS_LOCAL_PREFIX}${concertId}`) ||
-        "EMPTY";
-      const bio =
-        window.localStorage.getItem(`${BIO_LOCAL_PREFIX}${concertId}`) || null;
-      return { status, bio };
-    }
-    return { status: "EMPTY", bio: null };
-  }
+  const concert = await getConcertById(concertId);
+  return {
+    status: (concert.artistBioStatus || "empty").toUpperCase(),
+    bio: concert.artistBio,
+  };
 }
 
 export async function updateConcertBio(
   concertId: string,
   bio: string,
 ): Promise<any> {
-  try {
-    return await fetchApi(`/concerts/${concertId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ artistBio: bio }),
-    });
-  } catch (error) {
-    console.warn(`Failed to update concert bio, saving to LocalStorage`, error);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(`${BIO_LOCAL_PREFIX}${concertId}`, bio);
-      window.localStorage.setItem(
-        `${BIO_STATUS_LOCAL_PREFIX}${concertId}`,
-        "DONE",
-      );
-    }
-    return { success: true, bio };
-  }
+  return await fetchApi(`/concerts/${concertId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ artistBio: bio }),
+  });
 }
 
 export async function importGuestList(
@@ -1587,24 +1360,10 @@ export async function cancelConcert(
   concertId: string,
   reason = "Hủy bởi quản trị viên",
 ): Promise<any> {
-  try {
-    const res = await fetchApi(`/concerts/${concertId}/cancel`, {
-      method: "PATCH",
-      body: JSON.stringify({ reason }),
-    });
-    saveLocalConcertStatus(concertId, "CANCELLED");
-    return res;
-  } catch (err) {
-    if (err instanceof ApiError) {
-      throw err;
-    }
-    console.warn(
-      "Backend cancel API failed, falling back to LocalStorage",
-      err,
-    );
-    saveLocalConcertStatus(concertId, "CANCELLED");
-    return { success: true };
-  }
+  return await fetchApi(`/concerts/${concertId}/cancel`, {
+    method: "PATCH",
+    body: JSON.stringify({ reason }),
+  });
 }
 
 export async function updateConcert(
@@ -1618,23 +1377,9 @@ export async function updateConcert(
 }
 
 export async function publishConcert(concertId: string): Promise<any> {
-  try {
-    const res = await fetchApi(`/concerts/${concertId}/publish`, {
-      method: "PATCH",
-    });
-    saveLocalConcertStatus(concertId, "PUBLISHED");
-    return res;
-  } catch (err) {
-    if (err instanceof ApiError) {
-      throw err;
-    }
-    console.warn(
-      "Backend publish API failed, falling back to LocalStorage",
-      err,
-    );
-    saveLocalConcertStatus(concertId, "PUBLISHED");
-    return { success: true };
-  }
+  return await fetchApi(`/concerts/${concertId}/publish`, {
+    method: "PATCH",
+  });
 }
 
 // Helper to parse current user from localStorage token
@@ -1730,45 +1475,15 @@ export async function getNotifications(): Promise<{
   items: NotificationItem[];
   unreadCount: number;
 }> {
-  try {
-    return await fetchApi("/notifications");
-  } catch (error) {
-    const items = getLocalNotifications();
-    const unreadCount = items.filter((n) => !n.read).length;
-    return { items, unreadCount };
-  }
+  return await fetchApi("/notifications");
 }
 
 export async function markNotificationRead(id: string): Promise<any> {
-  try {
-    return await fetchApi(`/notifications/${id}/read`, { method: "PATCH" });
-  } catch (error) {
-    const items = getLocalNotifications();
-    const updated = items.map((n) => (n.id === id ? { ...n, read: true } : n));
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(
-        getNotificationsStorageKey(),
-        JSON.stringify(updated),
-      );
-    }
-    return { success: true };
-  }
+  return await fetchApi(`/notifications/${id}/read`, { method: "PATCH" });
 }
 
 export async function markAllNotificationsRead(): Promise<any> {
-  try {
-    return await fetchApi("/notifications/read-all", { method: "POST" });
-  } catch (error) {
-    const items = getLocalNotifications();
-    const updated = items.map((n) => ({ ...n, read: true }));
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(
-        getNotificationsStorageKey(),
-        JSON.stringify(updated),
-      );
-    }
-    return { success: true };
-  }
+  return await fetchApi("/notifications/read-all", { method: "POST" });
 }
 
 export function addLocalNotification(title: string, message: string) {

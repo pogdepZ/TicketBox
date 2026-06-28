@@ -1,4 +1,4 @@
-import type { Seat, TicketZone } from '@/lib/mock-data';
+import type { Seat, TicketZone } from '@/lib/types';
 
 export const DRAFT_RESERVATION_KEY = 'ticketbox-draft-reservation';
 export const MOCK_ORDERS_KEY = 'ticketbox-mock-orders';

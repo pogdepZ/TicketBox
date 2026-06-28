@@ -12,6 +12,11 @@ import {
   UserStatus,
   ConcertStatus,
   TicketTypeStatus,
+  OrderStatus,
+  ReservationStatus,
+  PaymentMethod,
+  TicketStatus,
+  PaymentGateway,
 } from '../src/generated/prisma';
 
 const connectionString = process.env.DATABASE_URL;
@@ -402,6 +407,7 @@ interface ConcertSeedData {
   defaultPosterUrl: string;
   zones: ZoneSeedData[];
   ticketTypes: TicketTypeSeedData[];
+  createdAt?: Date;
 }
 
 async function uploadSeatMapSvg(concertId: string, relativePath: string): Promise<string> {
@@ -495,6 +501,7 @@ async function seedConcert(data: ConcertSeedData): Promise<void> {
         city: data.city || null,
         posterUrl,
         seatMapSvgUrl,
+        createdAt: data.createdAt || undefined,
       },
     });
   } else {
@@ -513,6 +520,7 @@ async function seedConcert(data: ConcertSeedData): Promise<void> {
         city: data.city || null,
         seatMapSvgUrl,
         posterUrl,
+        createdAt: data.createdAt || undefined,
       },
     });
     console.log(`Created seeded concert: "${data.name}"`);
@@ -1069,6 +1077,63 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       zones: [],
       ticketTypes: [],
     },
+    {
+      id: '11aa23bb-cc44-55ee-66ff-77aa88bb9901',
+      createdAt: new Date('2025-07-01T00:00:00.000Z'),
+      name: 'Show Của Đen - Giữa Một Vạn Tour 2025',
+      description: 'Live Concert đặc biệt kỷ niệm chặng đường âm nhạc của Đen Vâu tại Việt Nam.',
+      artistName: 'Đen Vâu',
+      venueName: 'Sân vận động Quân khu 7',
+      venueAddress: '202 Hoàng Văn Thụ, Phú Nhuận, TP. Hồ Chí Minh',
+      eventDate: new Date('2025-11-15T19:00:00.000Z'),
+      status: ConcertStatus.COMPLETED,
+      type: 'Live Music',
+      city: 'Thành phố Hồ Chí Minh',
+      seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+      posterLocalPath: '../fixtures/giua_mot_van_tour.jpg',
+      s3Key: 'posters/giua_mot_van_tour_2025.webp',
+      defaultPosterUrl: 'https://example.com/posters/giua_mot_van_tour.webp',
+      zones: [],
+      ticketTypes: [],
+    },
+    {
+      id: '22bb33cc-dd55-66ee-77ff-88bb99ccaa02',
+      createdAt: new Date('2025-04-01T00:00:00.000Z'),
+      name: 'Inner Me Live Concert 2025',
+      description: 'Đại nhạc hội hoành tráng Inner Me của nữ ca sĩ nhạc sĩ Vũ Cát Tường.',
+      artistName: 'Vũ Cát Tường',
+      venueName: 'Nhà thi đấu Nguyễn Du',
+      venueAddress: '116 Nguyễn Du, Quận 1, TP. Hồ Chí Minh',
+      eventDate: new Date('2025-08-20T20:00:00.000Z'),
+      status: ConcertStatus.COMPLETED,
+      type: 'Live Music',
+      city: 'Thành phố Hồ Chí Minh',
+      seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+      posterLocalPath: '../fixtures/2506_VIPM_1600x900.webp',
+      s3Key: 'posters/innerme_live_concert.webp',
+      defaultPosterUrl: 'https://example.com/posters/innerme.webp',
+      zones: [],
+      ticketTypes: [],
+    },
+    {
+      id: '33cc44dd-ee66-77ee-88ff-99ccaaee1103',
+      createdAt: new Date('2025-01-01T00:00:00.000Z'),
+      name: 'Rhyder Album Tour 2025',
+      description: 'Đêm diễn ra mắt album phòng thu đầu tiên của quán quân Rhyder kết hợp giao lưu fan hâm mộ.',
+      artistName: 'Rhyder',
+      venueName: 'Lan Anh Stage',
+      venueAddress: '291 Cách Mạng Tháng Tám, Quận 10, TP. Hồ Chí Minh',
+      eventDate: new Date('2025-05-10T19:30:00.000Z'),
+      status: ConcertStatus.COMPLETED,
+      type: 'Live Music',
+      city: 'Thành phố Hồ Chí Minh',
+      seatMapSvgUrl: '<svg viewBox="0 0 100 100"><rect width="100" height="100" /></svg>',
+      posterLocalPath: '../fixtures/thumbnail_rhyder_album.webp',
+      s3Key: 'posters/rhyder_album_tour.webp',
+      defaultPosterUrl: 'https://example.com/posters/rhyder_album.webp',
+      zones: [],
+      ticketTypes: [],
+    },
   ];
 
   const defaultZones: ZoneSeedData[] = [
@@ -1238,7 +1303,156 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
   console.log(`Stable Concert ID: ${ticketBoxLiveConcert.id}`);
   console.log(`Hard-coded fixture concerts: ${webpConcerts.length}`);
   console.log(`Auto-generated unseeded fixture concerts: ${unseededFixtureConcerts.length}`);
-  console.log('==================================================================\n');
+    console.log('==================================================================\n');
+
+  // Seed revenue data for the past completed concerts
+  const pastConcertIds = [
+    '11aa23bb-cc44-55ee-66ff-77aa88bb9901', // Show Cua Den 2025
+    '22bb33cc-dd55-66ee-77ff-88bb99ccaa02', // Inner Me 2025
+    '33cc44dd-ee66-77ee-88ff-99ccaaee1103'  // Rhyder Album Tour 2025
+  ];
+  await seedRevenueDataForPastConcerts(pastConcertIds);
+}
+
+
+async function seedRevenueDataForPastConcerts(pastConcertIds: string[]) {
+  console.log('Generating revenue orders and tickets for completed concerts...');
+
+  // Create 5 customer users if they do not exist
+  const customerEmails = ['customer1@gmail.com', 'customer2@gmail.com', 'customer3@gmail.com', 'customer4@gmail.com', 'customer5@gmail.com'];
+  for (const email of customerEmails) {
+    let u = await prisma.user.findUnique({ where: { email } });
+    if (!u) {
+      await prisma.user.create({
+        data: {
+          email,
+          password: await bcrypt.hash('123456', 10),
+          fullName: 'Customer ' + email.split('@')[0].slice(-1),
+          status: UserStatus.ACTIVE,
+        }
+      });
+    }
+  }
+
+  const customerUsers = await prisma.user.findMany({
+    where: { email: { in: customerEmails } }
+  });
+
+  // Helper to generate deterministic UUIDs for orders, tickets, etc.
+  function generateSeedUuid(prefix: string, seed: string): string {
+    const hash = crypto.createHash('sha256').update(prefix + '-' + seed).digest('hex');
+    return hash.substring(0, 8) + '-' + hash.substring(8, 12) + '-4' + hash.substring(13, 16) + '-a' + hash.substring(17, 20) + '-' + hash.substring(20, 32);
+  }
+
+  for (const concertId of pastConcertIds) {
+    const ticketTypes = await prisma.ticketType.findMany({
+      where: { concertId }
+    });
+
+    if (ticketTypes.length === 0) continue;
+
+    const concert = await prisma.concert.findUnique({ where: { id: concertId } });
+    if (!concert) continue;
+
+    const concertDate = new Date(concert.eventDate);
+
+    // Generate 35 orders per past concert spread over 4 months leading up to the concert date
+    // to build a realistic monthly revenue distribution graph
+    for (let i = 0; i < 35; i++) {
+      const buyer = customerUsers[i % customerUsers.length];
+      const ticketType = ticketTypes[i % ticketTypes.length];
+
+      const quantity = (i % 3) + 1; // 1, 2, or 3 tickets
+      const unitPrice = ticketType.price;
+      const totalAmount = Number(unitPrice) * quantity;
+
+      // Purchase date spread over 120 days before eventDate
+      const purchaseDate = new Date(concertDate.getTime() - (120 - i * 3) * 24 * 60 * 60 * 1000);
+
+      const reservationId = generateSeedUuid(concertId, 'res-' + i);
+      const orderId = generateSeedUuid(concertId, 'ord-' + i);
+
+      // 1. Create Reservation
+      await prisma.reservation.create({
+        data: {
+          id: reservationId,
+          userId: buyer.id,
+          concertId,
+          status: ReservationStatus.CONFIRMED,
+          expiresAt: new Date(purchaseDate.getTime() + 15 * 60 * 1000),
+          createdAt: purchaseDate,
+          items: {
+            create: {
+              ticketTypeId: ticketType.id,
+              quantity,
+              unitPrice,
+            }
+          }
+        }
+      });
+
+      // 2. Create Order
+      await prisma.order.create({
+        data: {
+          id: orderId,
+          userId: buyer.id,
+          concertId,
+          reservationId,
+          idempotencyKey: 'idem-' + concertId + '-' + i,
+          status: OrderStatus.PAID,
+          totalAmount,
+          paymentMethod: PaymentMethod.VNPAY,
+          paymentRef: 'payref-' + concertId + '-' + i,
+          paidAt: purchaseDate,
+          expiresAt: new Date(purchaseDate.getTime() + 15 * 60 * 1000),
+          createdAt: purchaseDate,
+          items: {
+            create: {
+              ticketTypeId: ticketType.id,
+              quantity,
+              unitPrice,
+            }
+          }
+        }
+      });
+
+      // 3. Create Tickets and ReservationSeats
+      for (let q = 0; q < quantity; q++) {
+        const seatNumber = ticketType.name.substring(0, 3) + '-' + (10 + i * 5 + q);
+        const ticketId = generateSeedUuid(orderId, 'tkt-' + q);
+
+        await prisma.reservationSeat.create({
+          data: {
+            reservationId,
+            concertId,
+            ticketTypeId: ticketType.id,
+            seatNumber,
+            status: 'CONFIRMED',
+            expiresAt: new Date(purchaseDate.getTime() + 15 * 60 * 1000),
+            createdAt: purchaseDate,
+          }
+        });
+
+        await prisma.ticket.create({
+          data: {
+            id: ticketId,
+            orderId,
+            ticketTypeId: ticketType.id,
+            ownerUserId: buyer.id,
+            concertId,
+            ticketCode: 'TBOX-' + concertId.substring(0, 4).toUpperCase() + '-' + i + '-' + q,
+            qrPayload: 'SIGNED-JWT-PAYLOAD-FOR-TICKET-' + ticketId,
+            seatNumber,
+            status: TicketStatus.USED,
+            createdAt: purchaseDate,
+            scannedAt: concertDate,
+            scannedById: buyer.id,
+          }
+        });
+      }
+    }
+    console.log('  Generated revenue data (35 orders) for completed concert: ' + concert.name);
+  }
 }
 
 async function main(): Promise<void> {
