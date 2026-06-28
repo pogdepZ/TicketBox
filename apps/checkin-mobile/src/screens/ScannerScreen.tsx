@@ -274,6 +274,7 @@ export default function ScannerScreen() {
               serverCheckinId: null,
               createdAt: checkedAt,
               gate: selectedGate || undefined,
+              scanResult: 'TEMP_ACCEPTED',
             };
 
             await queueService.enqueue(offlineItem);
@@ -347,6 +348,8 @@ export default function ScannerScreen() {
               serverCheckinId: null,
               createdAt: checkedAt,
               gate: selectedGate || undefined,
+              guestCode: extractedTicketCode,
+              scanResult: 'ACCEPTED_GUEST',
             };
 
             await queueService.enqueue(offlineItem);

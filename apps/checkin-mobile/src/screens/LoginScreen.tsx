@@ -3,7 +3,7 @@
  * - Input Email/Mã NV + Password
  * - Fake JWT → AsyncStorage
  * - Network status badge (Online/Offline)
- * - Role mặc định: CHECKIN_STAFF
+ * - Role mặc định: checker
  */
 
 import React, { useState, useEffect } from "react";

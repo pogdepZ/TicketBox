@@ -79,6 +79,7 @@ export default function OfflineQueueScreen() {
           sourceDeviceId: item.sourceDeviceId,
           checkedAt: item.checkedAt,
           clientEventId: item.id,
+          gate: item.gate,
         }))
       });
 
@@ -152,11 +153,11 @@ export default function OfflineQueueScreen() {
         {/* Mock Avatar based on ticket code */}
         <View style={[styles.avatar, { backgroundColor: isSynced ? COLORS.success + '20' : COLORS.warning + '20' }]}>
           <Text style={[styles.avatarText, { color: isSynced ? COLORS.success : COLORS.warning }]}>
-            {item.ticketCode.substring(item.ticketCode.length - 2)}
+            {(item.ticketCode || item.guestCode || '??').slice(-2)}
           </Text>
         </View>
         <View style={styles.queueItemCenter}>
-          <Text style={styles.ticketCode} numberOfLines={1}>{item.ticketCode}</Text>
+          <Text style={styles.ticketCode} numberOfLines={1}>{item.ticketCode || item.guestCode || 'Unknown'}</Text>
           <Text style={styles.ticketTime}>{time} {item.syncAttempts > 0 ? `· ${item.syncAttempts} attempts` : ''}</Text>
           {item.lastSyncError && (
              <Text style={styles.errorText} numberOfLines={1}>{item.lastSyncError}</Text>

@@ -17,7 +17,7 @@ export type ScanStatus = 'SUCCESS' | 'DUPLICATE' | 'NOT_FOUND' | 'WRONG_EVENT' |
 export type SyncStatus = 'PENDING' | 'SYNCED' | 'FAILED' | 'CONFLICT' | 'REJECTED';
 
 /** User role */
-export type UserRole = 'CHECKIN_STAFF' | 'ADMIN' | 'ORGANIZER';
+export type UserRole = 'checker' | 'admin' | 'customer';
 
 /** Mock ticket data */
 export interface TicketInfo {
@@ -34,12 +34,15 @@ export interface TicketInfo {
 /** Offline queue item */
 export interface OfflineQueueItem {
   id: string;
-  ticketId: string;
-  ticketCode: string;
+  ticketId?: string;
+  ticketCode?: string;
+  guestCode?: string;
   qrCodeData: string;
   concertId: string;
   staffId: string;
   sourceDeviceId: string;
+  scanResult?: string;
+  gate?: string;
   checkedAt: string;
   syncStatus: SyncStatus;
   syncAttempts: number;

@@ -7,7 +7,7 @@ export const initDb = () => {
   const { user_version: currentDbVersion } = db.getFirstSync<{ user_version: number }>('PRAGMA user_version') || { user_version: 0 };
 
   // Mục tiêu version của code hiện tại
-  const TARGET_DB_VERSION = 9;
+  const TARGET_DB_VERSION = 10;
 
   if (currentDbVersion >= TARGET_DB_VERSION) {
     // Đã ở version mới nhất, không cần migrate
@@ -65,14 +65,21 @@ export const initDb = () => {
         
         CREATE TABLE IF NOT EXISTS checkin_log (
           id TEXT PRIMARY KEY,
+          ticketId TEXT,
           ticketCode TEXT,
           guestCode TEXT,
+          qrCodeData TEXT NOT NULL,
           concertId TEXT NOT NULL,
           staffId TEXT NOT NULL,
           deviceId TEXT NOT NULL,
           scanResult TEXT NOT NULL,
+          gate TEXT,
           checkedAt TEXT NOT NULL,
-          isOffline INTEGER NOT NULL DEFAULT 1
+          isOffline INTEGER NOT NULL DEFAULT 1,
+          syncStatus TEXT NOT NULL DEFAULT 'PENDING',
+          syncAttempts INTEGER NOT NULL DEFAULT 0,
+          lastSyncError TEXT,
+          createdAt TEXT NOT NULL
         );
         
         CREATE TABLE IF NOT EXISTS sync_log (
