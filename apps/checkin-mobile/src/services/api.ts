@@ -227,6 +227,26 @@ class ApiService {
     return error.name === "AbortError" ? "Request timeout" : error.message;
   }
 
+  async restoreAuthSession(): Promise<boolean> {
+    try {
+      const token = await this.getAccessToken();
+      if (!token) return false;
+      
+      // Try to fetch profile to verify token is still valid
+      const result = await this.get("/auth/profile");
+      if (result.success) {
+         return true;
+      }
+      
+      // If profile fails (e.g. 401), token is invalid
+      await this.clearAuthState();
+      return false;
+    } catch (error) {
+      console.warn("restoreAuthSession error:", error);
+      return false;
+    }
+  }
+
   async get<T>(endpoint: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: "GET" });
   }

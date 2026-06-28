@@ -17,6 +17,26 @@ export class CheckinService {
   async scan(dto: ScanCheckinDto) {
     const { qrCodeData, staffId, concertId, deviceId, clientEventId } = dto;
 
+    if (deviceId && concertId && staffId) {
+      try {
+        const existingDevice = await this.prisma.checkinDevice.findUnique({
+          where: { id: deviceId }
+        });
+        if (!existingDevice) {
+          await this.prisma.checkinDevice.create({
+            data: {
+              id: deviceId,
+              deviceCode: `DEV-${deviceId.substring(0, 6)}`,
+              staffUserId: staffId,
+              concertId: concertId,
+            }
+          });
+        }
+      } catch (e: any) {
+        this.logger.warn(`Failed to create CheckinDevice: ${e.message}`);
+      }
+    }
+
     let extractedTicketCode = qrCodeData;
     const ticketSecret = this.config.get<string>('JWT_TICKET_SECRET', 'ticket-secret');
 
@@ -91,7 +111,7 @@ export class CheckinService {
             ticketId: ticket.id,
             staffUserId: staffId,
             deviceId: deviceId,
-            clientEventId: clientEventId || `scan-${Date.now()}`,
+            clientEventId: clientEventId || `scan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             mode: 'ONLINE',
             result: checkinResult,
             scannedAtClient: checkedInAt,
@@ -172,7 +192,7 @@ export class CheckinService {
             guestId: guest.id,
             staffUserId: staffId,
             deviceId: deviceId,
-            clientEventId: clientEventId || `scan-${Date.now()}`,
+            clientEventId: clientEventId || `scan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             mode: 'ONLINE',
             result: checkinResult,
             scannedAtClient: checkedInAt,

@@ -10,7 +10,7 @@ import {
   Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -36,6 +36,7 @@ const STATUS_CONFIG = {
 
 export default function ScannerScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const isFocused = useIsFocused();
   const [isOffline, setIsOffline] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
@@ -102,7 +103,7 @@ export default function ScannerScreen() {
   }, [scanning]);
 
   const handleScan = async (qrData: string) => {
-    if (scanning) return;
+    if (scanning || !isFocused) return;
     setScanning(true);
 
     try {
@@ -116,7 +117,7 @@ export default function ScannerScreen() {
         staffId,
         concertId: concert.id,
         deviceId,
-        clientEventId: `scan-${Date.now()}`,
+        clientEventId: `scan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         gate: selectedGate || undefined,
       };
 
@@ -450,12 +451,14 @@ export default function ScannerScreen() {
       {/* Viewfinder */}
       <View style={styles.viewfinderWrapper}>
         <View style={styles.viewfinderContainer}>
-          <CameraView
-            style={StyleSheet.absoluteFill}
-            facing="back"
-            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            onBarcodeScanned={({ data }) => handleScan(data)}
-          />
+          {isFocused && (
+            <CameraView
+              style={StyleSheet.absoluteFill}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+              onBarcodeScanned={({ data }) => handleScan(data)}
+            />
+          )}
           {/* Simulated Dark overlay and vignette can be added here if needed */}
           <View style={styles.finderBox}>
             <View style={[styles.corner, styles.cornerTL]} />
