@@ -74,14 +74,14 @@ export function ConcertCard({
   const linkSlug = slug || id;
 
   return (
-    <Link href={`/concert/${linkSlug}`} className="group block h-full">
-      <div className="flex flex-col h-full overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/45 hover:shadow-xl hover:shadow-primary/10">
+    <Link href={`/concert/${linkSlug}`} className="group block h-full focus-visible:outline-none">
+      <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-focus-visible:-translate-y-1 group-focus-visible:border-primary/45 group-focus-visible:shadow-xl group-focus-visible:shadow-primary/10 hover:-translate-y-1.5 hover:border-primary/45 hover:shadow-xl hover:shadow-primary/10">
         <div className="relative aspect-[4/3] overflow-hidden bg-muted flex-shrink-0">
           <Image
             src={image}
             alt={title}
             fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105 group-focus-visible:scale-105"
           />
           <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent" />
           <div className="absolute left-4 top-4 rounded-2xl bg-card/95 px-3 py-2 text-center shadow-lg backdrop-blur">
@@ -91,8 +91,8 @@ export function ConcertCard({
           <button
             type="button"
             onClick={handleToggleFavorite}
-            className={`absolute right-4 top-4 grid size-10 place-items-center rounded-full backdrop-blur transition ${
-              isFavorite ? 'bg-primary text-primary-foreground' : 'bg-black/45 text-white hover:bg-primary'
+            className={`absolute right-4 top-4 grid size-10 place-items-center rounded-full backdrop-blur transition duration-300 hover:scale-110 active:scale-95 ${
+              isFavorite ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'bg-black/45 text-white hover:bg-primary'
             }`}
             aria-pressed={isFavorite}
             aria-label={isFavorite ? 'Bỏ lưu sự kiện' : 'Lưu sự kiện'}
@@ -132,7 +132,7 @@ export function ConcertCard({
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Từ</p>
               <p className="text-lg font-black text-foreground">{price.toLocaleString('vi-VN')}đ</p>
             </div>
-            <button className="rounded-full bg-foreground px-4 py-2 text-sm font-bold text-background transition hover:bg-primary cursor-pointer">
+            <button className="rounded-full bg-foreground px-4 py-2 text-sm font-bold text-background transition duration-300 hover:-translate-y-0.5 hover:bg-primary hover:shadow-lg hover:shadow-primary/20 active:translate-y-px cursor-pointer">
               Xem chi tiết
             </button>
           </div>

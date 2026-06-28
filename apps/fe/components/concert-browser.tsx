@@ -1,23 +1,27 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ConcertCard } from '@/components/concert-card';
+import { Reveal } from '@/components/reveal';
+
+interface ConcertItem {
+  id: string;
+  slug?: string;
+  title: string;
+  artist: string;
+  date: string;
+  time: string;
+  venue: string;
+  city: string;
+  image: string;
+  price: number;
+  soldOut?: boolean;
+  genre?: string;
+}
 
 interface ConcertBrowserProps {
-  concerts: Array<{
-    id: string;
-    title: string;
-    artist: string;
-    date: string;
-    time: string;
-    venue: string;
-    city: string;
-    image: string;
-    price: number;
-    soldOut?: boolean;
-    genre?: string;
-  }>;
+  concerts: ConcertItem[];
   initialKeyword?: string;
 }
 
@@ -39,7 +43,7 @@ function scrollToEvents() {
 
 interface ConcertRowProps {
   groupName: string;
-  list: any[];
+  list: ConcertItem[];
 }
 
 function ConcertRow({ groupName, list }: ConcertRowProps) {
@@ -117,7 +121,7 @@ function ConcertRow({ groupName, list }: ConcertRowProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <Reveal className="space-y-4" variant="up">
       <style>{`
         .scrollbar-none::-webkit-scrollbar {
           display: none;
@@ -184,15 +188,20 @@ function ConcertRow({ groupName, list }: ConcertRowProps) {
           className="w-full overflow-x-auto pb-4 scrollbar-none snap-x snap-mandatory"
         >
           <div className="flex gap-6 w-max">
-            {list.map((concert) => (
-              <div key={concert.id} className="w-[280px] sm:w-[320px] md:w-[360px] shrink-0 snap-start">
+            {list.map((concert, index) => (
+              <Reveal
+                key={concert.id}
+                className="w-[280px] sm:w-[320px] md:w-[360px] shrink-0 snap-start"
+                delay={Math.min(index, 5) * 55}
+                variant="scale"
+              >
                 <ConcertCard {...concert} />
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
       </div>
-    </div>
+    </Reveal>
   );
 }
 
@@ -327,20 +336,22 @@ export function ConcertBrowser({ concerts, initialKeyword = '' }: ConcertBrowser
 
   return (
     <section id="events" className="mx-auto max-w-7xl px-4 py-20">
-      <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+      <Reveal className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-2xl">
           <h2 className="text-3xl font-black tracking-tight text-foreground md:text-5xl">Sự kiện nổi bật</h2>
           <p className="mt-3 text-lg text-muted-foreground">
             Tìm show theo nghệ sĩ, địa điểm, hoặc thể loại bạn quan tâm.
           </p>
         </div>
-      </div>
+      </Reveal>
 
       {filteredConcerts.length > 0 ? (
         hasFilters ? (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredConcerts.map((concert) => (
-              <ConcertCard key={concert.id} {...concert} />
+            {filteredConcerts.map((concert, index) => (
+              <Reveal key={concert.id} delay={Math.min(index, 8) * 45} variant="scale">
+                <ConcertCard {...concert} />
+              </Reveal>
             ))}
           </div>
         ) : (
