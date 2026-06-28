@@ -137,7 +137,7 @@ export default function ScannerScreen() {
           
           try {
             const { jwtDecode } = require('jwt-decode');
-            const CryptoJS = require('crypto-js');
+            const forge = require('node-forge');
             const { db } = require('../services/db');
 
             const parts = qrData.split('.');
@@ -148,13 +148,20 @@ export default function ScannerScreen() {
               
               const concertCache: any[] = await db.getAllAsync('SELECT publicKey FROM concert_cache LIMIT 1');
               if (concertCache && concertCache.length > 0) {
-                const publicKey = concertCache[0].publicKey;
+                const publicKeyPem = concertCache[0].publicKey;
                 
-                const hmac = CryptoJS.HmacSHA256(`${header}.${payload}`, publicKey);
-                let expectedSignature = CryptoJS.enc.Base64.stringify(hmac);
-                expectedSignature = expectedSignature.replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+                const md = forge.md.sha256.create();
+                md.update(`${header}.${payload}`, 'utf8');
                 
-                if (signature === expectedSignature) {
+                const publicKey = forge.pki.publicKeyFromPem(publicKeyPem);
+                
+                let sigBase64 = signature.replace(/-/g, '+').replace(/_/g, '/');
+                while (sigBase64.length % 4 !== 0) { sigBase64 += '='; }
+                const decodedSignature = forge.util.decode64(sigBase64);
+                
+                const isVerified = publicKey.verify(md.digest().bytes(), decodedSignature);
+                
+                if (isVerified) {
                    isValid = true;
                    const decoded = jwtDecode(qrData) as any;
                    if (decoded && decoded.ticket_code) {

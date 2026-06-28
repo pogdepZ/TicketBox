@@ -18,12 +18,13 @@ export class CheckinService {
     const { qrCodeData, staffId, concertId, deviceId, clientEventId } = dto;
 
     let extractedTicketCode = qrCodeData;
-    const ticketSecret = this.config.get<string>('JWT_TICKET_SECRET', 'ticket-secret');
+    const pubBase64 = this.config.getOrThrow<string>('JWT_TICKET_PUBLIC_KEY');
+    const publicKey = Buffer.from(pubBase64, 'base64').toString('utf8');
 
     let isJwt = false;
     // 1. Verify JWS and extract ticket_code
     try {
-      const decoded = jwt.verify(qrCodeData, ticketSecret) as any;
+      const decoded = jwt.verify(qrCodeData, publicKey, { algorithms: ['RS256'] }) as any;
       if (decoded && decoded.ticket_code) {
         extractedTicketCode = decoded.ticket_code;
         isJwt = true;
@@ -287,12 +288,13 @@ export class CheckinService {
       },
     });
 
-    const ticketSecret = this.config.get<string>('JWT_TICKET_SECRET', 'ticket-secret');
+    const pubBase64 = this.config.getOrThrow<string>('JWT_TICKET_PUBLIC_KEY');
+    const publicKey = Buffer.from(pubBase64, 'base64').toString('utf8');
     const version = Date.now().toString();
 
     return {
       version,
-      publicKey: ticketSecret,
+      publicKey,
       tickets: tickets.map((t) => ({
         id: t.id,
         ticketCode: t.ticketCode,

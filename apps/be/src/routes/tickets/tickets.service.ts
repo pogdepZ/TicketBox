@@ -39,7 +39,7 @@ export class TicketsService {
    *
    * Mỗi item có quantity N → sinh N ticket riêng biệt.
    * ticketCode: TB-{6 chữ hoa ngẫu nhiên}-{6 hex ngẫu nhiên}
-   * qrPayload:  JWT signed với JWT_TICKET_SECRET, exp 7 ngày
+   * qrPayload:  JWT signed với RS256 bằng JWT_TICKET_PRIVATE_KEY, exp 7 ngày
    */
   async issueTickets(
     tx: TransactionClient,
@@ -79,10 +79,8 @@ export class TicketsService {
     });
 
     const issued: IssuedTicket[] = [];
-    const ticketSecret = this.config.get<string>(
-      'JWT_TICKET_SECRET',
-      'ticket-secret',
-    );
+    const privBase64 = this.config.getOrThrow<string>('JWT_TICKET_PRIVATE_KEY');
+    const privateKey = Buffer.from(privBase64, 'base64').toString('utf8');
 
     // If reservationSeats exists, use seat-based flow
     if (reservationSeats.length > 0) {
@@ -121,8 +119,8 @@ export class TicketsService {
             concert_id: order.concertId,
             ticket_type_id: seat.ticketTypeId,
           },
-          ticketSecret,
-          { expiresIn: '7d' },
+          privateKey,
+          { algorithm: 'RS256', expiresIn: '7d' },
         );
 
         await tx.ticket.update({
@@ -170,8 +168,8 @@ export class TicketsService {
               concert_id: order.concertId,
               ticket_type_id: item.ticketTypeId,
             },
-            ticketSecret,
-            { expiresIn: '7d' },
+            privateKey,
+            { algorithm: 'RS256', expiresIn: '7d' },
           );
 
           await tx.ticket.update({
