@@ -365,7 +365,7 @@ export class AdminDashboardService {
       ];
     }
 
-    const [items, total] = await this.prismaService.$transaction([
+    const [items, total] = await Promise.all([
       this.prismaService.user.findMany({
         where,
         select: {
