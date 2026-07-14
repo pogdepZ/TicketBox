@@ -35,6 +35,7 @@ function CheckoutResultContent() {
   const momoPayType = searchParams.get("payType");
 
   const provider = momoResultCode !== null ? "MOMO" : "VNPAY";
+  const providerName = provider === "MOMO" ? "MoMo" : "VNPAY";
   const txnRef = momoTxnRef || vnpTxnRef || searchParams.get("orderId") || searchParams.get("vnp_TxnRef");
   const transactionNo =
     provider === "MOMO" ? momoTransactionNo : vnpTransactionNo;
