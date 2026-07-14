@@ -80,7 +80,7 @@ export default function MockPaymentPage() {
             
             <div className="mt-4 pt-4 border-t border-slate-800/60 grid grid-cols-2 gap-y-2 text-xs">
               <span className="text-slate-400">Nhà cung cấp</span>
-              <span className="text-right font-bold text-slate-200">{provider === 'MOMO' ? 'Ví MoMo' : 'VNPay'}</span>
+              <span className="text-right font-bold text-slate-200">{provider === 'MOMO' ? 'Thẻ tín dụng' : 'VNPay'}</span>
               
               <span className="text-slate-400">Mã giao dịch</span>
               <span className="text-right font-mono text-slate-200 truncate pl-4">{paymentRef}</span>

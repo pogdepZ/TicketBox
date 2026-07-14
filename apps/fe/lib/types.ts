@@ -40,16 +40,16 @@ export interface Seat {
 export const paymentMethods = [
   {
     id: 'momo',
-    gateway: 'WALLET' as PaymentMethod,
-    name: 'Ví MoMo',
-    description: 'Thanh toán nhanh qua ứng dụng MoMo',
-    icon: 'Wallet',
+    gateway: 'CARD' as PaymentMethod,
+    name: 'Thẻ tín dụng',
+    description: 'Thanh toán qua thẻ quốc tế (Visa, Mastercard, JCB)',
+    icon: 'CreditCard',
   },
   {
     id: 'vnpay',
     gateway: 'WALLET' as PaymentMethod,
     name: 'VNPAY',
     description: 'Quét mã QR qua ứng dụng ngân hàng',
-    icon: 'Building2',
+    icon: 'Landmark',
   },
 ];
