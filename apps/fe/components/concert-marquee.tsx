@@ -18,7 +18,8 @@ export function ConcertMarquee({ concerts }: ConcertMarqueeProps) {
   if (!concerts || concerts.length === 0) return null;
 
   return (
-    <div className="py-12 overflow-hidden relative w-full border-y border-border/40 bg-muted/10">
+    <div className="mx-auto max-w-7xl px-4 my-8 animate-fade-in">
+      <div className="py-12 overflow-hidden relative w-full rounded-[2rem] border border-border bg-muted/10 shadow-sm">
       <style>{`
         @keyframes marquee-scroll-images {
           0% {
@@ -76,6 +77,7 @@ export function ConcertMarquee({ concerts }: ConcertMarqueeProps) {
             ))}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
