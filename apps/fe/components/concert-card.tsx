@@ -133,9 +133,9 @@ export function ConcertCard({
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Từ</p>
               <p className="text-lg font-black text-foreground">{price.toLocaleString('vi-VN')}đ</p>
             </div>
-            <button className="rounded-full bg-foreground px-4 py-2 text-sm font-bold text-background transition duration-300 hover:-translate-y-0.5 hover:bg-primary hover:shadow-lg hover:shadow-primary/20 active:translate-y-px cursor-pointer">
+            <span className="rounded-full bg-foreground px-4 py-2 text-sm font-bold text-background transition duration-300 hover:-translate-y-0.5 hover:bg-primary hover:shadow-lg hover:shadow-primary/20 active:translate-y-px cursor-pointer">
               Xem chi tiết
-            </button>
+            </span>
           </div>
         </div>
       </div>

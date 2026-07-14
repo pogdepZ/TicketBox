@@ -18,6 +18,9 @@ import {
   RefreshCw,
   Activity,
   LayoutDashboard,
+  LayoutGrid,
+  Table2,
+  FolderKanban,
 } from "lucide-react";
 
 const getTicketColor = (label: string) => {
@@ -511,6 +514,9 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [dashboardLayout, setDashboardLayout] = useState<'grid' | 'tabs' | 'table'>('grid');
+  const [activeReportTab, setActiveReportTab] = useState<'chart' | 'distribution' | 'events'>('chart');
+
   // Khởi tạo khoảng ngày mặc định: 30 ngày qua cho dashboard
   const getInitialDateRange = () => {
     const end = new Date();
@@ -578,7 +584,7 @@ export default function AdminDashboardPage() {
   return (
     <AdminLayout>
       <div className="space-y-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
           <div>
             <h1 className="mb-2 text-4xl font-black tracking-tight text-foreground flex items-center gap-3">
               <LayoutDashboard className="size-9 text-primary" />
@@ -588,19 +594,55 @@ export default function AdminDashboardPage() {
               Tổng quan bán vé, doanh thu và thống kê từ dữ liệu thời gian thực.
             </p>
           </div>
-          <button
-            onClick={() => {
-              loadDashboardData();
-              loadRevenueAnalytics();
-            }}
-            disabled={loading || revenueLoading}
-            className="flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary active:scale-95 disabled:opacity-50 cursor-pointer"
-          >
-            <RefreshCw
-              className={`size-4 ${loading || revenueLoading ? "animate-spin" : ""}`}
-            />
-            Làm mới
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Bố cục Toggle */}
+            <div className="inline-flex rounded-full bg-muted p-1 border border-border">
+              <button
+                type="button"
+                onClick={() => setDashboardLayout('grid')}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  dashboardLayout === 'grid' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <LayoutGrid className="size-3.5" />
+                Grid
+              </button>
+              <button
+                type="button"
+                onClick={() => setDashboardLayout('tabs')}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  dashboardLayout === 'tabs' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <FolderKanban className="size-3.5" />
+                Tab Phân Khu
+              </button>
+              <button
+                type="button"
+                onClick={() => setDashboardLayout('table')}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  dashboardLayout === 'table' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Table2 className="size-3.5" />
+                Bảng biểu
+              </button>
+            </div>
+
+            <button
+              onClick={() => {
+                loadDashboardData();
+                loadRevenueAnalytics();
+              }}
+              disabled={loading || revenueLoading}
+              className="flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary active:scale-95 disabled:opacity-50 cursor-pointer animate-fade-in"
+            >
+              <RefreshCw
+                className={`size-4 ${loading || revenueLoading ? "animate-spin" : ""}`}
+              />
+              Làm mới
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -694,77 +736,206 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* Combined Chart & Distribution */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2 rounded-[2rem] border border-border bg-card p-6 shadow-sm flex flex-col justify-between">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                  <div>
-                    <h3 className="text-lg font-black text-foreground">
-                      Doanh thu & Số vé bán hàng ngày
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      Cột xanh: Số vé bán ra (đơn vị: vé) · Đường đỏ: Doanh thu
-                      (đơn vị: đ)
-                    </p>
+            {dashboardLayout === 'grid' && (
+              <>
+                {/* Combined Chart & Distribution */}
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 animate-fade-in">
+                  <div className="lg:col-span-2 rounded-[2rem] border border-border bg-card p-6 shadow-sm flex flex-col justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                      <div>
+                        <h3 className="text-lg font-black text-foreground">
+                          Doanh thu & Số vé bán hàng ngày
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          Cột xanh: Số vé bán ra (đơn vị: vé) · Đường đỏ: Doanh thu
+                          (đơn vị: đ)
+                        </p>
+                      </div>
+                      <DateRangePicker value={dateRange} onChange={setDateRange} />
+                    </div>
+                    <div className="mt-4 relative min-h-[260px] flex items-center justify-center">
+                      {revenueLoading ? (
+                        <div className="flex items-center gap-2 text-muted-foreground animate-pulse font-bold text-sm">
+                          <RefreshCw className="size-4 animate-spin" />
+                          Đang tải dữ liệu...
+                        </div>
+                      ) : (
+                        <DailySalesChart data={revenueData} />
+                      )}
+                    </div>
                   </div>
-                  <DateRangePicker value={dateRange} onChange={setDateRange} />
+
+                  <div className="rounded-[2rem] border border-border bg-card p-6 shadow-sm flex flex-col justify-between">
+                    <h3 className="mb-4 text-lg font-black text-foreground">
+                      Phân bổ doanh số loại vé
+                    </h3>
+                    <div className="space-y-4 flex-1 flex flex-col justify-center">
+                      {stats.ticketDistribution?.map((item: any) => (
+                        <div key={item.label}>
+                          <div className="flex justify-between mb-1">
+                            <span className="text-sm font-semibold text-muted-foreground">
+                              {item.label}
+                            </span>
+                            <span className="text-sm font-black text-foreground">
+                              {item.value}%
+                            </span>
+                          </div>
+                          <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full"
+                              style={{ width: `${item.value}%`, backgroundColor: getTicketColor(item.label) }}
+                            />
+                          </div>
+                        </div>
+                      )) || (
+                        <div className="text-muted-foreground text-center py-16">
+                          Không có dữ liệu phân bổ
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-4 relative min-h-[260px] flex items-center justify-center">
-                  {revenueLoading ? (
-                    <div className="flex items-center gap-2 text-muted-foreground animate-pulse font-bold text-sm">
-                      <RefreshCw className="size-4 animate-spin" />
-                      Đang tải dữ liệu...
+
+                {/* Recent Events */}
+                <div className="space-y-4 animate-fade-in">
+                  <h2 className="text-2xl font-black text-foreground">
+                    Sự kiện gần đây
+                  </h2>
+                  {concertsList.length === 0 ? (
+                    <div className="rounded-3xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
+                      Chưa có sự kiện nào được ghi nhận.
                     </div>
                   ) : (
-                    <DailySalesChart data={revenueData} />
+                    <ConcertTable concerts={concertsList.slice(0, 5)} />
+                  )}
+                </div>
+              </>
+            )}
+
+            {dashboardLayout === 'tabs' && (
+              <div className="space-y-6 animate-fade-in">
+                {/* Tab selector bar */}
+                <div className="flex gap-2 border-b border-border/40 pb-3">
+                  <button
+                    onClick={() => setActiveReportTab('chart')}
+                    className={`px-4 py-2 text-sm font-bold border-b-2 transition cursor-pointer ${
+                      activeReportTab === 'chart' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Biểu đồ Doanh thu & Vé
+                  </button>
+                  <button
+                    onClick={() => setActiveReportTab('distribution')}
+                    className={`px-4 py-2 text-sm font-bold border-b-2 transition cursor-pointer ${
+                      activeReportTab === 'distribution' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Phân bổ Loại vé
+                  </button>
+                  <button
+                    onClick={() => setActiveReportTab('events')}
+                    className={`px-4 py-2 text-sm font-bold border-b-2 transition cursor-pointer ${
+                      activeReportTab === 'events' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Sự kiện quản lý
+                  </button>
+                </div>
+
+                {/* Tab contents */}
+                <div className="mt-4">
+                  {activeReportTab === 'chart' && (
+                    <div className="rounded-[2rem] border border-border bg-card p-6 shadow-sm flex flex-col justify-between animate-fade-in">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                        <div>
+                          <h3 className="text-lg font-black text-foreground">
+                            Doanh thu & Số vé bán hàng ngày
+                          </h3>
+                          <p className="text-xs text-muted-foreground">
+                            Cột xanh: Số vé bán ra (đơn vị: vé) · Đường đỏ: Doanh thu (đơn vị: đ)
+                          </p>
+                        </div>
+                        <DateRangePicker value={dateRange} onChange={setDateRange} />
+                      </div>
+                      <div className="mt-4 relative min-h-[260px] flex items-center justify-center">
+                        {revenueLoading ? (
+                          <div className="flex items-center gap-2 text-muted-foreground animate-pulse font-bold text-sm">
+                            <RefreshCw className="size-4 animate-spin" />
+                            Đang tải dữ liệu...
+                          </div>
+                        ) : (
+                          <DailySalesChart data={revenueData} />
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeReportTab === 'distribution' && (
+                    <div className="rounded-[2rem] border border-border bg-card p-8 shadow-sm max-w-xl mx-auto flex flex-col justify-between animate-fade-in">
+                      <h3 className="mb-6 text-lg font-black text-foreground">
+                        Phân bổ doanh số loại vé
+                      </h3>
+                      <div className="space-y-6 flex-1 flex flex-col justify-center">
+                        {stats.ticketDistribution?.map((item: any) => (
+                          <div key={item.label}>
+                            <div className="flex justify-between mb-2">
+                              <span className="text-sm font-bold text-muted-foreground">
+                                {item.label}
+                              </span>
+                              <span className="text-sm font-black text-foreground">
+                                {item.value}%
+                              </span>
+                            </div>
+                            <div className="h-3 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full"
+                                style={{ width: `${item.value}%`, backgroundColor: getTicketColor(item.label) }}
+                              />
+                            </div>
+                          </div>
+                        )) || (
+                          <div className="text-muted-foreground text-center py-16">
+                            Không có dữ liệu phân bổ
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeReportTab === 'events' && (
+                    <div className="space-y-4 animate-fade-in">
+                      <h2 className="text-xl font-black text-foreground">
+                        Sự kiện quản lý gần đây
+                      </h2>
+                      {concertsList.length === 0 ? (
+                        <div className="rounded-3xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
+                          Chưa có sự kiện nào được ghi nhận.
+                        </div>
+                      ) : (
+                        <ConcertTable concerts={concertsList.slice(0, 8)} />
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
+            )}
 
-              <div className="rounded-[2rem] border border-border bg-card p-6 shadow-sm flex flex-col justify-between">
-                <h3 className="mb-4 text-lg font-black text-foreground">
-                  Phân bổ doanh số loại vé
-                </h3>
-                <div className="space-y-4 flex-1 flex flex-col justify-center">
-                  {stats.ticketDistribution?.map((item: any) => (
-                    <div key={item.label}>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm font-semibold text-muted-foreground">
-                          {item.label}
-                        </span>
-                        <span className="text-sm font-black text-foreground">
-                          {item.value}%
-                        </span>
-                      </div>
-                      <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full"
-                          style={{ width: `${item.value}%`, backgroundColor: getTicketColor(item.label) }}
-                        />
-                      </div>
-                    </div>
-                  )) || (
-                    <div className="text-muted-foreground text-center py-16">
-                      Không có dữ liệu phân bổ
-                    </div>
-                  )}
+            {dashboardLayout === 'table' && (
+              <div className="space-y-4 animate-fade-in">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-black text-foreground animate-fade-in">
+                    Tất cả sự kiện quản lý ({concertsList.length})
+                  </h2>
                 </div>
+                {concertsList.length === 0 ? (
+                  <div className="rounded-3xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
+                    Chưa có sự kiện nào.
+                  </div>
+                ) : (
+                  <ConcertTable concerts={concertsList} />
+                )}
               </div>
-            </div>
-
-            {/* Recent Events */}
-            <div className="space-y-4">
-              <h2 className="text-2xl font-black text-foreground">
-                Sự kiện gần đây
-              </h2>
-              {concertsList.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
-                  Chưa có sự kiện nào được ghi nhận.
-                </div>
-              ) : (
-                <ConcertTable concerts={concertsList.slice(0, 5)} />
-              )}
-            </div>
+            )}
           </>
         )}
       </div>
