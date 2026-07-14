@@ -293,12 +293,12 @@ export function Header() {
       <div className="mx-auto flex h-18 max-w-7xl items-center justify-between gap-4 px-4">
         <Link
           href="/"
-          className="flex items-center gap-3 text-lg font-black tracking-tight text-foreground shrink-0"
+          className="flex items-center gap-3 text-lg font-black tracking-tight text-foreground shrink-0 group/logo"
         >
-          <span className="grid size-10 place-items-center rounded-2xl bg-foreground text-background shadow-sm shrink-0">
+          <span className="grid size-10 place-items-center rounded-2xl bg-gradient-to-tr from-primary to-rose-500 text-white shadow-lg shadow-primary/20 shrink-0 group-hover/logo:scale-105 group-hover/logo:shadow-primary/35 transition-all duration-300">
             <Ticket className="size-5" />
           </span>
-          <span className="hidden md:inline">TicketBox</span>
+          <span className="hidden md:inline group-hover/logo:text-primary transition-colors duration-300">TicketBox</span>
         </Link>
 
         {/* Global Search and Location filter pill in Header */}

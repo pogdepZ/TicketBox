@@ -7,12 +7,15 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-4 py-12">
         <div className="mb-10 grid grid-cols-1 gap-8 md:grid-cols-4">
           <div>
-            <div className="mb-4 flex items-center gap-3 text-lg font-black">
-              <span className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground">
-                <Ticket className="size-5" />
+            <Link
+              href="/"
+              className="mb-4 flex items-center gap-3 text-lg font-black group/logo text-background hover:text-background w-fit"
+            >
+              <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-tr from-primary to-rose-500 text-white shadow-lg shadow-primary/20 shrink-0 group-hover/logo:scale-105 transition-all duration-300">
+                <Ticket className="size-4.5" />
               </span>
-              TicketBox
-            </div>
+              <span className="group-hover/logo:text-primary transition-colors duration-300">TicketBox</span>
+            </Link>
             <p className="max-w-xs text-sm leading-6 text-background/65">
               Nền tảng đặt vé dành cho concert, lễ hội âm nhạc và sự kiện biểu diễn tại Việt Nam.
             </p>
