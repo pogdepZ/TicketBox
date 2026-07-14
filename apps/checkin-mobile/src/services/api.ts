@@ -16,11 +16,20 @@ export const AUTH_STORAGE_KEYS = {
 
 const CHECKIN_CLIENT_HEADER = "checkin-mobile";
 
+type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+
 class ApiService {
   private baseUrl: string;
   private token: string | null = null;
   private refreshToken: string | null = null;
   private refreshPromise: Promise<string | null> | null = null;
+
+  // Circuit Breaker State
+  private circuitState: CircuitState = 'CLOSED';
+  private consecutiveFailures = 0;
+  private readonly FAILURE_THRESHOLD = 3;
+  private nextAttemptTime = 0;
+  private readonly RESET_TIMEOUT_MS = 60000; // 1 minute
 
   constructor() {
     this.baseUrl = API_BASE_URL;
@@ -59,11 +68,28 @@ class ApiService {
     endpoint: string,
     options: RequestInit = {},
   ): Promise<ApiResponse<T>> {
+    // 1. Check Circuit Breaker
+    if (this.circuitState === 'OPEN') {
+      if (Date.now() > this.nextAttemptTime) {
+        this.circuitState = 'HALF_OPEN';
+      } else {
+        // Fast fail -> immediately return offline error without waiting for timeout
+        this.setOfflineStatus(true);
+        return {
+          success: false,
+          data: null as T,
+          message: 'Circuit Breaker OPEN: Network is too slow/unstable.',
+        };
+      }
+    }
+
     try {
       const currentToken = await this.getAccessToken();
       let result = await this.sendRequest(endpoint, options, currentToken);
 
-      // If we got a response, we are online
+      // Success -> Reset circuit breaker
+      this.consecutiveFailures = 0;
+      this.circuitState = 'CLOSED';
       this.setOfflineStatus(false);
 
       if (this.shouldAttemptRefresh(endpoint, result.response)) {
@@ -79,6 +105,9 @@ class ApiService {
     } catch (error) {
       console.error(`[API Error] request to ${endpoint} failed:`, error);
 
+      // Update Circuit Breaker
+      this.recordFailure();
+
       // Fetch threw an error, so we are offline
       this.setOfflineStatus(true);
 
@@ -87,6 +116,15 @@ class ApiService {
         data: null as T,
         message: this.getErrorMessage(error),
       };
+    }
+  }
+
+  private recordFailure() {
+    this.consecutiveFailures++;
+    if (this.circuitState === 'HALF_OPEN' || this.consecutiveFailures >= this.FAILURE_THRESHOLD) {
+      this.circuitState = 'OPEN';
+      this.nextAttemptTime = Date.now() + this.RESET_TIMEOUT_MS;
+      console.warn(`[Circuit Breaker] Tripped! State is now OPEN. Next attempt in ${this.RESET_TIMEOUT_MS}ms.`);
     }
   }
 
