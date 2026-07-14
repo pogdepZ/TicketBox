@@ -83,6 +83,7 @@ export default function MyTicketsPage() {
         ...ticket,
         concertTitle: order.concertTitle,
         concertVenue: order.concertVenue || "Nhà hát Hòa Bình, TP. Hồ Chí Minh",
+        concertDate: order.concertDate,
         orderNumber: orderNumber,
         paidAt: order.paidAt || new Date().toISOString(),
       }));
@@ -120,22 +121,23 @@ export default function MyTicketsPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="flex flex-wrap gap-6 justify-center items-start">
             {allTickets.map((ticket) => (
-              <ETicketCard
-                key={ticket.id}
-                ticketNumber={ticket.ticketCode}
-                concertTitle={ticket.concertTitle}
-                date={ticket.createdAt}
-                time={new Date(ticket.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                venue={ticket.concertVenue || "Nhà hát Hòa Bình, TP. Hồ Chí Minh"}
-                seatZone={ticket.seatZone}
-                seatNumber={ticket.seatNumber}
-                price={ticket.price}
-                purchaseDate={new Date(ticket.paidAt).toLocaleDateString('vi-VN')}
-                qrPayload={ticket.qrPayload}
-                status={ticket.status}
-              />
+              <div key={ticket.id} className="w-full sm:max-w-md md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] flex justify-center">
+                <ETicketCard
+                  ticketNumber={ticket.ticketCode}
+                  concertTitle={ticket.concertTitle}
+                  date={ticket.concertDate || ticket.createdAt}
+                  time={new Date(ticket.concertDate || ticket.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                  venue={ticket.concertVenue || "Nhà hát Hòa Bình, TP. Hồ Chí Minh"}
+                  seatZone={ticket.seatZone}
+                  seatNumber={ticket.seatNumber}
+                  price={ticket.price}
+                  purchaseDate={new Date(ticket.paidAt).toLocaleDateString('vi-VN')}
+                  qrPayload={ticket.qrPayload}
+                  status={ticket.status}
+                />
+              </div>
             ))}
           </div>
         )}

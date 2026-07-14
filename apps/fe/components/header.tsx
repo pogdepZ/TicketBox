@@ -237,7 +237,7 @@ export function Header() {
       window.addEventListener("ticketbox-notification-change", loadNotifications);
     }
 
-    const interval = setInterval(loadNotifications, 30000); // 30 seconds polling
+    const interval = setInterval(loadNotifications, 4000); // 4 seconds polling
 
     return () => {
       clearInterval(interval);
@@ -266,6 +266,20 @@ export function Header() {
       setUnreadCount(0);
     } catch (err) {
       console.error(err);
+    }
+  }
+
+  async function handleNotificationClick(id: string, routeUrl?: string, read?: boolean) {
+    try {
+      if (!read) {
+        await handleMarkRead(id);
+      }
+      setShowNotifications(false);
+      if (routeUrl) {
+        router.push(routeUrl);
+      }
+    } catch (err) {
+      console.error("Failed to handle notification click:", err);
     }
   }
 
@@ -415,32 +429,35 @@ export function Header() {
                       Không có thông báo nào.
                     </p>
                   ) : (
-                    notifications.map((n) => (
-                      <div
-                        key={n.id}
-                        onClick={() => !n.read && handleMarkRead(n.id)}
-                        className={`rounded-2xl p-3 transition relative ${
-                          n.read
-                            ? "bg-muted/30 text-muted-foreground"
-                            : "bg-muted/70 text-foreground cursor-pointer hover:bg-muted/90"
-                        }`}
-                      >
-                        {!n.read && (
-                          <span className="absolute top-3 right-3 size-2 rounded-full bg-primary" />
-                        )}
-                        <p className="font-bold pr-4">{n.title}</p>
-                        <p className="mt-1 text-xs leading-relaxed">
-                          {n.message}
-                        </p>
-                        <p className="mt-1.5 text-[10px] text-muted-foreground">
-                          {new Date(n.createdAt).toLocaleTimeString("vi-VN", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}{" "}
-                          · {new Date(n.createdAt).toLocaleDateString("vi-VN")}
-                        </p>
-                      </div>
-                    ))
+                    notifications.map((n) => {
+                      const [displayMessage, routeUrl] = n.message.split("|route:");
+                      return (
+                        <div
+                          key={n.id}
+                          onClick={() => handleNotificationClick(n.id, routeUrl, n.read)}
+                          className={`rounded-2xl p-3 transition relative cursor-pointer hover:bg-muted/90 ${
+                            n.read
+                              ? "bg-muted/30 text-muted-foreground"
+                              : "bg-muted/70 text-foreground font-semibold"
+                          }`}
+                        >
+                          {!n.read && (
+                            <span className="absolute top-3 right-3 size-2 rounded-full bg-primary" />
+                          )}
+                          <p className="font-bold pr-4">{n.title}</p>
+                          <p className="mt-1 text-xs leading-relaxed">
+                            {displayMessage}
+                          </p>
+                          <p className="mt-1.5 text-[10px] text-muted-foreground">
+                            {new Date(n.createdAt).toLocaleTimeString("vi-VN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}{" "}
+                            · {new Date(n.createdAt).toLocaleDateString("vi-VN")}
+                          </p>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>

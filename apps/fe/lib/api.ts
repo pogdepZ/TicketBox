@@ -1510,13 +1510,26 @@ export async function markAllNotificationsRead(): Promise<any> {
   return await fetchApi("/notifications/read-all", { method: "POST" });
 }
 
-export function addLocalNotification(title: string, message: string) {
+export function addLocalNotification(
+  title: string,
+  message: string,
+  routeUrl?: string,
+  type: "success" | "error" | "info" | "warning" = "success"
+) {
   if (typeof window === "undefined") return;
   const items = getLocalNotifications();
+  const fullMessage = routeUrl ? `${message}|route:${routeUrl}` : message;
+
+  // Tránh trùng lặp Toast / Local Notification khi gọi liên tiếp trong React StrictMode
+  const isDuplicate = items.some(
+    (item) => item.title === title && item.message === fullMessage
+  );
+  if (isDuplicate) return;
+
   const newItem: NotificationItem = {
     id: `notif-${Date.now()}`,
     title,
-    message,
+    message: fullMessage,
     read: false,
     createdAt: new Date().toISOString(),
   };
@@ -1531,7 +1544,7 @@ export function addLocalNotification(title: string, message: string) {
   // Dispatch custom event to show Toast alert
   window.dispatchEvent(
     new CustomEvent("ticketbox-toast", {
-      detail: { title, message, type: "success" },
+      detail: { title, message, type },
     }),
   );
 }

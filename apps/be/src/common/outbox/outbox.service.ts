@@ -41,7 +41,31 @@ export class OutboxService {
   ): Promise<{ outboxMessage: any; job?: Job }> {
     const prisma = tx || this.prisma;
 
-    // 1. Create outbox record in DB
+    // 1. Check for duplicate pending messages in outbox
+    const pendingMessages = await prisma.outboxMessage.findMany({
+      where: {
+        queueName,
+        jobName,
+        status: 'PENDING',
+      },
+    });
+
+    const existingPending = pendingMessages.find((msg: any) => {
+      try {
+        return JSON.stringify(msg.payload) === JSON.stringify(payload);
+      } catch {
+        return false;
+      }
+    });
+
+    if (existingPending) {
+      this.logger.warn(
+        `Duplicate pending outbox message detected for queue=${queueName} job=${jobName}. Skipping create.`,
+      );
+      return { outboxMessage: existingPending };
+    }
+
+    // 2. Create outbox record in DB
     const outboxMessage = await prisma.outboxMessage.create({
       data: {
         queueName,

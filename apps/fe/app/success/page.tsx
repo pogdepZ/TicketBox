@@ -84,12 +84,13 @@ export default function SuccessPage() {
                 concertId: fetchedOrder.concertId,
                 concertTitle,
                 concertVenue,
+                concertDate,
                 reservationId: fetchedOrder.reservationId,
                 status: 'PAID', // Treat success page loading as paid
                 totalAmount: subtotal,
                 paymentMethod: fetchedOrder.paymentMethod || 'MOMO',
                 paidAt: fetchedOrder.paidAt || fetchedOrder.createdAt || new Date().toISOString(),
-                createdAt: concertDate || fetchedOrder.createdAt || new Date().toISOString(),
+                createdAt: fetchedOrder.createdAt || new Date().toISOString(),
                 expiresAt: fetchedOrder.expiresAt || new Date().toISOString(),
                 items: fetchedOrder.items?.map((item: any) => ({
                   id: item.id,
@@ -122,7 +123,8 @@ export default function SuccessPage() {
               if (!alreadyNotified) {
                 addLocalNotification(
                   'Đặt vé thành công!',
-                  `Đơn hàng #${actualOrderNumber} cho sự kiện "${mappedOrder.concertTitle}" đã được đặt thành công.`
+                  `Đơn hàng #${actualOrderNumber} cho sự kiện "${mappedOrder.concertTitle}" đã được đặt thành công.`,
+                  `/success?orderId=${actualOrderId}`
                 );
                 if (typeof window !== 'undefined') {
                   window.sessionStorage.setItem(sessionKey, 'true');
@@ -136,6 +138,7 @@ export default function SuccessPage() {
                 orderNumber: actualOrderNumber,
                 concertTitle,
                 concertVenue,
+                concertDate,
               };
               setOrder(mappedOrder);
               
@@ -144,7 +147,8 @@ export default function SuccessPage() {
               if (!alreadyNotified) {
                 addLocalNotification(
                   'Đặt vé thành công!',
-                  `Đơn hàng #${actualOrderNumber} cho sự kiện "${concertTitle}" đã được đặt thành công.`
+                  `Đơn hàng #${actualOrderNumber} cho sự kiện "${concertTitle}" đã được đặt thành công.`,
+                  `/success?orderId=${actualOrderId}`
                 );
                 if (typeof window !== 'undefined') {
                   window.sessionStorage.setItem(sessionKey, 'true');
@@ -162,6 +166,24 @@ export default function SuccessPage() {
   }, [orderId, retryCount]);
 
   const isFailed = status === 'failed' || dbFailed;
+
+  useEffect(() => {
+    if (!loading && isFailed && orderId) {
+      const sessionKey = `notified-order-failed-${orderId}`;
+      const alreadyNotified = typeof window !== 'undefined' && window.sessionStorage.getItem(sessionKey);
+      if (!alreadyNotified) {
+        addLocalNotification(
+          'Thanh toán thất bại!',
+          `Đơn đặt vé #${orderId.substring(0, 8).toUpperCase()} của bạn thanh toán thất bại hoặc đã bị hủy.`,
+          `/success?orderId=${orderId}&status=failed`,
+          'error'
+        );
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem(sessionKey, 'true');
+        }
+      }
+    }
+  }, [loading, isFailed, orderId]);
 
   if (loading) {
     return (
@@ -264,23 +286,23 @@ export default function SuccessPage() {
         </div>
 
         <div className="mb-12">
-          <h2 className="mb-6 text-2xl font-black text-foreground">Vé của bạn</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="flex flex-wrap gap-6 justify-center items-start">
             {order.tickets.map((ticket) => (
-              <ETicketCard
-                key={ticket.id}
-                ticketNumber={ticket.ticketCode}
-                concertTitle={order.concertTitle}
-                date={order.createdAt} // Fallback to order date if concert date isn't saved in draft
-                time={new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                venue={order.concertVenue || "Nhà hát Hòa Bình, TP. Hồ Chí Minh"}
-                seatZone={ticket.seatZone}
-                seatNumber={ticket.seatNumber}
-                price={ticket.price}
-                purchaseDate={purchaseDate}
-                qrPayload={ticket.qrPayload}
-                status={ticket.status}
-              />
+              <div key={ticket.id} className="w-full sm:max-w-md md:w-[calc(50%-12px)] flex justify-center">
+                <ETicketCard
+                  ticketNumber={ticket.ticketCode}
+                  concertTitle={order.concertTitle}
+                  date={order.concertDate || order.createdAt}
+                  time={new Date(order.concertDate || order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                  venue={order.concertVenue || "Nhà hát Hòa Bình, TP. Hồ Chí Minh"}
+                  seatZone={ticket.seatZone}
+                  seatNumber={ticket.seatNumber}
+                  price={ticket.price}
+                  purchaseDate={purchaseDate}
+                  qrPayload={ticket.qrPayload}
+                  status={ticket.status}
+                />
+              </div>
             ))}
           </div>
         </div>
