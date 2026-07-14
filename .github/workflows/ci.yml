@@ -70,7 +70,7 @@ jobs:
       MOMO_SECRET_KEY: "K951B6PE1waDMi640xX08PD3vg6EkVlz"
       MOMO_REDIRECT_URL: "http://localhost:3000/checkout/result"
       MOMO_IPN_URL: "http://localhost:3000/payments/webhooks/MOMO"
-      MOMO_REQUEST_TYPE: "captureWallet"
+      MOMO_REQUEST_TYPE: "payWithCC"
       SEED_ADMIN_EMAIL: "admin@gmail.com"
       SEED_ADMIN_PASSWORD: "123456"
       SEED_ADMIN_FULL_NAME: "System Admin"

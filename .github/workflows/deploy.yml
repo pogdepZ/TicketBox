@@ -30,7 +30,7 @@ jobs:
             # 2. Xóa các thay đổi tạm thời trên server để tránh xung đột khi git pull
             git reset --hard HEAD
             git clean -fd
-            git pull origin main
+            git pull origin main  
             
             # 3. Cài đặt các thư viện mới nếu có thay đổi
             pnpm install
