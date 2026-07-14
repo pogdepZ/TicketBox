@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { ToastContainer } from '@/components/toast-container'
 import { HistoryListener } from '@/components/history-listener'
+import { ScrollToTop } from '@/components/scroll-to-top'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({
@@ -58,7 +59,8 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body suppressHydrationWarning className="font-sans antialiased bg-background text-foreground">
+      <body className="font-sans antialiased bg-background text-foreground">
+        <ScrollToTop />
         {children}
         <ToastContainer />
         <HistoryListener />

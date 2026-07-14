@@ -13,8 +13,11 @@ export class AdminDashboardController {
   constructor(private readonly dashboardService: AdminDashboardService) {}
 
   @Get("revenue/summary")
-  async getRevenueSummary() {
-    return this.dashboardService.getRevenueSummary();
+  async getRevenueSummary(
+    @Query("startDate") startDateStr?: string,
+    @Query("endDate") endDateStr?: string,
+  ) {
+    return this.dashboardService.getRevenueSummary(startDateStr, endDateStr);
   }
 
   @Get("dashboard/analytics")

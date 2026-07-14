@@ -2,8 +2,10 @@ import { Processor, WorkerHost } from "@nestjs/bullmq";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Job } from "bullmq";
-import { Attachment } from "nodemailer/lib/mailer";
-import { MailService } from "../../common/mail/mail.service";
+import {
+  MailAttachment,
+  MailService,
+} from "../../common/mail/mail.service";
 import { OutboxService } from "../../common/outbox/outbox.service";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import {
@@ -24,12 +26,18 @@ type QrRenderOptions = {
   width?: number;
 };
 
+const NOTIFICATION_QUEUE_CONCURRENCY = 3;
+const NOTIFICATION_QUEUE_LOCK_DURATION_MS = 120000;
+
 const QRCode = require("qrcode") as {
   toBuffer(text: string, options?: QrRenderOptions): Promise<Buffer>;
 };
 
 @Injectable()
-@Processor("notification")
+@Processor("notification", {
+  concurrency: NOTIFICATION_QUEUE_CONCURRENCY,
+  lockDuration: NOTIFICATION_QUEUE_LOCK_DURATION_MS,
+})
 export class NotificationsProcessor extends WorkerHost {
   private readonly logger = new Logger(NotificationsProcessor.name);
 
@@ -48,6 +56,10 @@ export class NotificationsProcessor extends WorkerHost {
     switch (job.name) {
       case "payment.completed":
         return this.handlePaymentCompleted(job.data as PaymentCompletedPayload);
+      case "payment.failed":
+        return this.handlePaymentFailed(job.data as { orderId: string; reason: string });
+      case "payment.cancelled":
+        return this.handlePaymentCancelled(job.data as { orderId: string });
       case "send-single":
         return this.handleSendSingle(job.data as SendSinglePayload);
       case "concert.reminder":
@@ -115,14 +127,28 @@ export class NotificationsProcessor extends WorkerHost {
       sentAt: new Date(),
     });
 
-    await this.prisma.inAppNotification.create({
-      data: {
+    const existingCompletedNotif = await this.prisma.inAppNotification.findFirst({
+      where: {
         userId: order.userId,
         title: "Thanh toán đơn hàng thành công",
-        message: `Thanh toán thành công đơn hàng vé concert "${order.concert.name}". Mã vé QR của bạn đã sẵn sàng!`,
-        read: false,
+        message: {
+          contains: `route:/success?orderId=${order.id}`,
+        },
       },
     });
+
+    if (!existingCompletedNotif) {
+      await this.prisma.inAppNotification.create({
+        data: {
+          userId: order.userId,
+          title: "Thanh toán đơn hàng thành công",
+          message: `Thanh toán thành công đơn hàng vé concert "${order.concert.name}". Mã vé QR của bạn đã sẵn sàng!|route:/success?orderId=${order.id}`,
+          read: false,
+        },
+      });
+    } else {
+      this.logger.warn(`InAppNotification for completed order #${order.id.substring(0, 8).toUpperCase()} already exists. Skipping.`);
+    }
 
     const email = await this.createNotification({
       userId: order.userId,
@@ -231,7 +257,7 @@ export class NotificationsProcessor extends WorkerHost {
           data: {
             userId: order.userId,
             title: "Sự kiện sắp diễn ra",
-            message: `Chỉ còn chưa đầy 24 giờ nữa là concert "${concert.name}" sẽ bắt đầu. Đừng bỏ lỡ nhé!`,
+            message: `Chỉ còn chưa đầy 24 giờ nữa là concert "${concert.name}" sẽ bắt đầu. Đừng bỏ lỡ nhé!|route:/my-tickets`,
             read: false,
           },
         });
@@ -306,9 +332,12 @@ export class NotificationsProcessor extends WorkerHost {
       );
       return { success: true, notificationId: notification.id };
     } catch (error) {
+      const isConnRefused = error instanceof Error && error.message.includes("ECONNREFUSED");
+
       this.logger.error(
         `Failed processing notificationId=${notification.id}: ${error instanceof Error ? error.message : String(error)}`,
       );
+
       await this.prisma.notification.update({
         where: { id: notification.id },
         data: {
@@ -317,8 +346,113 @@ export class NotificationsProcessor extends WorkerHost {
           errorMessage: error instanceof Error ? error.message : String(error),
         },
       });
+
+      if (isConnRefused) {
+        this.logger.warn(
+          `[Notice] Mailpit/SMTP server is not running. Email simulation skipped. In-app notifications are unaffected.`
+        );
+        return { success: false, reason: "Mail server offline" }; // Do not throw so BullMQ/Outbox does not retry endlessly
+      }
+
       throw error;
     }
+  }
+
+  private async handlePaymentFailed(payload: { orderId: string; reason: string }) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: payload.orderId },
+      include: {
+        concert: { select: { name: true } },
+        items: {
+          include: {
+            ticketType: { select: { name: true } },
+          },
+        },
+      },
+    });
+    if (!order) return { success: false, reason: "Order not found" };
+
+    const orderCode = order.id.substring(0, 8).toUpperCase();
+    const formattedAmount = new Intl.NumberFormat("vi-VN").format(Number(order.totalAmount)) + "đ";
+    const ticketDetails = order.items.map(item => `${item.ticketType.name} (x${item.quantity})`).join(", ");
+
+    const title = payload.reason === "EXPIRED" ? "Thanh toán thất bại - Đơn hàng bị hủy" : "Thanh toán thất bại";
+    const message = payload.reason === "EXPIRED"
+      ? `Đơn hàng #${orderCode} - ${order.concert.name} (${ticketDetails}) giá trị ${formattedAmount}: Giao dịch thanh toán thất bại và thời gian giữ chỗ đã hết hạn. Đơn đặt vé đã bị hủy tự động.|route:/checkout/result?orderId=${payload.orderId}&status=failed`
+      : `Đơn hàng #${orderCode} - ${order.concert.name} (${ticketDetails}) giá trị ${formattedAmount}: Giao dịch thanh toán thất bại. Bạn có thể thực hiện thanh toán lại trước khi hết hạn giữ ghế.|route:/checkout/result?orderId=${payload.orderId}&status=failed`;
+
+    const existingFailedNotif = await this.prisma.inAppNotification.findFirst({
+      where: {
+        userId: order.userId,
+        title,
+        message: {
+          contains: `route:/checkout/result?orderId=${payload.orderId}`,
+        },
+      },
+    });
+
+    if (!existingFailedNotif) {
+      await this.prisma.inAppNotification.create({
+        data: {
+          userId: order.userId,
+          title,
+          message,
+          read: false,
+        },
+      });
+    } else {
+      this.logger.warn(`InAppNotification for failed order #${orderCode} already exists. Skipping.`);
+    }
+
+    this.logger.log(`[Worker] Handled payment.failed for orderId=${payload.orderId}`);
+    return { success: true };
+  }
+
+  private async handlePaymentCancelled(payload: { orderId: string }) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: payload.orderId },
+      include: {
+        concert: { select: { name: true } },
+        items: {
+          include: {
+            ticketType: { select: { name: true } },
+          },
+        },
+      },
+    });
+    if (!order) return { success: false, reason: "Order not found" };
+
+    const orderCode = order.id.substring(0, 8).toUpperCase();
+    const formattedAmount = new Intl.NumberFormat("vi-VN").format(Number(order.totalAmount)) + "đ";
+    const ticketDetails = order.items.map(item => `${item.ticketType.name} (x${item.quantity})`).join(", ");
+
+    const message = `Đơn hàng #${orderCode} - ${order.concert.name} (${ticketDetails}) giá trị ${formattedAmount}: Giao dịch thanh toán đã bị hủy bỏ theo yêu cầu.|route:/checkout/result?orderId=${payload.orderId}&status=failed`;
+
+    const existingCancelledNotif = await this.prisma.inAppNotification.findFirst({
+      where: {
+        userId: order.userId,
+        title: "Thanh toán bị hủy",
+        message: {
+          contains: `route:/checkout/result?orderId=${payload.orderId}`,
+        },
+      },
+    });
+
+    if (!existingCancelledNotif) {
+      await this.prisma.inAppNotification.create({
+        data: {
+          userId: order.userId,
+          title: "Thanh toán bị hủy",
+          message,
+          read: false,
+        },
+      });
+    } else {
+      this.logger.warn(`InAppNotification for cancelled order #${orderCode} already exists. Skipping.`);
+    }
+
+    this.logger.log(`[Worker] Handled payment.cancelled for orderId=${payload.orderId}`);
+    return { success: true };
   }
 
   private async sendEmail(notification: any) {
@@ -370,25 +504,29 @@ export class NotificationsProcessor extends WorkerHost {
     payload: Record<string, any>,
   ): Promise<{
     html: string;
-    attachments: Attachment[];
+    attachments: MailAttachment[];
   }> {
-    const attachments: Attachment[] = [];
-
+    const attachments: MailAttachment[] = [];
     const tickets = await Promise.all(
       (payload.tickets ?? []).map(async (ticket: any, index: number) => {
-        const cid = `ticket-qr-${index}-${ticket.ticketCode}@ticketbox`;
-
         const qrBuffer = ticket.qrPayload
           ? await this.generateQrBuffer(ticket.qrPayload)
           : null;
-
+        let qrImageSrc = null;
         if (qrBuffer) {
+          const cid = `ticket-qr-${index + 1}`;
+          const base64Len = qrBuffer.toString("base64").length;
+          this.logger.log(
+            `Generating QR code for ticket [${ticket.ticketCode}]: buffer size = ${qrBuffer.length} bytes, base64 length = ${base64Len}, cid = ${cid}`
+          );
+
           attachments.push({
-            filename: `${ticket.ticketCode}.png`,
+            filename: `ticket-qr-${index + 1}.png`,
             content: qrBuffer,
-            cid,
             contentType: "image/png",
+            cid,
           });
+          qrImageSrc = `cid:${cid}`;
         }
 
         return `
@@ -410,11 +548,11 @@ export class NotificationsProcessor extends WorkerHost {
                 </td>
                 <td align="right" style="vertical-align: middle; width: 140px;">
                   ${
-                    qrBuffer
+                    qrImageSrc
                       ? `
                         <div style="border: 1px solid #e1e4e6; padding: 6px; border-radius: 8px; background-color: #ffffff; display: inline-block; width: 120px; text-align: center;">
                           <img
-                            src="cid:${cid}"
+                            src="${qrImageSrc}"
                             alt="QR for ticket ${ticket.ticketCode}"
                             width="120"
                             height="120"
@@ -635,7 +773,7 @@ export class NotificationsProcessor extends WorkerHost {
   }
 
   private buildETicketUrl(orderId: string): string {
-    return `${this.config.get<string>("mail.appBaseUrl")}/tickets/orders/${orderId}`;
+    return `${this.config.get<string>("mail.appBaseUrl")}/success?orderId=${orderId}`;
   }
 
   private dedupeKey(

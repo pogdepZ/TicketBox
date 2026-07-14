@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AlertCircle, ArrowLeft } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CreditCard, Landmark } from 'lucide-react';
 import { CheckoutSummary } from '@/components/checkout-summary';
 import { paymentMethods } from '@/lib/types';
 import { createDraftReservation, DraftReservation, getDraftReservation } from '@/lib/draft-reservation';
@@ -407,10 +407,23 @@ export function CheckoutFlow() {
                       onChange={() => setPaymentMethod(method.id)}
                       className="mt-1 size-4 accent-[var(--primary)]"
                     />
-                    <span className="ml-3">
-                      <span className="block font-semibold text-foreground">{method.name}</span>
-                      <span className="block text-sm text-muted-foreground">{method.description}</span>
-                    </span>
+                    <div className="ml-3 flex items-start gap-3">
+                      <div className={`mt-0.5 rounded-xl p-2 transition ${
+                        paymentMethod === method.id 
+                          ? 'bg-primary/10 text-primary' 
+                          : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {method.icon === 'CreditCard' ? (
+                          <CreditCard className="size-5" />
+                        ) : (
+                          <Landmark className="size-5" />
+                        )}
+                      </div>
+                      <div>
+                        <span className="block font-semibold text-foreground">{method.name}</span>
+                        <span className="block text-sm text-muted-foreground">{method.description}</span>
+                      </div>
+                    </div>
                   </label>
                 ))}
               </div>

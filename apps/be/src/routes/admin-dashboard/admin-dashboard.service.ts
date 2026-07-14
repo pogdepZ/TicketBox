@@ -16,8 +16,17 @@ export class AdminDashboardService {
     private readonly authCacheService: AuthCacheService,
   ) {}
 
-  async getRevenueSummary() {
+  async getRevenueSummary(startDateStr?: string, endDateStr?: string) {
     const now = new Date();
+    
+    let start: Date | undefined;
+    let end: Date | undefined;
+    if (startDateStr && endDateStr) {
+      start = new Date(startDateStr);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(endDateStr);
+      end.setHours(23, 59, 59, 999);
+    }
     
     // 1. Total Concerts
     const totalEvents = await this.prismaService.concert.count();
@@ -161,19 +170,31 @@ export class AdminDashboardService {
     const monthlySales = monthlySalesRaw.map(v => Math.round((v / maxVal) * 100));
 
     // 8. Ticket distribution by TicketType name
+    const distributionWhere: any = {
+      status: { in: ["ACTIVE", "USED"] },
+    };
+    if (start && end) {
+      distributionWhere.createdAt = {
+        gte: start,
+        lte: end,
+      };
+    }
+
     const ticketsByTier = await this.prismaService.ticket.groupBy({
       by: ["ticketTypeId"],
-      where: {
-        status: { in: ["ACTIVE", "USED"] },
-      },
+      where: distributionWhere,
       _count: {
         id: true,
       },
     });
 
+    const totalSoldInPeriod = await this.prismaService.ticket.count({
+      where: distributionWhere,
+    });
+
     const ticketTypes = await this.prismaService.ticketType.findMany();
     const colors = ["bg-primary", "bg-[#e0a82e]", "bg-[#3d6f8f]", "bg-accent", "bg-slate-500", "bg-indigo-500"];
-    const totalSold = ticketsSold || 1;
+    const totalSold = totalSoldInPeriod || 1;
 
     // Gom nhóm số lượng vé theo tên hạng vé
     const distributionMap = new Map<string, number>();
@@ -344,7 +365,7 @@ export class AdminDashboardService {
       ];
     }
 
-    const [items, total] = await this.prismaService.$transaction([
+    const [items, total] = await Promise.all([
       this.prismaService.user.findMany({
         where,
         select: {

@@ -1,0 +1,337 @@
+{
+  "options": {
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)"
+    ],
+    "summaryTimeUnit": "",
+    "noColor": false
+  },
+  "state": {
+    "isStdOutTTY": true,
+    "isStdErrTTY": true,
+    "testRunDurationMs": 1982.4592
+  },
+  "metrics": {
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 1.4565000000000001,
+        "min": 0,
+        "med": 0,
+        "max": 28.0712,
+        "p(90)": 0.1058800000000015,
+        "p(95)": 2.4094200000000194
+      }
+    },
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 0,
+        "min": 0,
+        "med": 0,
+        "max": 0,
+        "p(90)": 0,
+        "p(95)": 0
+      }
+    },
+    "http_req_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 472.7162,
+        "p(90)": 82.05708000000004,
+        "p(95)": 124.08491500000027,
+        "avg": 67.224775,
+        "min": 6.9898,
+        "med": 43.8364
+      }
+    },
+    "http_req_failed": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0.1,
+        "passes": 2,
+        "fails": 18
+      }
+    },
+    "vus_max": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "value": 1,
+        "min": 1,
+        "max": 1
+      }
+    },
+    "http_req_sending": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 0,
+        "max": 0,
+        "p(90)": 0,
+        "p(95)": 0,
+        "avg": 0,
+        "min": 0
+      }
+    },
+    "http_req_waiting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 471.7393,
+        "p(90)": 81.32619000000004,
+        "p(95)": 124.03607000000027,
+        "avg": 66.448555,
+        "min": 5.5097,
+        "med": 43.53355
+      }
+    },
+    "vus": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "min": 1,
+        "max": 1,
+        "value": 1
+      }
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 0.77622,
+        "min": 0,
+        "med": 0.56215,
+        "max": 3.4514,
+        "p(90)": 2.0191700000000017,
+        "p(95)": 3.0412850000000002
+      }
+    },
+    "iteration_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(90)": 1182.1142,
+        "p(95)": 1182.1142,
+        "avg": 1182.1142,
+        "min": 1182.1142,
+        "med": 1182.1142,
+        "max": 1182.1142
+      }
+    },
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 1.0718,
+        "p(90)": 0.1058800000000015,
+        "p(95)": 1.05945,
+        "avg": 0.10653000000000001,
+        "min": 0,
+        "med": 0
+      }
+    },
+    "group_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 60.1966,
+        "med": 139.7258,
+        "max": 841.9276,
+        "p(90)": 640.7329900000001,
+        "p(95)": 741.3302949999998,
+        "avg": 295.39395
+      }
+    },
+    "http_req_duration{expected_response:true}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 160.78294499999947,
+        "avg": 71.02043888888889,
+        "min": 11.5129,
+        "med": 43.8364,
+        "max": 472.7162,
+        "p(90)": 87.31904000000003
+      }
+    },
+    "iterations": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 1,
+        "rate": 0.5044240002518084
+      }
+    },
+    "checks": {
+      "thresholds": {
+        "rate==1": {
+          "ok": true
+        }
+      },
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 1,
+        "passes": 7,
+        "fails": 0
+      }
+    },
+    "business_rule_passes": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 7,
+        "rate": 3.530968001762659
+      }
+    },
+    "business_rule_failures": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 0,
+        "rate": 0
+      },
+      "thresholds": {
+        "count==0": {
+          "ok": true
+        }
+      }
+    },
+    "http_reqs": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "rate": 10.08848000503617,
+        "count": 20
+      }
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 10181,
+        "rate": 5135.540746563662
+      }
+    },
+    "data_received": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 18211,
+        "rate": 9186.065468585684
+      }
+    }
+  },
+  "setup_data": {
+    "quotaCustomer": {
+      "email": "k6-quota-1783177774623-693243@ticketbox.local",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNzhiYzZhZC02MjZhLTRhOWMtYmRmNS04MTMxM2EzMjQwMTMiLCJlbWFpbCI6Ims2LXF1b3RhLTE3ODMxNzc3NzQ2MjMtNjkzMjQzQHRpY2tldGJveC5sb2NhbCIsImlhdCI6MTc4MzE3Nzc3NCwiZXhwIjoxNzgzMTc4Njc0fQ.zMa4JjNyOYGcY5zNqmkXMqh8deLuxr3HIY-3mJ9InMM"
+    },
+    "rateCustomer": {
+      "email": "k6-rate-1783177774792-550990@ticketbox.local",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4MmI4ZWE3YS1mNGRlLTQ5MjEtODhlNi0wYWE2Yjg2ZjgyNWEiLCJlbWFpbCI6Ims2LXJhdGUtMTc4MzE3Nzc3NDc5Mi01NTA5OTBAdGlja2V0Ym94LmxvY2FsIiwiaWF0IjoxNzgzMTc3Nzc0LCJleHAiOjE3ODMxNzg2NzR9.JRLz2oHC0-Y247a9F8LG4oU_7vD3kozzzqWFrjTghPU"
+    },
+    "admin": {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxYzc5MTcyYS1jODVjLTQ3NjctOGM4OC1kODk2YWI5NmE0ZTciLCJlbWFpbCI6ImFkbWluQGdtYWlsLmNvbSIsImlhdCI6MTc4MzE3Nzc3NCwiZXhwIjoxNzgzMTc4Njc0fQ.SZ-xNAxeAjGyekCV_opE17qGekxWvSyMq2nxw02bSbY"
+    }
+  },
+  "root_group": {
+    "checks": [],
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [
+        {
+          "name": "per-user quota is enforced",
+          "path": "::per-user quota is enforced",
+          "id": "835a5b2ad6be5cdd9c693cffc4595380",
+          "groups": [],
+          "checks": [
+              {
+                "id": "f0be305db47ca915b5ca94e286897ed5",
+                "passes": 1,
+                "fails": 0,
+                "name": "quota request above maxPerUser returns 409",
+                "path": "::per-user quota is enforced::quota request above maxPerUser returns 409"
+              }
+            ]
+        },
+        {
+          "groups": [],
+          "checks": [
+              {
+                "name": "first five customer order requests can pass",
+                "path": "::customer order rate limit is enforced::first five customer order requests can pass",
+                "id": "626d705621900e97e7d25b4201a97f28",
+                "passes": 1,
+                "fails": 0
+              },
+              {
+                "name": "sixth customer order request is rate-limited",
+                "path": "::customer order rate limit is enforced::sixth customer order request is rate-limited",
+                "id": "2003ca7b82f24e3d8805c7dc36e783ec",
+                "passes": 1,
+                "fails": 0
+              }
+            ],
+          "name": "customer order rate limit is enforced",
+          "path": "::customer order rate limit is enforced",
+          "id": "747e2c0676e18f9cdc8d75751583fa0f"
+        },
+        {
+          "id": "0f11555aef5ad6d60cf254a7917b6a56",
+          "groups": [],
+          "checks": [
+              {
+                "path": "::payment webhook duplicate is idempotent::first SUCCESS webhook marks order PAID",
+                "id": "950bef5f74fb01eb7d450990d75698fe",
+                "passes": 1,
+                "fails": 0,
+                "name": "first SUCCESS webhook marks order PAID"
+              },
+              {
+                "passes": 1,
+                "fails": 0,
+                "name": "duplicate SUCCESS webhook is idempotent",
+                "path": "::payment webhook duplicate is idempotent::duplicate SUCCESS webhook is idempotent",
+                "id": "c64fb2961d37445c515fa34ad7eb7e3f"
+              },
+              {
+                "name": "duplicate SUCCESS webhook does not duplicate tickets",
+                "path": "::payment webhook duplicate is idempotent::duplicate SUCCESS webhook does not duplicate tickets",
+                "id": "6ef6b9f0d7147a8615e159765806286c",
+                "passes": 1,
+                "fails": 0
+              }
+            ],
+          "name": "payment webhook duplicate is idempotent",
+          "path": "::payment webhook duplicate is idempotent"
+        },
+        {
+          "groups": [],
+          "checks": [
+              {
+                "path": "::payment TIMEOUT before expiry keeps order retryable::TIMEOUT webhook before reservation expiry returns order to PENDING_PAYMENT",
+                "id": "db7096f45d8d18170cb56326e547f820",
+                "passes": 1,
+                "fails": 0,
+                "name": "TIMEOUT webhook before reservation expiry returns order to PENDING_PAYMENT"
+              }
+            ],
+          "name": "payment TIMEOUT before expiry keeps order retryable",
+          "path": "::payment TIMEOUT before expiry keeps order retryable",
+          "id": "10338f05ef0dd1074cd5852e1beea43d"
+        }
+      ]
+  }
+}

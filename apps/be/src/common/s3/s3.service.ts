@@ -36,6 +36,19 @@ export class S3Service {
     this.bucket = this.config.bucket;
   }
 
+  private buildPublicUrl(key: string): string {
+    if (this.config.publicUrl) {
+      return `${this.config.publicUrl}/${key}`;
+    }
+
+    if (this.config.endpoint) {
+      const endpoint = this.config.endpoint.replace(/\/$/, '');
+      return `${endpoint}/${this.bucket}/${key}`;
+    }
+
+    return `https://${this.bucket}.s3.${this.config.region}.amazonaws.com/${key}`;
+  }
+
   /**
    * Uploads a file to S3 bucket.
    * Returns the file URL.
@@ -56,15 +69,7 @@ export class S3Service {
 
     await this.s3Client.send(command);
 
-    // If using custom endpoint (like local MinIO), return URL pointing to that endpoint.
-    // Otherwise construct standard S3 URL.
-    if (this.config.endpoint) {
-      // Local or custom endpoint. Minio URL structure: endpoint/bucket/key
-      const endpoint = this.config.endpoint.replace(/\/$/, '');
-      return `${endpoint}/${this.bucket}/${key}`;
-    }
-
-    return `https://${this.bucket}.s3.${this.config.region}.amazonaws.com/${key}`;
+    return this.buildPublicUrl(key);
   }
 
   /**

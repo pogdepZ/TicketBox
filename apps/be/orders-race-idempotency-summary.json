@@ -1,0 +1,348 @@
+{
+  "state": {
+    "isStdOutTTY": true,
+    "isStdErrTTY": true,
+    "testRunDurationMs": 6165.5137
+  },
+  "metrics": {
+    "checks": {
+      "values": {
+        "rate": 1,
+        "passes": 155,
+        "fails": 0
+      },
+      "thresholds": {
+        "rate==1": {
+          "ok": true
+        }
+      },
+      "type": "rate",
+      "contains": "default"
+    },
+    "order_rate_limits": {
+      "values": {
+        "count": 0,
+        "rate": 0
+      },
+      "thresholds": {
+        "count==0": {
+          "ok": true
+        }
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 10.1595,
+        "avg": 4.282361111111112,
+        "min": 0,
+        "med": 3.47765,
+        "max": 25.7368,
+        "p(90)": 9.875160000000003
+      }
+    },
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 3.2641111111111107,
+        "min": 0,
+        "med": 1.435,
+        "max": 11.0068,
+        "p(90)": 8.690400000000002,
+        "p(95)": 10.1595
+      }
+    },
+    "iterations": {
+      "contains": "default",
+      "values": {
+        "count": 51,
+        "rate": 8.271816831742665
+      },
+      "type": "counter"
+    },
+    "http_req_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 503.31665,
+        "max": 556.2796,
+        "p(90)": 533.07665,
+        "p(95)": 544.210305,
+        "avg": 480.14540740740745,
+        "min": 8.4495
+      }
+    },
+    "http_req_sending": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 0,
+        "max": 6.581,
+        "p(90)": 3.01907,
+        "p(95)": 3.437699999999999,
+        "avg": 0.772785185185185,
+        "min": 0
+      }
+    },
+    "http_req_waiting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 502.62605,
+        "max": 555.269,
+        "p(90)": 532.18618,
+        "p(95)": 543.46498,
+        "avg": 478.9124555555555,
+        "min": 7.5546
+      }
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 0.4601666666666666,
+        "min": 0,
+        "med": 0.53715,
+        "max": 1.1363,
+        "p(90)": 0.9892800000000002,
+        "p(95)": 1.0379999999999998
+      }
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 30465,
+        "rate": 4941.194113314516
+      }
+    },
+    "http_reqs": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 54,
+        "rate": 8.75839429243341
+      }
+    },
+    "http_req_duration{expected_response:true}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 446.9915,
+        "max": 552.8652,
+        "p(90)": 504.08136,
+        "p(95)": 528.4732799999999,
+        "avg": 359.5994285714286,
+        "min": 8.9639
+      }
+    },
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 0,
+        "max": 0,
+        "p(90)": 0,
+        "p(95)": 0,
+        "avg": 0,
+        "min": 0
+      }
+    },
+    "data_received": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 27994,
+        "rate": 4540.416478192239
+      }
+    },
+    "http_req_failed": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0.8703703703703703,
+        "passes": 47,
+        "fails": 7
+      }
+    },
+    "order_server_errors": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 0,
+        "rate": 0
+      },
+      "thresholds": {
+        "count==0": {
+          "ok": true
+        }
+      }
+    },
+    "vus": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "value": 50,
+        "min": 0,
+        "max": 50
+      }
+    },
+    "group_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 8.4495,
+        "med": 601.46955,
+        "max": 1194.4896,
+        "p(90)": 1075.88559,
+        "p(95)": 1135.187595,
+        "avg": 601.46955
+      }
+    },
+    "order_conflicts": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 47,
+        "rate": 7.623046884155006
+      }
+    },
+    "order_successes": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 5,
+        "rate": 0.8109624344845751
+      },
+      "thresholds": {
+        "count<=5": {
+          "ok": true
+        }
+      }
+    },
+    "vus_max": {
+      "values": {
+        "value": 51,
+        "min": 51,
+        "max": 51
+      },
+      "type": "gauge",
+      "contains": "default"
+    },
+    "iteration_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 530.7476784313726,
+        "min": 396.0986,
+        "med": 520.0297,
+        "max": 1202.9391,
+        "p(90)": 553.6925,
+        "p(95)": 566.50765
+      }
+    }
+  },
+  "setup_data": {
+    "commonHeaders": {
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxYzc5MTcyYS1jODVjLTQ3NjctOGM4OC1kODk2YWI5NmE0ZTciLCJlbWFpbCI6ImFkbWluQGdtYWlsLmNvbSIsImlhdCI6MTc4MzE1OTA1NSwiZXhwIjoxNzgzMTU5OTU1fQ.GzvixuJtP-yZTebZu7qHWo0znCKeyiWH5fwXYsTlIms",
+      "Content-Type": "application/json"
+    }
+  },
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [
+      {
+        "name": "same key + same body returns stored order",
+        "path": "::same key + same body returns stored order",
+        "id": "6216ced3c6acd79c8e56e62d806767f9",
+        "groups": [],
+        "checks": [
+            {
+              "name": "first idempotency request succeeds",
+              "path": "::same key + same body returns stored order::first idempotency request succeeds",
+              "id": "a1c9436f130cc27544afade838bafc62",
+              "passes": 1,
+              "fails": 0
+            },
+            {
+              "fails": 0,
+              "name": "first idempotency response has orderId",
+              "path": "::same key + same body returns stored order::first idempotency response has orderId",
+              "id": "ece520eb15416f8325323859c4e0fe76",
+              "passes": 1
+            },
+            {
+              "name": "retry with same key succeeds",
+              "path": "::same key + same body returns stored order::retry with same key succeeds",
+              "id": "e6df1e922ae9b581bbca628e222893c5",
+              "passes": 1,
+              "fails": 0
+            },
+            {
+              "name": "retry returns the same orderId",
+              "path": "::same key + same body returns stored order::retry returns the same orderId",
+              "id": "9a16802125b07fd0ba22aaf6980f0600",
+              "passes": 1,
+              "fails": 0
+            }
+          ]
+      },
+      {
+        "checks": [
+          {
+            "fails": 0,
+            "name": "same idempotency key with different body returns 409",
+            "path": "::same key + different body is rejected::same idempotency key with different body returns 409",
+            "id": "ae71283ed99d2a0f912db999e7b03858",
+            "passes": 1
+          }
+        ],
+        "name": "same key + different body is rejected",
+        "path": "::same key + different body is rejected",
+        "id": "72a3d1cfbfe88a033792da23411a782f",
+        "groups": []
+      }
+    ],
+    "checks": [
+      {
+        "name": "oversell response is success or expected 409",
+        "path": "::oversell response is success or expected 409",
+        "id": "93f42339fb60d839e1e6f9b9cab47d69",
+        "passes": 50,
+        "fails": 0
+      },
+      {
+        "fails": 0,
+        "name": "oversell probe has no rate-limit or server error",
+        "path": "::oversell probe has no rate-limit or server error",
+        "id": "4896a535b3be7b5e6c5d7edd4be014af",
+        "passes": 50
+      },
+      {
+        "name": "successful oversell response has orderId",
+        "path": "::successful oversell response has orderId",
+        "id": "73a8883172c2cf359c5f7b39e8ee6295",
+        "passes": 50,
+        "fails": 0
+      }
+    ]
+  },
+  "options": {
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)"
+    ],
+    "summaryTimeUnit": "",
+    "noColor": false
+  }
+}

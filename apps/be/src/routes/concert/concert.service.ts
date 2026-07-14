@@ -134,9 +134,35 @@ function slugify(str: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+type L1CacheEntry<T> = {
+  value: T;
+  expiresAt: number;
+};
+
 @Injectable()
 export class ConcertService {
   private readonly logger = new Logger(ConcertService.name);
+  private readonly activeQueries = new Map<string, Promise<any>>();
+  private readonly l1Cache = new Map<string, L1CacheEntry<any>>();
+
+  private getL1Cache<T>(key: string): T | null {
+    const entry = this.l1Cache.get(key);
+    if (!entry) {
+      return null;
+    }
+    if (Date.now() > entry.expiresAt) {
+      this.l1Cache.delete(key);
+      return null;
+    }
+    return entry.value;
+  }
+
+  private setL1Cache<T>(key: string, value: T, ttlSeconds: number = 10): void {
+    this.l1Cache.set(key, {
+      value,
+      expiresAt: Date.now() + ttlSeconds * 1000,
+    });
+  }
 
   constructor(
     private readonly prismaService: PrismaService,
@@ -655,18 +681,41 @@ export class ConcertService {
 
   async findAll(query: QueryConcertDto): Promise<PaginatedConcerts> {
     const cacheKey = this.buildConcertListCacheKey(query);
-    const cached = await this.getCache<PaginatedConcerts>(cacheKey);
-
-    if (cached) {
-      return cached;
+    
+    // 1. Try L1 Cache (Local Memory)
+    const l1Cached = this.getL1Cache<PaginatedConcerts>(cacheKey);
+    if (l1Cached) {
+      return l1Cached;
     }
 
-    const where = this.buildWhereQuery(query);
-    const concerts = await this.findMany(where, query.page, query.limit);
+    // 2. Coalesce concurrent requests if L1 misses
+    let activePromise = this.activeQueries.get(cacheKey);
+    if (!activePromise) {
+      activePromise = (async () => {
+        // Try L2 Cache (Redis)
+        const l2Cached = await this.getCache<PaginatedConcerts>(cacheKey);
+        if (l2Cached) {
+          this.setL1Cache(cacheKey, l2Cached);
+          return l2Cached;
+        }
 
-    await this.setCache(cacheKey, concerts);
+        // DB fetch
+        const where = this.buildWhereQuery(query);
+        const concerts = await this.findMany(where, query.page, query.limit);
 
-    return concerts;
+        // Save to L2 and L1 Cache
+        await this.setCache(cacheKey, concerts);
+        this.setL1Cache(cacheKey, concerts);
+
+        return concerts;
+      })();
+      this.activeQueries.set(cacheKey, activePromise);
+      activePromise.finally(() => {
+        this.activeQueries.delete(cacheKey);
+      });
+    }
+
+    return activePromise;
   }
 
   private async findMany(
@@ -676,7 +725,7 @@ export class ConcertService {
   ): Promise<PaginatedConcerts> {
     const skip = (page - 1) * limit;
 
-    const [items, total] = await this.prismaService.$transaction([
+    const [items, total] = await Promise.all([
       this.prismaService.concert.findMany({
         where,
         skip,
@@ -712,47 +761,70 @@ export class ConcertService {
 
   async findOne(idOrSlug: string): Promise<ConcertResponseDto> {
     const cacheKey = this.buildConcertDetailCacheKey(idOrSlug);
-    const cached = await this.getCache<ConcertResponseDto>(cacheKey);
-
-    if (cached) {
-      return cached;
+    
+    // 1. Try L1 Cache (Local Memory)
+    const l1Cached = this.getL1Cache<ConcertResponseDto>(cacheKey);
+    if (l1Cached) {
+      return l1Cached;
     }
 
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
-    const concert = await this.prismaService.concert.findFirst({
-      where: isUuid ? { id: idOrSlug } : { slug: idOrSlug },
-      include: {
-        seatZones: {
+    // 2. Coalesce concurrent requests if L1 misses
+    let activePromise = this.activeQueries.get(cacheKey);
+    if (!activePromise) {
+      activePromise = (async () => {
+        // Try L2 Cache (Redis)
+        const l2Cached = await this.getCache<ConcertResponseDto>(cacheKey);
+        if (l2Cached) {
+          this.setL1Cache(cacheKey, l2Cached);
+          return l2Cached;
+        }
+
+        // DB fetch
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+        const concert = await this.prismaService.concert.findFirst({
+          where: isUuid ? { id: idOrSlug } : { slug: idOrSlug },
           include: {
-            ticketTypes: true,
+            seatZones: {
+              include: {
+                ticketTypes: true,
+              },
+            },
+            guestList: {
+              select: {
+                fullName: true,
+                guestType: true,
+              },
+              where: {
+                status: "ACTIVE"
+              }
+            },
+            _count: {
+              select: {
+                tickets: true,
+              },
+            },
           },
-        },
-        guestList: {
-          select: {
-            fullName: true,
-            guestType: true,
-          },
-          where: {
-            status: "ACTIVE"
-          }
-        },
-        _count: {
-          select: {
-            tickets: true,
-          },
-        },
-      },
-    });
+        });
 
-    if (!concert) {
-      throw new NotFoundException("Concert not found");
+        if (!concert) {
+          throw new NotFoundException("Concert not found");
+        }
+
+        const response = this.toResponse(concert);
+        
+        // Save to L2 and L1 Cache
+        await this.setCache(cacheKey, response);
+        this.setL1Cache(cacheKey, response);
+
+        return response;
+      })();
+      this.activeQueries.set(cacheKey, activePromise);
+      activePromise.finally(() => {
+        this.activeQueries.delete(cacheKey);
+      });
     }
 
-    const response = this.toResponse(concert);
-
-    await this.setCache(cacheKey, response);
-
-    return response;
+    return activePromise;
   }
 
   async getReservedSeats(concertId: string) {
@@ -1093,6 +1165,7 @@ export class ConcertService {
 
   private async invalidateConcertCache(concertId: string): Promise<void> {
     try {
+      this.l1Cache.clear();
       await Promise.all([
         this.redisService.delPattern(`${CONCERT_LIST_CACHE_KEY}*`),
         this.redisService.del(this.buildConcertDetailCacheKey(concertId)),

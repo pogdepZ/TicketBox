@@ -83,6 +83,7 @@ export default function MyTicketsPage() {
         ...ticket,
         concertTitle: order.concertTitle,
         concertVenue: order.concertVenue || "Nhà hát Hòa Bình, TP. Hồ Chí Minh",
+        concertDate: order.concertDate,
         orderNumber: orderNumber,
         paidAt: order.paidAt || new Date().toISOString(),
       }));
@@ -92,7 +93,7 @@ export default function MyTicketsPage() {
     <main className="min-h-screen bg-background flex flex-col">
       <Header />
 
-      <section className="flex-grow mx-auto w-full max-w-4xl px-4 py-12">
+      <section className="flex-1 mx-auto max-w-7xl w-full px-4 py-10">
         <div className="mb-10">
           <h1 className="text-4xl font-black tracking-tight text-foreground md:text-5xl flex items-center gap-3">
             <span className="grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
@@ -120,21 +121,23 @@ export default function MyTicketsPage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="flex flex-wrap gap-6 justify-center items-start">
             {allTickets.map((ticket) => (
-              <ETicketCard
-                key={ticket.id}
-                ticketNumber={ticket.ticketCode}
-                concertTitle={ticket.concertTitle}
-                date={ticket.createdAt}
-                time={new Date(ticket.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                venue={ticket.concertVenue || "Nhà hát Hòa Bình, TP. Hồ Chí Minh"}
-                seatZone={ticket.seatZone}
-                seatNumber={ticket.seatNumber}
-                price={ticket.price}
-                purchaseDate={new Date(ticket.paidAt).toLocaleDateString('vi-VN')}
-                qrPayload={ticket.qrPayload}
-              />
+              <div key={ticket.id} className="w-full sm:max-w-md md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] flex justify-center">
+                <ETicketCard
+                  ticketNumber={ticket.ticketCode}
+                  concertTitle={ticket.concertTitle}
+                  date={ticket.concertDate || ticket.createdAt}
+                  time={new Date(ticket.concertDate || ticket.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                  venue={ticket.concertVenue || "Nhà hát Hòa Bình, TP. Hồ Chí Minh"}
+                  seatZone={ticket.seatZone}
+                  seatNumber={ticket.seatNumber}
+                  price={ticket.price}
+                  purchaseDate={new Date(ticket.paidAt).toLocaleDateString('vi-VN')}
+                  qrPayload={ticket.qrPayload}
+                  status={ticket.status}
+                />
+              </div>
             ))}
           </div>
         )}

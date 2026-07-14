@@ -1,6 +1,7 @@
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { ConcertBrowser } from '@/components/concert-browser';
+import { ConcertMarquee } from '@/components/concert-marquee';
 import { HomeBanner } from '@/components/home-banner';
 import { Reveal } from '@/components/reveal';
 import { FeaturedCarousel } from '@/components/featured-carousel';
@@ -57,6 +58,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           </Reveal>
         )}
       </section>
+
+      <ConcertMarquee concerts={concerts} />
 
       <ConcertBrowser concerts={concerts} initialKeyword={initialKeyword} />
 

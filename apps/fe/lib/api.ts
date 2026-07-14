@@ -1,5 +1,26 @@
+import { formatViTime } from "./format";
+
+const localApiBaseUrl = "http://127.0.0.1:3001";
+const configuredApiBaseUrl = (
+  process.env.API_BASE_URL ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  ""
+).replace(/\/$/, "");
+
 export const API_BASE_URL =
-  typeof window !== "undefined" ? "/api" : "http://127.0.0.1:3001";
+  typeof window !== "undefined"
+    ? "/api"
+    : configuredApiBaseUrl || localApiBaseUrl;
+
+if (
+  typeof window === "undefined" &&
+  process.env.NODE_ENV === "production" &&
+  !configuredApiBaseUrl
+) {
+  console.warn(
+    "API_BASE_URL is not configured. Server-side requests will fall back to local API URL.",
+  );
+}
 
 export class ApiError extends Error {
   statusCode?: number;
@@ -697,11 +718,7 @@ function mapConcertToDisplay(concert: any, useLocalOverride = false) {
     title: concert.name,
     artist: concert.artistName || "Nhiều nghệ sĩ",
     date: concert.eventDate,
-    time: new Date(concert.eventDate).toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }),
+    time: formatViTime(concert.eventDate),
     venue: concert.venueName,
     city: concert.city || "",
     address: concert.venueAddress || "",
@@ -1198,8 +1215,15 @@ export async function getUserOrders(): Promise<any[]> {
 // REVENUE & DASHBOARD (REAL/FALLBACK)
 // ----------------------------------------------------
 
-export async function getRevenueSummary(): Promise<any> {
-  return await fetchApi("/admin/revenue/summary");
+export async function getRevenueSummary(
+  startDate?: string,
+  endDate?: string,
+): Promise<any> {
+  let url = "/admin/revenue/summary";
+  if (startDate && endDate) {
+    url += `?startDate=${startDate}&endDate=${endDate}`;
+  }
+  return await fetchApi(url);
 }
 
 export async function getConcertRevenue(concertId: string): Promise<any> {
@@ -1486,13 +1510,26 @@ export async function markAllNotificationsRead(): Promise<any> {
   return await fetchApi("/notifications/read-all", { method: "POST" });
 }
 
-export function addLocalNotification(title: string, message: string) {
+export function addLocalNotification(
+  title: string,
+  message: string,
+  routeUrl?: string,
+  type: "success" | "error" | "info" | "warning" = "success"
+) {
   if (typeof window === "undefined") return;
   const items = getLocalNotifications();
+  const fullMessage = routeUrl ? `${message}|route:${routeUrl}` : message;
+
+  // Tránh trùng lặp Toast / Local Notification khi gọi liên tiếp trong React StrictMode
+  const isDuplicate = items.some(
+    (item) => item.title === title && item.message === fullMessage
+  );
+  if (isDuplicate) return;
+
   const newItem: NotificationItem = {
     id: `notif-${Date.now()}`,
     title,
-    message,
+    message: fullMessage,
     read: false,
     createdAt: new Date().toISOString(),
   };
@@ -1507,7 +1544,7 @@ export function addLocalNotification(title: string, message: string) {
   // Dispatch custom event to show Toast alert
   window.dispatchEvent(
     new CustomEvent("ticketbox-toast", {
-      detail: { title, message, type: "success" },
+      detail: { title, message, type },
     }),
   );
 }

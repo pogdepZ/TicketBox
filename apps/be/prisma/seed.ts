@@ -40,6 +40,16 @@ const s3Client = new S3Client({
 });
 const s3Bucket = process.env.AWS_S3_BUCKET ?? 'ticketbox-media';
 const s3Endpoint = process.env.AWS_S3_ENDPOINT ?? 'http://localhost:9000';
+const s3PublicUrl = process.env.AWS_S3_PUBLIC_URL?.replace(/\/$/, '');
+
+function buildPublicS3Url(s3Key: string): string {
+  if (s3PublicUrl) {
+    return `${s3PublicUrl}/${s3Key}`;
+  }
+
+  const endpoint = s3Endpoint.replace(/\/$/, '');
+  return `${endpoint}/${s3Bucket}/${s3Key}`;
+}
 
 async function uploadPoster(s3Key: string, relativePath: string): Promise<string> {
   const localPath = path.resolve(__dirname, relativePath);
@@ -71,8 +81,7 @@ async function uploadPoster(s3Key: string, relativePath: string): Promise<string
 
     await s3Client.send(command);
 
-    const endpoint = s3Endpoint.replace(/\/$/, '');
-    return `${endpoint}/${s3Bucket}/${s3Key}`;
+    return buildPublicS3Url(s3Key);
   } catch (error) {
     console.error(`Failed to upload poster to S3/MinIO:`, error);
     return '';
@@ -432,8 +441,7 @@ async function uploadSeatMapSvg(concertId: string, relativePath: string): Promis
 
     await s3Client.send(command);
 
-    const endpoint = s3Endpoint.replace(/\/$/, '');
-    return `${endpoint}/${s3Bucket}/${s3Key}`;
+    return buildPublicS3Url(s3Key);
   } catch (error) {
     console.error(`Failed to upload seatmap SVG to S3/MinIO:`, error);
     return '';
@@ -706,7 +714,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'Various Artists',
       venueName: 'Sân vận động Quân khu 7',
       venueAddress: '202 Hoàng Văn Thụ, Phường 9, Phú Nhuận, TP. Hồ Chí Minh',
-      eventDate: new Date('2027-06-02T16:00:00.000Z'),
+      eventDate: new Date('2026-08-02T16:00:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Music Festival',
       city: 'Thành phố Hồ Chí Minh',
@@ -724,7 +732,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'Rhyder',
       venueName: 'Lan Anh Stage',
       venueAddress: '291 Cách Mạng Tháng Tám, Phường 12, Quận 10, TP. Hồ Chí Minh',
-      eventDate: new Date('2026-09-15T20:00:00.000Z'),
+      eventDate: new Date('2026-08-15T20:00:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Live Music',
       city: 'Thành phố Hồ Chí Minh',
@@ -742,7 +750,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'GAM Esports',
       venueName: 'Nhà thi đấu Nguyễn Du',
       venueAddress: '116 Nguyễn Du, Phường Bến Thành, Quận 1, TP. Hồ Chí Minh',
-      eventDate: new Date('2026-09-20T14:00:00.000Z'),
+      eventDate: new Date('2026-08-20T14:00:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Gaming',
       city: 'Thành phố Hồ Chí Minh',
@@ -760,7 +768,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'Pink Run',
       venueName: 'Saigon Outcast',
       venueAddress: '188/1 Nguyễn Văn Hưởng, Thảo Điền, Quận 2, TP. Hồ Chí Minh',
-      eventDate: new Date('2026-10-18T06:00:00.000Z'),
+      eventDate: new Date('2026-07-26T06:00:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Sport',
       city: 'Thành phố Hồ Chí Minh',
@@ -778,7 +786,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'The Wandering Rose',
       venueName: 'Đà Lạt Opera House',
       venueAddress: 'Quảng trường Lâm Viên, Phường 10, TP. Đà Lạt',
-      eventDate: new Date('2026-10-24T19:30:00.000Z'),
+      eventDate: new Date('2026-07-24T19:30:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Live Music',
       city: 'Tỉnh Lâm Đồng',
@@ -796,7 +804,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'The Next',
       venueName: 'Nhà hát Hòa Bình',
       venueAddress: '240 Đường 3 Tháng 2, Quận 10, TP. Hồ Chí Minh',
-      eventDate: new Date('2026-10-31T20:00:00.000Z'),
+      eventDate: new Date('2026-07-31T20:00:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Live Music',
       city: 'Thành phố Hồ Chí Minh',
@@ -814,7 +822,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'Sen Huế',
       venueName: 'Trung tâm Hội nghị Quốc gia',
       venueAddress: '57 Phạm Hùng, Nam Từ Liêm, Hà Nội',
-      eventDate: new Date('2027-05-21T08:00:00.000Z'),
+      eventDate: new Date('2026-07-21T08:00:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Festival',
       city: 'Thành phố Hà Nội',
@@ -832,7 +840,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'Luminix',
       venueName: 'Cung Điền kinh Mỹ Đình',
       venueAddress: 'Đường Trần Hữu Dực, Cầu Diễn, Nam Từ Liêm, TP. Hà Nội',
-      eventDate: new Date('2026-11-05T19:30:00.000Z'),
+      eventDate: new Date('2026-08-05T19:30:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Music Festival',
       city: 'Thành phố Hà Nội',
@@ -868,7 +876,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'T1',
       venueName: 'Trung tâm Triển lãm Việt Nam VEC',
       venueAddress: 'Trung tâm Triển lãm Việt Nam VEC, TP. Hồ Chí Minh',
-      eventDate: new Date('2025-12-20T09:00:00.000Z'),
+      eventDate: new Date('2026-07-20T09:00:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Gaming',
       city: 'Thành phố Hồ Chí Minh',
@@ -881,12 +889,12 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
     },
     {
       id: '56221c5f-3312-4fb3-beef-e67c8cb312d8',
-      name: 'Saigon Sake Fest 2025',
+      name: 'Saigon Sake Fest 2026',
       description: 'Lễ hội văn hóa ẩm thực và thưởng thức rượu Sake truyền thống Nhật Bản tại Sài Gòn.',
       artistName: 'Various Artists',
       venueName: 'Terrace, 2nd Floor, New World Hotel',
       venueAddress: '76 Lê Lai, Phường Bến Thành, Quận 1, TP. Hồ Chí Minh',
-      eventDate: new Date('2025-12-13T18:00:00.000Z'),
+      eventDate: new Date('2026-07-15T18:00:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Festival',
       city: 'Thành phố Hồ Chí Minh',
@@ -904,7 +912,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'VPIM',
       venueName: 'Hồ Hoàn Kiếm',
       venueAddress: 'Hoàn Kiếm, Hà Nội',
-      eventDate: new Date('2026-10-18T06:00:00.000Z'),
+      eventDate: new Date('2026-08-18T06:00:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Sport',
       city: 'Thành phố Hà Nội',
@@ -922,7 +930,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'Hương Lan, Họa Mi, Như Quỳnh',
       venueName: 'Nhà hát Hòa Bình',
       venueAddress: '240 Đường 3 Tháng 2, Quận 10, TP. Hồ Chí Minh',
-      eventDate: new Date('2025-12-27T19:00:00.000Z'),
+      eventDate: new Date('2026-07-27T19:00:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Live Music',
       city: 'Thành phố Hồ Chí Minh',
@@ -940,7 +948,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'The Next',
       venueName: 'Cung Thể thao Tiên Sơn',
       venueAddress: 'Hải Châu, Đà Nẵng',
-      eventDate: new Date('2026-05-10T19:30:00.000Z'),
+      eventDate: new Date('2026-07-16T19:30:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Live Music',
       city: 'Thành phố Đà Nẵng',
@@ -958,7 +966,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'Sơn.K',
       venueName: 'Capital Theatre',
       venueAddress: '212 Lý Chính Thắng, Quận 3, TP. Hồ Chí Minh',
-      eventDate: new Date('2026-01-04T19:00:00.000Z'),
+      eventDate: new Date('2026-07-17T19:00:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Fan Meeting',
       city: 'Thành phố Hồ Chí Minh',
@@ -976,7 +984,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'Trung Quân, Vicky Nhung, Chu Thúy Quỳnh',
       venueName: 'The Wandering Rose Villa Ba Vi',
       venueAddress: 'Yên Bài, Ba Vì, Hà Nội',
-      eventDate: new Date('2025-11-08T17:00:00.000Z'),
+      eventDate: new Date('2026-08-08T17:00:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Live Music',
       city: 'Thành phố Hà Nội',
@@ -994,7 +1002,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'Hà Lê, Đỗ Hoàng Hiệp, Tăng Phúc, Liên Bỉnh Phát',
       venueName: 'The Opera',
       venueAddress: 'Lô 18A Lê Hồng Phong, Đằng Lâm, Hải An, Hải Phòng',
-      eventDate: new Date('2026-01-17T19:30:00.000Z'),
+      eventDate: new Date('2026-07-18T19:30:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Live Music',
       city: 'Thành phố Hải Phòng',
@@ -1012,7 +1020,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'SAM Arena',
       venueName: 'Trung tâm Triển lãm Việt Nam VEC',
       venueAddress: 'Trung tâm Triển lãm Việt Nam VEC, TP. Hồ Chí Minh',
-      eventDate: new Date('2026-03-08T18:00:00.000Z'),
+      eventDate: new Date('2026-07-19T18:00:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Event',
       city: 'Thành phố Hồ Chí Minh',
@@ -1030,7 +1038,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'Ravolution DJs',
       venueName: 'SECC',
       venueAddress: '799 Nguyễn Văn Linh, Tân Phú, Quận 7, TP. Hồ Chí Minh',
-      eventDate: new Date('2026-06-13T19:00:00.000Z'),
+      eventDate: new Date('2026-07-25T19:00:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Music Festival',
       city: 'Thành phố Hồ Chí Minh',
@@ -1048,7 +1056,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'Hòa Minzy',
       venueName: 'Cung Văn hóa Hữu nghị Việt Xô',
       venueAddress: '91 Trần Hưng Đạo, Hoàn Kiếm, Hà Nội',
-      eventDate: new Date('2026-06-20T19:30:00.000Z'),
+      eventDate: new Date('2026-07-22T19:30:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Fan Concert',
       city: 'Thành phố Hà Nội',
@@ -1066,7 +1074,7 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
       artistName: 'Anh Quân Idol, Hoàng Dũng, Song Luân',
       venueName: 'The Wandering Rose Villa Ba Vi',
       venueAddress: 'Yên Bài, Ba Vì, Hà Nội',
-      eventDate: new Date('2025-12-27T17:00:00.000Z'),
+      eventDate: new Date('2026-08-27T17:00:00.000Z'),
       status: ConcertStatus.PUBLISHED,
       type: 'Live Music',
       city: 'Thành phố Hà Nội',
@@ -1250,7 +1258,10 @@ async function seedConcertsAndTicketTypes(): Promise<void> {
     const id = generateDeterministicUuid('fixture-concert', fileName);
     const extension = path.extname(fileName).slice(1).toLowerCase() || 'jpg';
     const posterSlug = slugify(`${paddedIndex}-${title}`) || `fixture-event-${paddedIndex}`;
-    const eventDate = new Date(Date.UTC(2026 + Math.floor(index / 36), (6 + index) % 12, (index % 24) + 1, event.hour, 0, 0));
+    const baseDate = new Date('2026-07-14T00:00:00Z');
+    const addedDays = (index % 48); // Spread from 0 to 47 days (stays within 14/07/2026 to 30/08/2026)
+    const eventDate = new Date(baseDate.getTime() + addedDays * 24 * 60 * 60 * 1000);
+    eventDate.setUTCHours(event.hour);
 
     return {
       id,
