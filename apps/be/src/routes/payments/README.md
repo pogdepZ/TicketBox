@@ -117,7 +117,7 @@ Base URL: `/payments`
 
 ## MoMo sandbox config
 
-Backend gọi MoMo One-Time Payment sandbox bằng `POST /v2/gateway/api/create` với `requestType = captureWallet`.
+Backend gọi MoMo One-Time Payment sandbox bằng `POST /v2/gateway/api/create` với `requestType = payWithCC`.
 
 ```env
 MOMO_PARTNER_CODE="MOMO"
@@ -126,7 +126,7 @@ MOMO_SECRET_KEY="K951B6PE1waDMi640xX08PD3vg6EkVlz"
 MOMO_ENDPOINT="https://test-payment.momo.vn/v2/gateway/api/create"
 MOMO_REDIRECT_URL="http://localhost:3000/checkout/result"
 MOMO_IPN_URL="http://localhost:3001/payments/webhooks/MOMO"
-MOMO_REQUEST_TYPE="captureWallet"
+MOMO_REQUEST_TYPE="payWithCC"
 ```
 
 Khi tạo payment với `"provider": "MOMO"`, BE trả `paymentUrl` là `payUrl` từ MoMo sandbox. MoMo IPN sẽ POST body gốc về `MOMO_IPN_URL`; BE verify chữ ký MoMo rồi map về payload chung để xử lý order/ticket.

@@ -174,7 +174,7 @@ function CheckoutResultContent() {
             </h2>
             <p className="text-muted-foreground font-medium max-w-md mx-auto">
               Vui lòng không đóng hoặc tải lại trang. Chúng tôi đang kiểm tra
-              kết quả thanh toán từ cổng {provider}...
+              kết quả thanh toán từ cổng {providerName}...
             </p>
           </div>
         </div>
@@ -217,7 +217,7 @@ function CheckoutResultContent() {
         <div className="space-y-4">
           <div className="flex justify-between border-b border-border/50 pb-3">
             <span className="text-muted-foreground">Nhà cung cấp</span>
-            <span className="font-bold text-foreground">{provider}</span>
+            <span className="font-bold text-foreground">{providerName}</span>
           </div>
 
           {txnRef && (
