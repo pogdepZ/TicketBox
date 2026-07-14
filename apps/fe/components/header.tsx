@@ -260,7 +260,8 @@ export function Header() {
       }
       setShowNotifications(false);
       if (routeUrl) {
-        router.push(routeUrl);
+        const separator = routeUrl.includes("?") ? "&" : "?";
+        router.push(`${routeUrl}${separator}fromNotif=true`);
       }
     } catch (err) {
       console.error("Failed to handle notification click:", err);

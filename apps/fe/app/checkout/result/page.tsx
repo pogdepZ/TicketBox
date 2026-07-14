@@ -15,6 +15,7 @@ import {
 
 function CheckoutResultContent() {
   const searchParams = useSearchParams();
+  const fromNotif = searchParams.get("fromNotif") === "true";
 
   // Extract VNPAY parameters
   const responseCode = searchParams.get("vnp_ResponseCode");
@@ -86,7 +87,7 @@ function CheckoutResultContent() {
           const alreadyNotified =
             typeof window !== "undefined" &&
             window.sessionStorage.getItem(sessionKey);
-          if (!alreadyNotified) {
+          if (!alreadyNotified && !fromNotif) {
             addLocalNotification(
               "Thanh toán thành công!",
               `Đơn đặt vé #${txnRef?.substring(0, 8).toUpperCase()} của bạn đã được thanh toán thành công.`,
@@ -112,7 +113,7 @@ function CheckoutResultContent() {
           const alreadyNotified =
             typeof window !== "undefined" &&
             window.sessionStorage.getItem(sessionKey);
-          if (!alreadyNotified && txnRef) {
+          if (!alreadyNotified && txnRef && !fromNotif) {
             addLocalNotification(
               "Thanh toán thất bại!",
               `Đơn đặt vé #${txnRef.substring(0, 8).toUpperCase()}: ${localMsg}`,
