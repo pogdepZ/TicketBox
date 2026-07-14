@@ -555,6 +555,8 @@ export function ConcertBrowser({ concerts, initialKeyword = '' }: ConcertBrowser
           >
             Xem tất cả sự kiện
           </button>
+        </div>
+      )}
       {/* Infinite Partner Logos & Concert Images Marquees */}
       <style>{`
         @keyframes marquee-scroll {
