@@ -37,7 +37,7 @@ export default function SuccessPage() {
               if (retryCount < 5) {
                 setTimeout(() => {
                   setRetryCount((prev) => prev + 1);
-                }, 2000);
+                }, 1000);
                 return;
               }
             }
