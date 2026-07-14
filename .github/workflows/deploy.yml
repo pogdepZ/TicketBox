@@ -19,18 +19,28 @@ jobs:
           username: azureuser
           key: ${{ secrets.AZURE_SSH_KEY }}
           script: |
+            # 1. Khai báo môi trường để nhận pnpm và pm2 trong non-interactive shell
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            export PNPM_HOME="$HOME/.local/share/pnpm"
+            export PATH="$PNPM_HOME:$HOME/.npm-global/bin:$PATH"
+
             cd ~/TicketBox
+            
+            # 2. Xóa các thay đổi tạm thời trên server để tránh xung đột khi git pull
+            git reset --hard HEAD
+            git clean -fd
             git pull origin main
             
-            # Cài đặt các thư viện mới nếu có thay đổi
+            # 3. Cài đặt các thư viện mới nếu có thay đổi
             pnpm install
             
-            # Sinh lại Prisma Client và chạy migration
+            # 4. Sinh lại Prisma Client và chạy migration
             pnpm --filter @repo/be run migrate:gen
             pnpm --filter @repo/be run migrate:deploy
             
-            # Biên dịch lại mã nguồn Backend & Frontend
+            # 5. Biên dịch lại mã nguồn Backend & Frontend
             pnpm build
             
-            # Khởi động lại các tiến trình chạy ngầm qua PM2
+            # 6. Khởi động lại các tiến trình chạy ngầm qua PM2
             pm2 restart all
