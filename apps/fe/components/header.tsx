@@ -6,6 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { ThemeToggle } from "./theme-toggle";
 import {
+  ApiError,
   getProfile,
   logout,
   getNotifications,
@@ -179,6 +180,8 @@ export function Header() {
         }
       } catch {
         setSession(null);
+        setNotifications([]);
+        setUnreadCount(0);
       }
     }
 
@@ -197,6 +200,13 @@ export function Header() {
 
   useEffect(() => {
     async function loadNotifications() {
+      if (!session?.user) {
+        setNotifications([]);
+        setUnreadCount(0);
+        setShowNotifications(false);
+        return;
+      }
+
       const token =
         typeof window !== "undefined"
           ? window.localStorage.getItem("access_token")
@@ -211,6 +221,12 @@ export function Header() {
         setNotifications(res.items);
         setUnreadCount(res.unreadCount);
       } catch (err) {
+        if (err instanceof ApiError && err.statusCode === 401) {
+          setNotifications([]);
+          setUnreadCount(0);
+          setShowNotifications(false);
+          return;
+        }
         console.error("Failed to load notifications:", err);
       }
     }
