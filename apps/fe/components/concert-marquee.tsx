@@ -19,7 +19,7 @@ export function ConcertMarquee({ concerts }: ConcertMarqueeProps) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 my-8 animate-fade-in">
-      <div className="py-12 overflow-hidden relative w-full rounded-[2rem] border border-border bg-muted/10 shadow-sm">
+      <div className="py-12 overflow-hidden relative w-full">
       <style>{`
         @keyframes marquee-scroll-images {
           0% {
