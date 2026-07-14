@@ -34,6 +34,7 @@ const environmentSchema = z.object({
   AWS_S3_REGION: z.string().optional(),
   AWS_S3_BUCKET: z.string().optional(),
   AWS_S3_ENDPOINT: z.string().optional(),
+  AWS_S3_PUBLIC_URL: z.string().url().optional(),
   AWS_S3_FORCE_PATH_STYLE: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().optional(),

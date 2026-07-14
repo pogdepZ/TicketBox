@@ -6,5 +6,6 @@ export default registerAs('s3', () => ({
   region: process.env.AWS_S3_REGION ?? 'us-east-1',
   bucket: process.env.AWS_S3_BUCKET ?? 'ticketbox-media',
   endpoint: process.env.AWS_S3_ENDPOINT ?? 'http://localhost:9000',
+  publicUrl: process.env.AWS_S3_PUBLIC_URL?.replace(/\/$/, ''),
   forcePathStyle: process.env.AWS_S3_FORCE_PATH_STYLE === 'true',
 }));

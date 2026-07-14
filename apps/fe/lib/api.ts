@@ -1,3 +1,5 @@
+import { formatViTime } from "./format";
+
 const localApiBaseUrl = "http://127.0.0.1:3001";
 const configuredApiBaseUrl = (
   process.env.API_BASE_URL ||
@@ -716,11 +718,7 @@ function mapConcertToDisplay(concert: any, useLocalOverride = false) {
     title: concert.name,
     artist: concert.artistName || "Nhiều nghệ sĩ",
     date: concert.eventDate,
-    time: new Date(concert.eventDate).toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }),
+    time: formatViTime(concert.eventDate),
     venue: concert.venueName,
     city: concert.city || "",
     address: concert.venueAddress || "",

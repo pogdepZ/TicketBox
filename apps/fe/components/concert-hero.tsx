@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { MapPin, Calendar, Clock, Users } from 'lucide-react';
+import { formatViDate } from '@/lib/format';
 
 interface ConcertHeroProps {
   title: string;
@@ -22,7 +23,7 @@ export function ConcertHero({
   image,
   capacity,
 }: ConcertHeroProps) {
-  const formattedDate = new Date(date).toLocaleDateString('vi-VN', {
+  const formattedDate = formatViDate(date, {
     weekday: 'long',
     year: 'numeric',
     month: 'long',

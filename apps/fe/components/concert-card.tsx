@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Calendar, Clock, Heart, MapPin } from 'lucide-react';
 import { MouseEvent, useEffect, useState } from 'react';
+import { formatViDate } from '@/lib/format';
 
 interface ConcertCardProps {
   id: string;
@@ -53,7 +54,7 @@ export function ConcertCard({
     setIsFavorite(getFavorites().includes(id));
   }, [id]);
 
-  const formattedDate = new Date(date).toLocaleDateString('vi-VN', {
+  const formattedDate = formatViDate(date, {
     day: '2-digit',
     month: '2-digit',
   });

@@ -40,6 +40,16 @@ const s3Client = new S3Client({
 });
 const s3Bucket = process.env.AWS_S3_BUCKET ?? 'ticketbox-media';
 const s3Endpoint = process.env.AWS_S3_ENDPOINT ?? 'http://localhost:9000';
+const s3PublicUrl = process.env.AWS_S3_PUBLIC_URL?.replace(/\/$/, '');
+
+function buildPublicS3Url(s3Key: string): string {
+  if (s3PublicUrl) {
+    return `${s3PublicUrl}/${s3Key}`;
+  }
+
+  const endpoint = s3Endpoint.replace(/\/$/, '');
+  return `${endpoint}/${s3Bucket}/${s3Key}`;
+}
 
 async function uploadPoster(s3Key: string, relativePath: string): Promise<string> {
   const localPath = path.resolve(__dirname, relativePath);
@@ -71,8 +81,7 @@ async function uploadPoster(s3Key: string, relativePath: string): Promise<string
 
     await s3Client.send(command);
 
-    const endpoint = s3Endpoint.replace(/\/$/, '');
-    return `${endpoint}/${s3Bucket}/${s3Key}`;
+    return buildPublicS3Url(s3Key);
   } catch (error) {
     console.error(`Failed to upload poster to S3/MinIO:`, error);
     return '';
@@ -432,8 +441,7 @@ async function uploadSeatMapSvg(concertId: string, relativePath: string): Promis
 
     await s3Client.send(command);
 
-    const endpoint = s3Endpoint.replace(/\/$/, '');
-    return `${endpoint}/${s3Bucket}/${s3Key}`;
+    return buildPublicS3Url(s3Key);
   } catch (error) {
     console.error(`Failed to upload seatmap SVG to S3/MinIO:`, error);
     return '';

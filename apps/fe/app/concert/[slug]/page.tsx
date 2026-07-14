@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, Calendar, Clock, MapPin, Sparkles, User, Users }
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Image from "next/image";
+import { formatViDate } from "@/lib/format";
 
 interface ConcertDetailPageProps {
   params: Promise<{
@@ -204,7 +205,7 @@ export default async function ConcertDetailPage({
                   <div>
                     <p className="font-semibold text-foreground">Thời gian diễn ra</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {new Date(concert.date).toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                      {formatViDate(concert.date, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                     </p>
                   </div>
                 </div>

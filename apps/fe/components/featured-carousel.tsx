@@ -8,6 +8,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { CalendarDays, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
+import { formatViDate } from '@/lib/format';
 
 interface ConcertItem {
   id: string;
@@ -312,7 +313,7 @@ export function FeaturedCarousel({ concerts }: FeaturedCarouselProps) {
         <div className="grid gap-3 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <CalendarDays className="size-4 text-primary" />
-            {new Date(activeConcert.date).toLocaleDateString('vi-VN')} · {activeConcert.time}
+            {formatViDate(activeConcert.date)} · {activeConcert.time}
           </div>
           <div className="flex items-center gap-2">
             <MapPin className="size-4 text-primary" />
@@ -323,3 +324,4 @@ export function FeaturedCarousel({ concerts }: FeaturedCarouselProps) {
     </div>
   );
 }
+
