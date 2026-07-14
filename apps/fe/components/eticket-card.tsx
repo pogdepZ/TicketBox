@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef } from 'react';
-import { Download, Share2 } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Download, Share2, Ticket, Smartphone, FileText } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 interface ETicketCardProps {
@@ -15,7 +15,6 @@ interface ETicketCardProps {
   price: number;
   purchaseDate: string;
   qrPayload?: string;
-  status?: string;
 }
 
 export function ETicketCard({
@@ -29,10 +28,10 @@ export function ETicketCard({
   price,
   purchaseDate,
   qrPayload,
-  status = 'ACTIVE',
 }: ETicketCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const downloadRef = useRef<HTMLDivElement>(null);
+  const [ticketStyle, setTicketStyle] = useState<'stub' | 'wallet' | 'pdf'>('stub');
 
   const formattedDate = new Date(date).toLocaleDateString('vi-VN', {
     weekday: 'long',
@@ -41,54 +40,11 @@ export function ETicketCard({
     day: 'numeric',
   });
 
-  // Xác định trạng thái thực tế của vé
-  const getTicketStatus = () => {
-    const eventDateTime = new Date(date);
-    const isExpired = eventDateTime < new Date();
-
-    if (status === 'USED') {
-      return {
-        label: 'Đã sử dụng',
-        classes: 'bg-slate-500/10 text-slate-500 border-slate-500/20 dark:bg-slate-500/20',
-        isActive: false,
-      };
-    }
-    if (status === 'CANCELLED') {
-      return {
-        label: 'Đã huỷ',
-        classes: 'bg-rose-500/10 text-rose-600 border-rose-500/20 dark:text-rose-400 dark:bg-rose-950/30',
-        isActive: false,
-      };
-    }
-    if (status === 'REFUNDED') {
-      return {
-        label: 'Đã hoàn tiền',
-        classes: 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400 dark:bg-blue-950/30',
-        isActive: false,
-      };
-    }
-    if (isExpired) {
-      return {
-        label: 'Đã hết hạn',
-        classes: 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400 dark:bg-amber-950/30',
-        isActive: false,
-      };
-    }
-
-    return {
-      label: 'Chưa sử dụng',
-      classes: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400 dark:bg-emerald-950/30',
-      isActive: true,
-    };
-  };
-
-  const ticketStatusInfo = getTicketStatus();
-
   function handleDownload() {
     if (!downloadRef.current) return;
 
     toPng(downloadRef.current, {
-      backgroundColor: 'rgb(3, 7, 18)', // slate-950
+      backgroundColor: 'rgb(3, 7, 18)', // Khớp nền tối slate-950 của dự án
       style: {
         borderRadius: '2.5rem',
       },
@@ -167,161 +123,321 @@ export function ETicketCard({
   }
 
   return (
-    <div ref={cardRef} className="mx-auto max-w-md w-full overflow-hidden rounded-[2.5rem] border border-border bg-card text-foreground shadow-xl relative">
-      {/* Subtle glow matching the site's accent */}
-      {ticketStatusInfo.isActive && (
-        <>
-          <div className="absolute -top-24 -left-24 w-48 h-48 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-        </>
-      )}
-
-      {/* Ticket Body: Info Section */}
-      <div className="p-6 pb-4 relative z-10">
-        <div className="flex justify-between items-center mb-5">
-          <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-            <span className={`w-1.5 h-1.5 rounded-full ${ticketStatusInfo.isActive ? 'bg-primary animate-pulse' : 'bg-slate-400'}`} />
-            TicketBox E-Pass
-          </span>
-          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${ticketStatusInfo.classes}`}>
-            {ticketStatusInfo.label}
-          </span>
-        </div>
-
-        <h3 className="text-xl sm:text-2xl font-black tracking-tight text-foreground mb-5 line-clamp-2 leading-tight">
-          {concertTitle}
-        </h3>
-
-        {/* Details Layout */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3.5 bg-muted/40 p-4 rounded-2xl border border-border/50">
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Ngày diễn</p>
-            <p className="text-xs sm:text-sm font-bold text-foreground">{formattedDate}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Giờ diễn</p>
-            <p className="text-xs sm:text-sm font-bold text-foreground">{time}</p>
-          </div>
-          <div className="col-span-2 border-t border-border/50 pt-2.5">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Địa điểm</p>
-            <p className="text-xs font-semibold text-muted-foreground line-clamp-2 leading-relaxed">{venue}</p>
-          </div>
-        </div>
-
-        {/* Seat specifics & pricing */}
-        <div className="grid grid-cols-3 gap-2 mt-4">
-          <div className="bg-muted/20 p-2.5 rounded-xl border border-border/50 text-center">
-            <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">Khu vực</p>
-            <p className="text-xs sm:text-sm font-black text-primary truncate" title={seatZone}>{seatZone}</p>
-          </div>
-          <div className="bg-muted/20 p-2.5 rounded-xl border border-border/50 text-center">
-            <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">Ghế</p>
-            <p className="text-xs sm:text-sm font-black text-primary truncate" title={seatNumber}>{seatNumber}</p>
-          </div>
-          <div className="bg-muted/20 p-2.5 rounded-xl border border-border/50 text-center">
-            <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">Giá vé</p>
-            <p className="text-xs sm:text-sm font-black text-primary truncate">{price.toLocaleString('vi-VN')}đ</p>
-          </div>
+    <div className="space-y-6 max-w-full">
+      {/* Design Style Selector Toolbar */}
+      <div className="flex flex-wrap gap-2 justify-center">
+        <div className="inline-flex rounded-full bg-muted p-1 border border-border">
+          <button
+            type="button"
+            onClick={() => setTicketStyle('stub')}
+            className={`px-4 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              ticketStyle === 'stub' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Ticket className="w-3.5 h-3.5" />
+            Cổ điển (Stub)
+          </button>
+          <button
+            type="button"
+            onClick={() => setTicketStyle('wallet')}
+            className={`px-4 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              ticketStyle === 'wallet' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Smartphone className="w-3.5 h-3.5" />
+            Apple Wallet
+          </button>
+          <button
+            type="button"
+            onClick={() => setTicketStyle('pdf')}
+            className={`px-4 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              ticketStyle === 'pdf' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            PDF / A4 In ấn
+          </button>
         </div>
       </div>
 
-      {/* Ticket Cut Separator */}
-      <div className="relative my-2">
-        <div className="absolute -left-[1px] top-1/2 -translate-y-1/2 w-3 h-6 rounded-r-full bg-background border-y border-r border-border z-20" />
-        <div className="absolute -right-[1px] top-1/2 -translate-y-1/2 w-3 h-6 rounded-l-full bg-background border-y border-l border-border z-20" />
-        <div className="border-t border-dashed border-border w-full" />
-      </div>
-
-      {/* Ticket Stub: QR Centerpiece */}
-      <div className="p-6 pt-4 text-center relative z-10">
-        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] block mb-4">
-          QUÉT MÃ ĐỂ VÀO CỬA SOÁT VÉ
-        </span>
-
-        {/* Large Focal QR Code */}
-        <div className="mb-6 flex justify-center">
-          <div className="h-48 w-48 sm:h-56 sm:w-56 rounded-[2rem] bg-white p-4.5 shadow-xl shadow-foreground/5 transition-transform duration-300 hover:scale-[1.02] flex items-center justify-center overflow-hidden border border-border/50 relative">
-            <div className={`w-full h-full flex items-center justify-center transition-opacity duration-300 ${!ticketStatusInfo.isActive ? 'opacity-15 grayscale blur-[0.5px]' : ''}`}>
-              {qrPayload ? (
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrPayload)}`}
-                  alt="QR Code"
-                  className="w-full h-full object-contain"
-                  loading="lazy"
-                  crossOrigin="anonymous"
-                />
-              ) : (
-                <svg viewBox="0 0 100 100" className="w-full h-full">
-                  <rect width="100" height="100" fill="white" />
-                  <path d="M8 8h24v24H8zM14 14v12h12V14zM68 8h24v24H68zM74 14v12h12V14zM8 68h24v24H8zM14 74v12h12V74zM44 10h8v8h-8zM56 18h8v8h-8zM40 32h24v8H40zM72 44h8v8h-8zM84 52h8v8h-8zM40 52h8v8h-8zM52 60h16v8H52zM72 72h20v8H72zM40 78h8v14h-8zM56 84h8v8h-8z" fill="black" />
-                </svg>
-              )}
+      <div ref={cardRef} className="max-w-full">
+        {/* Render Layout Conditional on Selected Style */}
+        {ticketStyle === 'stub' && (
+          <div className="overflow-hidden rounded-[2rem] border border-dashed border-primary/55 bg-card shadow-xl shadow-foreground/5 max-w-full">
+            <div className="border-b border-dashed border-primary/30 bg-foreground p-6 text-background">
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4 sm:gap-0 mb-2">
+                <div>
+                  <p className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-background/50">Mã vé</p>
+                  <p className="font-mono font-bold text-primary break-all">{ticketNumber}</p>
+                </div>
+                <div className="text-left sm:text-right">
+                  <p className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-background/50">Ngày mua</p>
+                  <p className="text-sm font-semibold text-background">{purchaseDate}</p>
+                </div>
+              </div>
             </div>
 
-            {/* Overlaid status text over QR if not active */}
-            {!ticketStatusInfo.isActive && (
-              <div className="absolute inset-0 flex items-center justify-center p-4 bg-white/40 backdrop-blur-[1px]">
-                <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider ${ticketStatusInfo.classes} bg-white dark:bg-slate-900 shadow-md border`}>
-                  {ticketStatusInfo.label}
-                </span>
+            <div className="p-6">
+              <h3 className="mb-4 text-xl sm:text-2xl font-black tracking-tight text-foreground">{concertTitle}</h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 pb-6 border-b border-primary/20">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Ngày</p>
+                  <p className="font-semibold text-foreground text-sm sm:text-base">{formattedDate}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Giờ</p>
+                  <p className="font-semibold text-foreground text-sm sm:text-base">{time}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-xs text-muted-foreground mb-1">Địa điểm</p>
+                  <p className="font-semibold text-foreground text-sm sm:text-base">{venue}</p>
+                </div>
               </div>
-            )}
+
+              <div className="grid grid-cols-1 min-[425px]:grid-cols-3 gap-4 mb-6 pb-6 border-b border-primary/20">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Khu vực</p>
+                  <p className="text-base sm:text-lg font-black text-primary truncate" title={seatZone}>{seatZone}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Ghế</p>
+                  <p className="text-base sm:text-lg font-black text-primary">{seatNumber}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Giá</p>
+                  <p className="text-base sm:text-lg font-black text-primary">{price.toLocaleString('vi-VN')}đ</p>
+                </div>
+              </div>
+
+              <div className="mb-6 flex items-center justify-center rounded-3xl bg-muted/60 p-4">
+                <div className="h-32 w-32 rounded-2xl bg-white p-2 shadow-inner flex items-center justify-center overflow-hidden">
+                  {qrPayload ? (
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrPayload)}`}
+                      alt="QR Code"
+                      className="w-full h-full object-contain"
+                      loading="lazy"
+                      crossOrigin="anonymous"
+                    />
+                  ) : (
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                      <rect width="100" height="100" fill="white" />
+                      <path d="M8 8h24v24H8zM14 14v12h12V14zM68 8h24v24H8zM74 14v12h12V14zM8 68h24v24H8zM14 74v12h12V74zM44 10h8v8h-8zM56 18h8v8h-8zM40 32h24v8H40zM72 44h8v8h-8zM84 52h8v8h-8zM40 52h8v8h-8zM52 60h16v8H52zM72 72h20v8H72zM40 78h8v14h-8zM56 84h8v8h-8z" fill="black" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={handleDownload}
+                  className="flex-1 flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2 font-bold text-primary-foreground transition hover:bg-primary/90 hover:-translate-y-0.5 active:translate-y-px cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  Tải xuống
+                </button>
+                <button
+                  onClick={handleShare}
+                  className="flex-1 flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-card px-4 py-2 font-bold text-foreground transition hover:border-primary/40 hover:text-primary hover:-translate-y-0.5 active:translate-y-px cursor-pointer"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Chia sẻ
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Mono Ticket Number & Purchase Date */}
-        <div className="mb-6">
-          <p className="font-mono text-sm sm:text-base font-bold text-primary tracking-[0.2em] uppercase break-all">
-            {ticketNumber}
-          </p>
-          <p className="text-[9px] text-muted-foreground mt-1 uppercase tracking-wider">
-            Ngày mua: {purchaseDate}
-          </p>
-        </div>
+        {ticketStyle === 'wallet' && (
+          <div className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-8 shadow-2xl flex flex-col justify-between w-full max-w-sm mx-auto min-h-[500px]">
+            <div className="absolute top-0 right-0 -mt-20 -mr-20 w-44 h-44 rounded-full bg-primary/20 blur-3xl" />
+            <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-44 h-44 rounded-full bg-blue-500/10 blur-3xl" />
+            
+            <div className="flex justify-between items-center border-b border-white/5 pb-4 mb-4 relative z-10">
+              <span className="text-xs font-black uppercase tracking-widest text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/25">
+                TicketBox Pass
+              </span>
+              <span className="text-[10px] font-mono text-muted-foreground uppercase">{ticketNumber.slice(0, 8)}</span>
+            </div>
 
-        {/* Call to Actions */}
-        <div className="flex gap-3">
-          <button
-            onClick={handleDownload}
-            className="flex-1 flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2 font-bold text-primary-foreground transition hover:bg-primary/90 hover:-translate-y-0.5 active:translate-y-px cursor-pointer shadow-lg shadow-primary/10"
-          >
-            <Download className="w-4 h-4" />
-            Tải xuống
-          </button>
-          <button
-            onClick={handleShare}
-            className="flex-1 flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-card px-4 py-2 font-bold text-muted-foreground transition hover:border-primary/40 hover:text-primary hover:-translate-y-0.5 active:translate-y-px cursor-pointer"
-          >
-            <Share2 className="w-4 h-4" />
-            Chia sẻ
-          </button>
-        </div>
+            <div className="mb-6 relative z-10 text-left">
+              <h3 className="text-2xl font-black text-white leading-tight tracking-tight line-clamp-2">{concertTitle}</h3>
+              <p className="text-xs text-primary font-bold mt-1.5 uppercase tracking-wider">{seatZone}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-left mb-6 bg-white/[0.02] border border-white/5 p-4 rounded-2xl relative z-10 backdrop-blur-sm">
+              <div>
+                <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Thời gian</p>
+                <p className="text-xs font-bold text-white mt-0.5">{formattedDate}</p>
+                <p className="text-[11px] font-semibold text-primary mt-0.5">{time}</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Số ghế</p>
+                <p className="text-sm font-black text-white mt-0.5">{seatNumber}</p>
+              </div>
+              <div className="col-span-2 border-t border-white/5 pt-2 mt-1">
+                <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Địa điểm</p>
+                <p className="text-xs font-semibold text-slate-300 mt-0.5 line-clamp-1">{venue}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center justify-center bg-white rounded-3xl p-5 shadow-xl relative z-10 mb-6">
+              <div className="w-36 h-36 flex items-center justify-center overflow-hidden">
+                {qrPayload ? (
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrPayload)}`}
+                    alt="QR Code"
+                    className="w-full h-full object-contain"
+                    crossOrigin="anonymous"
+                  />
+                ) : (
+                  <svg viewBox="0 0 100 100" className="w-full h-full">
+                    <rect width="100" height="100" fill="white" />
+                    <path d="M8 8h24v24H8zM14 14v12h12V14zM68 8h24v24H68zM74 14v12h12V14zM8 68h24v24H8zM14 74v12h12V74zM44 10h8v8h-8zM56 18h8v8h-8zM40 32h24v8H40zM72 44h8v8h-8zM84 52h8v8h-8zM40 52h8v8h-8zM52 60h16v8H52zM72 72h20v8H72zM40 78h8v14h-8zM56 84h8v8h-8z" fill="black" />
+                  </svg>
+                )}
+              </div>
+              <span className="text-[9px] font-mono text-slate-900 mt-2 font-bold tracking-widest uppercase">{ticketNumber}</span>
+            </div>
+
+            <div className="flex gap-3 relative z-10">
+              <button
+                onClick={handleDownload}
+                className="flex-1 flex h-10 items-center justify-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Tải xuống
+              </button>
+              <button
+                onClick={handleShare}
+                className="flex-1 flex h-10 items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-white/[0.1] cursor-pointer"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                Chia sẻ
+              </button>
+            </div>
+          </div>
+        )}
+
+        {ticketStyle === 'pdf' && (
+          <div className="bg-white text-slate-950 p-6 sm:p-8 rounded-[2rem] border border-slate-200 shadow-lg w-full max-w-2xl mx-auto flex flex-col justify-between min-h-[600px]">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 border-b-2 border-slate-900 pb-5 mb-5 text-left">
+              <div>
+                <h1 className="text-2xl font-black tracking-tight text-slate-900 uppercase">VÉ ĐIỆN TỬ</h1>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">TicketBox Electronic Ticket</p>
+              </div>
+              <div className="text-left sm:text-right">
+                <p className="text-[10px] text-slate-400 uppercase font-bold">Mã giao dịch / ID</p>
+                <p className="font-mono text-sm font-bold text-slate-900 tracking-wider break-all">{ticketNumber}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 text-left">
+              <div className="md:col-span-2 space-y-4">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tên sự kiện / Event Title</span>
+                  <h3 className="text-xl font-black text-slate-900 mt-1 leading-snug">{concertTitle}</h3>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 border-y border-slate-200 py-4">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ngày / Date</span>
+                    <p className="text-sm font-extrabold text-slate-900 mt-1">{formattedDate}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Giờ / Time</span>
+                    <p className="text-sm font-extrabold text-slate-900 mt-1">{time}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Địa điểm / Venue</span>
+                  <p className="text-sm font-extrabold text-slate-900">{venue}</p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 border-t border-slate-200 pt-4">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Hạng vé / Zone</span>
+                    <p className="text-sm font-black text-primary uppercase">{seatZone}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Số ghế / Seat</span>
+                    <p className="text-sm font-black text-slate-900">{seatNumber}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Giá vé / Price</span>
+                    <p className="text-sm font-black text-slate-900">{price.toLocaleString('vi-VN')}đ</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center justify-center border-l border-slate-200 pl-0 md:pl-6 pt-6 md:pt-0">
+                <div className="border border-slate-300 p-2 bg-white rounded-xl shadow-inner">
+                  <div className="w-36 h-36 overflow-hidden flex items-center justify-center">
+                    {qrPayload ? (
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrPayload)}`}
+                        alt="QR Code"
+                        className="w-full h-full object-contain"
+                        crossOrigin="anonymous"
+                      />
+                    ) : (
+                      <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <rect width="100" height="100" fill="white" />
+                        <path d="M8 8h24v24H8zM14 14v12h12V14zM68 8h24v24H68zM74 14v12h12V14zM8 68h24v24H8zM14 74v12h12V74zM44 10h8v8h-8zM56 18h8v8h-8zM40 32h24v8H40zM72 44h8v8h-8zM84 52h8v8h-8zM40 52h8v8h-8zM52 60h16v8H52zM72 72h20v8H72zM40 78h8v14h-8zM56 84h8v8h-8z" fill="black" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+                <span className="text-[9px] font-mono text-slate-500 mt-2 font-bold tracking-widest">{ticketNumber.slice(0, 16)}</span>
+                <span className="text-[8px] text-slate-400 font-bold uppercase mt-4 text-center">HÃY GIỮ QR CODE NÀY BẢO MẬT</span>
+              </div>
+            </div>
+
+            <div className="border-t border-dashed border-slate-300 pt-4 mt-4 text-[9px] text-slate-400 leading-normal space-y-1 text-left">
+              <p className="font-bold text-slate-600">ĐIỀU KHOẢN & QUY ĐỊNH / TERMS & CONDITIONS:</p>
+              <p>1. Vé điện tử hợp lệ phải có QR code hiển thị rõ ràng, không bị mờ hay đứt gãy.</p>
+              <p>2. Mỗi QR code chỉ có giá trị cho một (01) lần quét vào cổng duy nhất. Ban tổ chức không chịu trách nhiệm nếu vé bị sao chép trái phép.</p>
+              <p>3. Vui lòng xuất trình vé điện tử trên điện thoại hoặc bản in giấy cùng giấy tờ tùy thân hợp lệ tại cổng check-in.</p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-4 border-t border-slate-200">
+              <button
+                onClick={handleDownload}
+                className="flex-1 flex h-10 items-center justify-center gap-1.5 rounded-full bg-slate-900 text-white px-4 py-2 text-xs font-bold hover:bg-slate-800 transition cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Tải file in PNG
+              </button>
+              <button
+                onClick={handleShare}
+                className="flex-1 flex h-10 items-center justify-center gap-1.5 rounded-full border border-slate-300 text-slate-700 bg-white px-4 py-2 text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                Chia sẻ liên kết
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Hidden container used ONLY for generating the PNG image */}
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', pointerEvents: 'none' }}>
         <div
           ref={downloadRef}
-          className="w-[400px] bg-slate-950 p-8 flex flex-col items-center text-center rounded-[2.5rem] border-2 border-primary/30 relative"
+          className="w-[400px] bg-slate-950 p-8 flex flex-col items-center text-center rounded-[2.5rem] border-2 border-primary/30"
         >
-          {/* Header */}
-          <div className="w-full flex justify-between items-center mb-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
-              TicketBox E-Pass
-            </span>
-            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${ticketStatusInfo.classes.replace('dark:', '')}`}>
-              {ticketStatusInfo.label}
-            </span>
-          </div>
-
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+            TicketBox E-Pass
+          </span>
           <h2 className="mt-4 text-xl font-black text-white leading-tight line-clamp-2">
             {concertTitle}
           </h2>
           <p className="mt-1.5 text-xs text-slate-400">{formattedDate} · {time}</p>
 
-          {/* Main Focus: Massive QR Code */}
-          <div className="my-6 p-5 bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center relative">
-            <div className={`w-60 h-60 flex items-center justify-center overflow-hidden ${!ticketStatusInfo.isActive ? 'opacity-15 grayscale blur-[0.5px]' : ''}`}>
+          <div className="my-6 p-5 bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center">
+            <div className="w-60 h-60 flex items-center justify-center overflow-hidden">
               {qrPayload ? (
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrPayload)}`}
@@ -336,16 +452,8 @@ export function ETicketCard({
                 </svg>
               )}
             </div>
-            {!ticketStatusInfo.isActive && (
-              <div className="absolute inset-0 flex items-center justify-center p-4 bg-white/40 backdrop-blur-[1px]">
-                <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider ${ticketStatusInfo.classes.replace('dark:', '')} bg-white shadow-md border`}>
-                  {ticketStatusInfo.label}
-                </span>
-              </div>
-            )}
           </div>
 
-          {/* Ticket Info */}
           <div className="w-full border-t border-dashed border-white/20 pt-4 mt-2">
             <p className="font-mono text-sm font-bold text-primary tracking-widest uppercase mb-4">
               {ticketNumber}
@@ -367,7 +475,6 @@ export function ETicketCard({
             </div>
           </div>
 
-          {/* Footer */}
           <div className="mt-6 text-[9px] font-bold text-slate-500 tracking-wider">
             VUI LÒNG XUẤT TRÌNH VÉ NÀY TẠI CỬA BÀN SOÁT VÉ
           </div>

@@ -1,37 +1,29 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import nodemailer, { Transporter } from "nodemailer";
-import { Attachment } from "nodemailer/lib/mailer";
+import sgMail from "@sendgrid/mail";
+import { classes } from "@sendgrid/helpers";
+
+export type MailAttachment = {
+  filename: string;
+  content: Buffer | string;
+  contentType?: string;
+  cid?: string;
+};
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private readonly transporter: Transporter;
-  private readonly mailHost: string;
-  private readonly mailPort: number;
-  private readonly mailSecure: boolean;
   private readonly mailFrom: string;
 
   constructor(private readonly config: ConfigService) {
-    const user = this.config.get<string>("mail.user");
-    const pass = this.config.get<string>("mail.pass");
-    this.mailHost = this.config.get<string>("mail.host") ?? "localhost";
-    this.mailPort = this.config.get<number>("mail.port") ?? 1025;
-    this.mailSecure = this.config.get<boolean>("mail.secure") ?? false;
+    const apiKey = this.config.getOrThrow<string>("mail.sendGridApiKey");
     this.mailFrom =
       this.config.get<string>("mail.from") ??
       "TicketBox <noreply@ticketbox.local>";
 
-    this.transporter = nodemailer.createTransport({
-      host: this.mailHost,
-      port: this.mailPort,
-      secure: this.mailSecure,
-      auth: user && pass ? { user, pass } : undefined,
-    });
+    sgMail.setApiKey(apiKey);
 
-    this.logger.log(
-      `Mailer configured host=${this.mailHost} port=${this.mailPort} secure=${this.mailSecure} from=${this.mailFrom} authUser=${user ?? "<none>"}`,
-    );
+    this.logger.log(`SendGrid mailer configured from=${this.mailFrom}`);
   }
 
   async sendMail(options: {
@@ -39,35 +31,62 @@ export class MailService {
     subject: string;
     html: string;
     text?: string;
-    attachments?: Attachment[];
+    attachments?: MailAttachment[];
   }) {
     this.logger.log(
-      `Sending mail to=${options.to} subject=${options.subject} via ${this.mailHost}:${this.mailPort} from=${this.mailFrom}`,
+      `Sending mail to=${options.to} subject=${options.subject} via SendGrid from=${this.mailFrom}`,
     );
 
     try {
-      const info = await this.transporter.sendMail({
+      const [response] = await sgMail.send({
         from: this.mailFrom,
-        ...options,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+        attachments: options.attachments?.map((attachment) => {
+          const rawContent = Buffer.isBuffer(attachment.content)
+            ? attachment.content.toString("base64")
+            : attachment.content;
+
+          // Strip base64 data URI prefix
+          const cleanContent = typeof rawContent === "string"
+            ? rawContent.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '')
+            : rawContent;
+
+          const isInline = !!attachment.cid;
+          if (isInline) {
+            this.logger.log(
+              `Attachment inline log: contentId=${attachment.cid}, length=${cleanContent.length}, base64Prefix20=${cleanContent.substring(0, 20)}`
+            );
+          }
+
+          return {
+            filename: attachment.filename,
+            content: cleanContent,
+            type: attachment.contentType || "image/png",
+            disposition: isInline ? "inline" : "attachment",
+            content_id: attachment.cid,
+            contentId: attachment.cid,
+          } as any;
+        }),
       });
 
       this.logger.log(
-        `Mail sent to ${options.to}: ${info.messageId} accepted=${info.accepted.join(",")} rejected=${info.rejected.join(",")}`,
+        `Mail sent to=${options.to} statusCode=${response.statusCode} messageId=${response.headers["x-message-id"] ?? "UNKNOWN"}`,
       );
     } catch (error) {
       const err = error as Error & {
         code?: string;
-        response?: string;
-        responseCode?: number;
-        command?: string;
+        response?: { statusCode?: number; body?: unknown };
       };
 
       this.logger.error(
-        `Mail send failed to=${options.to} code=${err.code ?? "UNKNOWN"} responseCode=${err.responseCode ?? "UNKNOWN"} command=${err.command ?? "UNKNOWN"} message=${err.message}`,
+        `SendGrid mail failed to=${options.to} code=${err.code ?? "UNKNOWN"} statusCode=${err.response?.statusCode ?? "UNKNOWN"} message=${err.message}`,
       );
 
-      if (err.response) {
-        this.logger.error(`SMTP response: ${err.response}`);
+      if (err.response?.body) {
+        this.logger.error(`SendGrid response: ${JSON.stringify(err.response.body)}`);
       }
 
       throw error;
