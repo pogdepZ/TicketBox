@@ -1215,8 +1215,15 @@ export async function getUserOrders(): Promise<any[]> {
 // REVENUE & DASHBOARD (REAL/FALLBACK)
 // ----------------------------------------------------
 
-export async function getRevenueSummary(): Promise<any> {
-  return await fetchApi("/admin/revenue/summary");
+export async function getRevenueSummary(
+  startDate?: string,
+  endDate?: string,
+): Promise<any> {
+  let url = "/admin/revenue/summary";
+  if (startDate && endDate) {
+    url += `?startDate=${startDate}&endDate=${endDate}`;
+  }
+  return await fetchApi(url);
 }
 
 export async function getConcertRevenue(concertId: string): Promise<any> {

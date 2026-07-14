@@ -92,7 +92,7 @@ export default function MyTicketsPage() {
     <main className="min-h-screen bg-background flex flex-col">
       <Header />
 
-      <section className="flex-grow mx-auto w-full max-w-4xl px-4 py-12">
+      <section className="flex-1 mx-auto max-w-7xl w-full px-4 py-10">
         <div className="mb-10">
           <h1 className="text-4xl font-black tracking-tight text-foreground md:text-5xl flex items-center gap-3">
             <span className="grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
@@ -120,7 +120,7 @@ export default function MyTicketsPage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {allTickets.map((ticket) => (
               <ETicketCard
                 key={ticket.id}
@@ -134,6 +134,7 @@ export default function MyTicketsPage() {
                 price={ticket.price}
                 purchaseDate={new Date(ticket.paidAt).toLocaleDateString('vi-VN')}
                 qrPayload={ticket.qrPayload}
+                status={ticket.status}
               />
             ))}
           </div>
