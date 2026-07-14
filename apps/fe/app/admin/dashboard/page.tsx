@@ -534,12 +534,7 @@ export default function AdminDashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const [summaryData, concertsData] = await Promise.all([
-        getRevenueSummary(),
-        getConcerts(),
-      ]);
-
-      setStats(summaryData);
+      const concertsData = await getConcerts();
       setConcertsList(concertsData.items || []);
     } catch (err: any) {
       console.error(err);
@@ -549,6 +544,15 @@ export default function AdminDashboardPage() {
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadDashboardSummary(start: string, end: string) {
+    try {
+      const summaryData = await getRevenueSummary(start, end);
+      setStats(summaryData);
+    } catch (err) {
+      console.error("Failed to load dashboard summary:", err);
     }
   }
 
@@ -573,6 +577,7 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     loadRevenueAnalytics();
+    loadDashboardSummary(dateRange.startDate, dateRange.endDate);
   }, [dateRange.startDate, dateRange.endDate]);
 
   return (
@@ -592,6 +597,7 @@ export default function AdminDashboardPage() {
             onClick={() => {
               loadDashboardData();
               loadRevenueAnalytics();
+              loadDashboardSummary(dateRange.startDate, dateRange.endDate);
             }}
             disabled={loading || revenueLoading}
             className="flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-bold text-foreground shadow-sm transition hover:border-primary/40 hover:text-primary active:scale-95 disabled:opacity-50 cursor-pointer"
@@ -726,26 +732,28 @@ export default function AdminDashboardPage() {
                   Phân bổ doanh số loại vé
                 </h3>
                 <div className="space-y-4 flex-1 flex flex-col justify-center">
-                  {stats.ticketDistribution?.map((item: any) => (
-                    <div key={item.label}>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm font-semibold text-muted-foreground">
-                          {item.label}
-                        </span>
-                        <span className="text-sm font-black text-foreground">
-                          {item.value}%
-                        </span>
+                  {stats.ticketDistribution && stats.ticketDistribution.length > 0 ? (
+                    stats.ticketDistribution.map((item: any) => (
+                      <div key={item.label}>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm font-semibold text-muted-foreground">
+                            {item.label}
+                          </span>
+                          <span className="text-sm font-black text-foreground">
+                            {item.value}%
+                          </span>
+                        </div>
+                        <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full"
+                            style={{ width: `${item.value}%`, backgroundColor: getTicketColor(item.label) }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full"
-                          style={{ width: `${item.value}%`, backgroundColor: getTicketColor(item.label) }}
-                        />
-                      </div>
-                    </div>
-                  )) || (
+                    ))
+                  ) : (
                     <div className="text-muted-foreground text-center py-16">
-                      Không có dữ liệu phân bổ
+                      Không có dữ liệu để thống kê
                     </div>
                   )}
                 </div>

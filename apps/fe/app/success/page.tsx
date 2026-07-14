@@ -250,7 +250,7 @@ export default function SuccessPage() {
     <main className="min-h-screen bg-background">
       <Header />
 
-      <section className="mx-auto max-w-4xl px-4 py-12">
+      <section className="mx-auto max-w-7xl px-4 py-10">
         <div className="mb-12 text-center">
           <div className="mb-6 flex justify-center">
             <div className="rounded-full bg-emerald-500/10 p-4 text-emerald-500 shadow-xl shadow-emerald-500/15">
@@ -265,7 +265,7 @@ export default function SuccessPage() {
 
         <div className="mb-12">
           <h2 className="mb-6 text-2xl font-black text-foreground">Vé của bạn</h2>
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {order.tickets.map((ticket) => (
               <ETicketCard
                 key={ticket.id}
@@ -279,6 +279,7 @@ export default function SuccessPage() {
                 price={ticket.price}
                 purchaseDate={purchaseDate}
                 qrPayload={ticket.qrPayload}
+                status={ticket.status}
               />
             ))}
           </div>

@@ -73,12 +73,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       icon: Users,
       exact: true,
     },
-    {
-      href: '/admin/settings',
-      label: 'Cài đặt',
-      icon: Settings,
-      exact: true,
-    },
   ];
 
   const isActive = (item: any) => {

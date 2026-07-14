@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { AdminLayout } from "@/components/admin-layout";
 import { getDashboardAnalytics, getUserAnalyticsAdmin, getGenreRevenueAnalytics } from "@/lib/api";
 import { DateRangePicker, DateRange } from "@/components/date-range-picker";
-import { Users, Percent, Activity, RefreshCw, BarChart3 } from "lucide-react";
+import { Users, Percent, Activity, RefreshCw, BarChart3, Search, X } from "lucide-react";
 
 function VelocityChart({ data }: { data: any[] }) {
   if (!data || data.length === 0) {
@@ -606,6 +606,8 @@ function GenreRevenuePieChart({ data }: { data: any[] }) {
   ];
 
   const totalRevenue = data.reduce((sum, item) => sum + item.revenue, 0);
+  const activeGenresCount = data.filter(item => item.revenue > 0).length;
+  const topGenre = data[0];
 
   // Doughnut math
   const radius = 70;
@@ -618,7 +620,6 @@ function GenreRevenuePieChart({ data }: { data: any[] }) {
   const segments = useMemo(() => {
     let accumulated = 0;
     return data.map((item, idx) => {
-      // Use actual revenue ratio for accurate arcs (not rounded percentage)
       const ratio = totalRevenue > 0 ? item.revenue / totalRevenue : 0;
       const segmentLength = Math.max((ratio - gapAngle) * circumference, 0);
       const offset = -accumulated * circumference; // negative = clockwise advance
@@ -633,104 +634,142 @@ function GenreRevenuePieChart({ data }: { data: any[] }) {
   }, [data, totalRevenue]);
 
   return (
-    <div className="flex flex-col md:flex-row items-center justify-around gap-8 p-6 bg-card border border-border/40 rounded-[2rem] shadow-sm">
-      {/* Doughnut SVG */}
-      <div className="relative size-[200px] shrink-0">
-        <svg viewBox="0 0 200 200" className="size-full" style={{ transform: 'rotate(-90deg)' }}>
-          {/* Base background circle */}
-          <circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            stroke="var(--color-border)"
-            strokeOpacity={0.1}
-            strokeWidth={strokeWidth}
-          />
-          {segments.map((seg, idx) => {
-            const isHovered = hoveredIdx === idx;
-            const isAnyHovered = hoveredIdx !== null;
-            const opacity = isAnyHovered ? (isHovered ? 1.0 : 0.3) : 1.0;
-            const currentStrokeWidth = isHovered ? strokeWidth + 5 : strokeWidth;
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 p-6 bg-card border border-border/40 rounded-[2rem] shadow-sm">
+      {/* Cột 1: Doughnut Chart SVG */}
+      <div className="lg:col-span-4 flex flex-col items-center justify-center">
+        <div className="relative size-[200px] shrink-0">
+          <svg viewBox="0 0 200 200" className="size-full" style={{ transform: 'rotate(-90deg)' }}>
+            {/* Base background circle */}
+            <circle
+              cx={center}
+              cy={center}
+              r={radius}
+              fill="none"
+              stroke="var(--color-border)"
+              strokeOpacity={0.1}
+              strokeWidth={strokeWidth}
+            />
+            {segments.map((seg, idx) => {
+              const isHovered = hoveredIdx === idx;
+              const isAnyHovered = hoveredIdx !== null;
+              const opacity = isAnyHovered ? (isHovered ? 1.0 : 0.3) : 1.0;
+              const currentStrokeWidth = isHovered ? strokeWidth + 5 : strokeWidth;
 
-            return (
-              <circle
-                key={idx}
-                cx={center}
-                cy={center}
-                r={radius}
-                fill="none"
-                stroke={seg.color}
-                strokeWidth={currentStrokeWidth}
-                strokeDasharray={`${seg.segmentLength} ${circumference - seg.segmentLength}`}
-                strokeDashoffset={seg.offset}
-                strokeLinecap="butt"
-                className="transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer"
-                style={{ opacity }}
-                onMouseEnter={() => setHoveredIdx(idx)}
-                onMouseLeave={() => setHoveredIdx(null)}
-              />
-            );
-          })}
-        </svg>
+              return (
+                <circle
+                  key={idx}
+                  cx={center}
+                  cy={center}
+                  r={radius}
+                  fill="none"
+                  stroke={seg.color}
+                  strokeWidth={currentStrokeWidth}
+                  strokeDasharray={`${seg.segmentLength} ${circumference - seg.segmentLength}`}
+                  strokeDashoffset={seg.offset}
+                  strokeLinecap="butt"
+                  className="transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer"
+                  style={{ opacity }}
+                  onMouseEnter={() => setHoveredIdx(idx)}
+                  onMouseLeave={() => setHoveredIdx(null)}
+                />
+              );
+            })}
+          </svg>
 
-        {/* Center label */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
-          {hoveredIdx !== null ? (
-            <>
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-                {data[hoveredIdx].genre}
-              </span>
-              <span className="text-base font-black text-foreground mt-0.5">
-                {data[hoveredIdx].percentage}%
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-                Tổng doanh thu
-              </span>
-              <span className="text-base font-black text-foreground mt-0.5">
-                {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(totalRevenue)}
-              </span>
-            </>
-          )}
+          {/* Center label */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
+            {hoveredIdx !== null ? (
+              <>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                  {data[hoveredIdx].genre}
+                </span>
+                <span className="text-base font-black text-foreground mt-0.5">
+                  {data[hoveredIdx].percentage}%
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                  Tổng doanh thu
+                </span>
+                <span className="text-sm font-black text-foreground mt-0.5">
+                  {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(totalRevenue)}
+                </span>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex-1 w-full space-y-3">
-        <h4 className="text-sm font-black text-foreground mb-3 pl-2 border-l-3 border-primary">Chi tiết theo thể loại</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {data.map((item, idx) => {
-            const color = colors[idx % colors.length];
-            const isHovered = hoveredIdx === idx;
-            const isAnyHovered = hoveredIdx !== null;
-            const opacity = isAnyHovered ? (isHovered ? 1.0 : 0.4) : 1.0;
+      {/* Cột 2: Chi tiết theo thể loại (Legend list) */}
+      <div className="lg:col-span-4 flex flex-col justify-between border-t lg:border-t-0 lg:border-l border-border/30 pt-6 lg:pt-0 lg:pl-6">
+        <div>
+          <h4 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-4">Chi tiết theo thể loại</h4>
+          <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+            {data.map((item, idx) => {
+              const color = colors[idx % colors.length];
+              const isHovered = hoveredIdx === idx;
+              const isAnyHovered = hoveredIdx !== null;
+              const opacity = isAnyHovered ? (isHovered ? 1.0 : 0.4) : 1.0;
 
-            return (
-              <div
-                key={idx}
-                className="flex items-center justify-between p-3 rounded-2xl border border-border/40 bg-background/50 transition-all duration-300 cursor-pointer"
-                style={{ opacity, transform: isHovered ? "translateX(4px)" : "none" }}
-                onMouseEnter={() => setHoveredIdx(idx)}
-                onMouseLeave={() => setHoveredIdx(null)}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="size-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                  <span className="text-xs font-bold text-foreground truncate">{item.genre}</span>
+              return (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between p-2.5 rounded-xl border border-border/40 bg-background/30 transition-all duration-300 cursor-pointer"
+                  style={{ opacity, transform: isHovered ? "translateX(4px)" : "none" }}
+                  onMouseEnter={() => setHoveredIdx(idx)}
+                  onMouseLeave={() => setHoveredIdx(null)}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                    <span className="text-xs font-bold text-foreground truncate">{item.genre}</span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-black text-foreground">
+                      {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(item.revenue)}
+                    </span>
+                    <span className="block text-[9px] font-bold text-muted-foreground">
+                      {item.percentage}%
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <span className="text-xs font-black text-foreground">
-                    {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(item.revenue)}
-                  </span>
-                  <span className="block text-[10px] font-bold text-muted-foreground">
-                    {item.percentage}%
-                  </span>
-                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Cột 3: Key Financial Metrics & Strategic Insights (Cột ngoài cùng) */}
+      <div className="lg:col-span-4 flex flex-col justify-between space-y-6 border-t lg:border-t-0 lg:border-l border-border/30 pt-6 lg:pt-0 lg:pl-6">
+        <div>
+          <h4 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-4">Chỉ số tài chính</h4>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center bg-muted/20 p-3 rounded-2xl border border-border/40">
+              <span className="text-xs text-muted-foreground font-medium">Tổng doanh số</span>
+              <span className="text-sm font-black text-primary">
+                {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(totalRevenue)}
+              </span>
+            </div>
+            
+            <div className="flex justify-between items-center bg-muted/20 p-3 rounded-2xl border border-border/40">
+              <span className="text-xs text-muted-foreground font-medium">Thể loại dẫn đầu</span>
+              <div className="text-right">
+                <span className="text-xs font-black text-foreground block">
+                  {topGenre ? topGenre.genre : "N/A"}
+                </span>
+                <span className="text-[10px] text-muted-foreground font-bold">
+                  {topGenre ? `${topGenre.percentage}% doanh thu` : "0%"}
+                </span>
               </div>
-            );
-          })}
+            </div>
+
+            <div className="flex justify-between items-center bg-muted/20 p-3 rounded-2xl border border-border/40">
+              <span className="text-xs text-muted-foreground font-medium">Số nhóm tạo doanh thu</span>
+              <span className="text-xs font-black text-foreground">
+                {activeGenresCount} / {data.length} nhóm
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -840,18 +879,46 @@ export default function AdminAnalyticsPage() {
     loadGenreRevenue();
   }, [genreDateRange.startDate, genreDateRange.endDate]);
 
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredEvents = useMemo(() => {
+    if (!analytics?.eventAnalytics) return [];
+    if (!searchQuery.trim()) return analytics.eventAnalytics;
+    const query = searchQuery.toLowerCase().trim();
+    return analytics.eventAnalytics.filter((event: any) =>
+      event.title?.toLowerCase().includes(query) ||
+      event.artist?.toLowerCase().includes(query)
+    );
+  }, [analytics?.eventAnalytics, searchQuery]);
+
+  useEffect(() => {
+    setEventPage(1);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (filteredEvents.length > 0) {
+      const exists = filteredEvents.some((e: any) => e.id === selectedConcertId);
+      if (!exists) {
+        setSelectedConcertId(filteredEvents[0].id);
+      }
+    } else {
+      setSelectedConcertId(null);
+    }
+  }, [filteredEvents]);
+
   const selectedConcertAnalytic = analytics?.eventAnalytics?.find(
     (e: any) => e.id === selectedConcertId,
   );
 
   const totalEventPages = Math.ceil(
-    (analytics?.eventAnalytics?.length || 0) / eventLimit,
+    (filteredEvents.length || 0) / eventLimit,
   );
-  const paginatedEvents =
-    analytics?.eventAnalytics?.slice(
+  const paginatedEvents = useMemo(() => {
+    return filteredEvents.slice(
       (eventPage - 1) * eventLimit,
       eventPage * eventLimit,
-    ) || [];
+    );
+  }, [filteredEvents, eventPage, eventLimit]);
 
   return (
     <AdminLayout>
@@ -860,7 +927,7 @@ export default function AdminAnalyticsPage() {
           <div>
             <h1 className="mb-2 text-4xl font-black tracking-tight text-foreground flex items-center gap-3">
               <BarChart3 className="size-9 text-primary" />
-              Phân tích chi tiết (Analytics)
+              Phân tích chi tiết
             </h1>
             <p className="text-muted-foreground">
               Theo dõi hành vi người dùng, tỷ lệ lấp đầy sự kiện và tốc độ bán
@@ -981,91 +1048,118 @@ export default function AdminAnalyticsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Sell-through rates list */}
               <div className="lg:col-span-1 rounded-[2.5rem] border border-border bg-card p-6 shadow-sm h-fit">
-                <h3 className="text-lg font-black text-foreground mb-6 flex items-center gap-2">
+                <h3 className="text-lg font-black text-foreground mb-4 flex items-center gap-2">
                   <Percent className="size-5 text-primary" />
                   Tỷ lệ bán vé theo sự kiện
                 </h3>
-                <div className="space-y-5">
-                  {paginatedEvents.map((event: any) => (
-                    <div
-                      key={event.id}
-                      onClick={() => setSelectedConcertId(event.id)}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-                        selectedConcertId === event.id
-                          ? "border-primary bg-primary/5 shadow-sm"
-                          : "border-border hover:border-primary/40 bg-card"
-                      }`}
+                
+                {/* Search Bar */}
+                <div className="relative mb-5">
+                  <input
+                    type="text"
+                    placeholder="Tìm sự kiện, nghệ sĩ..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full rounded-2xl border border-border bg-background/50 px-4 py-2 pl-9 text-xs font-medium text-foreground placeholder-muted-foreground outline-none transition focus:border-primary/50 focus:bg-background"
+                  />
+                  <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer flex items-center justify-center p-0.5"
                     >
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-bold text-foreground text-sm line-clamp-1 mb-1.5">
-                            {event.title}
-                          </h4>
-                          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                            <span className="truncate">{event.artist}</span>
-                            <span
-                              className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider shrink-0 ${
-                                event.status === "PUBLISHED"
-                                  ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                                  : event.status === "COMPLETED"
-                                    ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
-                                    : event.status === "CANCELLED"
-                                      ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
-                                      : "bg-slate-500/10 text-slate-500 border-slate-500/20"
-                              }`}
-                            >
-                              {event.status === "PUBLISHED"
-                                ? "Mở bán"
-                                : event.status === "COMPLETED"
-                                  ? "Đã kết thúc"
-                                  : event.status === "CANCELLED"
-                                    ? "Đã hủy"
-                                    : "Nháp"}
-                            </span>
-                          </div>
-                        </div>
-                        <span
-                          className={`text-xs font-black px-2 py-0.5 rounded-full border ${
-                            event.sellThroughRate >= 80
-                              ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                              : event.sellThroughRate >= 30
-                                ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                                : "bg-rose-500/10 text-rose-500 border-rose-500/20"
-                          }`}
-                        >
-                          {event.sellThroughRate}%
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
-                        <span>
-                          {event.ticketsSold.toLocaleString()} /{" "}
-                          {event.capacity.toLocaleString()} vé
-                        </span>
-                      </div>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            event.sellThroughRate >= 80
-                              ? "bg-emerald-500"
-                              : event.sellThroughRate >= 30
-                                ? "bg-amber-500"
-                                : "bg-rose-500"
-                          }`}
-                          style={{ width: `${event.sellThroughRate}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-
-                  {paginatedEvents.length === 0 && (
-                    <div className="text-muted-foreground text-center py-6">
-                      Không có dữ liệu phân tích
-                    </div>
+                      <X className="size-3" />
+                    </button>
                   )}
+                </div>
+
+                <div className="min-h-[380px] flex flex-col justify-between">
+                  <div className="space-y-4 flex-grow">
+                    {paginatedEvents.map((event: any) => (
+                      <div
+                        key={event.id}
+                        onClick={() => setSelectedConcertId(event.id)}
+                        className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                          selectedConcertId === event.id
+                            ? "border-primary bg-primary/5 shadow-sm"
+                            : "border-border hover:border-primary/40 bg-card"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-bold text-foreground text-sm line-clamp-1 mb-1.5">
+                              {event.title}
+                            </h4>
+                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                              <span className="truncate">{event.artist}</span>
+                              <span
+                                className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider shrink-0 ${
+                                  event.status === "PUBLISHED"
+                                    ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                    : event.status === "COMPLETED"
+                                      ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                                      : event.status === "CANCELLED"
+                                        ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                                        : "bg-slate-500/10 text-slate-500 border-slate-500/20"
+                                }`}
+                              >
+                                {event.status === "PUBLISHED"
+                                  ? "Mở bán"
+                                  : event.status === "COMPLETED"
+                                    ? "Đã kết thúc"
+                                    : event.status === "CANCELLED"
+                                      ? "Đã hủy"
+                                      : "Nháp"}
+                              </span>
+                            </div>
+                          </div>
+                          <span
+                            className={`text-xs font-black px-2 py-0.5 rounded-full border ${
+                              event.sellThroughRate >= 80
+                                ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                : event.sellThroughRate >= 30
+                                  ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                                  : "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                            }`}
+                          >
+                            {event.sellThroughRate}%
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+                          <span>
+                            {event.ticketsSold.toLocaleString()} /{" "}
+                            {event.capacity.toLocaleString()} vé
+                          </span>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              event.sellThroughRate >= 80
+                                ? "bg-emerald-500"
+                                : event.sellThroughRate >= 30
+                                  ? "bg-amber-500"
+                                  : "bg-rose-500"
+                            }`}
+                            style={{ width: `${event.sellThroughRate}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+
+                    {paginatedEvents.length === 0 && (
+                      <div className="flex flex-col items-center justify-center text-center py-16 h-full">
+                        <Search className="size-10 text-muted-foreground/30 mb-3 animate-pulse" />
+                        <span className="font-bold text-sm text-foreground block">Không có kết quả</span>
+                        <p className="text-[11px] text-muted-foreground mt-1 max-w-[200px] leading-relaxed">
+                          Không tìm thấy sự kiện hoặc nghệ sĩ nào khớp với từ khoá "{searchQuery}".
+                        </p>
+                      </div>
+                    )}
+                  </div>
 
                   {totalEventPages > 1 && (
-                    <div className="flex items-center justify-between border-t border-border/60 pt-4 mt-2">
+                    <div className="flex items-center justify-between border-t border-border/60 pt-4 mt-4">
                       <span className="text-xs text-muted-foreground">
                         Trang{" "}
                         <strong className="text-foreground">{eventPage}</strong>{" "}
@@ -1078,7 +1172,7 @@ export default function AdminAnalyticsPage() {
                             const newPage = eventPage - 1;
                             setEventPage(newPage);
                             const newPageEvents =
-                              analytics.eventAnalytics.slice(
+                              filteredEvents.slice(
                                 (newPage - 1) * eventLimit,
                                 newPage * eventLimit,
                               );
@@ -1096,7 +1190,7 @@ export default function AdminAnalyticsPage() {
                             const newPage = eventPage + 1;
                             setEventPage(newPage);
                             const newPageEvents =
-                              analytics.eventAnalytics.slice(
+                              filteredEvents.slice(
                                 (newPage - 1) * eventLimit,
                                 newPage * eventLimit,
                               );
