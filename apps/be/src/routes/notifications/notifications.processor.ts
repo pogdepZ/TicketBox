@@ -2,8 +2,10 @@ import { Processor, WorkerHost } from "@nestjs/bullmq";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Job } from "bullmq";
-import { Attachment } from "nodemailer/lib/mailer";
-import { MailService } from "../../common/mail/mail.service";
+import {
+  MailAttachment,
+  MailService,
+} from "../../common/mail/mail.service";
 import { OutboxService } from "../../common/outbox/outbox.service";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import {
@@ -24,12 +26,18 @@ type QrRenderOptions = {
   width?: number;
 };
 
+const NOTIFICATION_QUEUE_CONCURRENCY = 3;
+const NOTIFICATION_QUEUE_LOCK_DURATION_MS = 120000;
+
 const QRCode = require("qrcode") as {
   toBuffer(text: string, options?: QrRenderOptions): Promise<Buffer>;
 };
 
 @Injectable()
-@Processor("notification")
+@Processor("notification", {
+  concurrency: NOTIFICATION_QUEUE_CONCURRENCY,
+  lockDuration: NOTIFICATION_QUEUE_LOCK_DURATION_MS,
+})
 export class NotificationsProcessor extends WorkerHost {
   private readonly logger = new Logger(NotificationsProcessor.name);
 
@@ -370,26 +378,16 @@ export class NotificationsProcessor extends WorkerHost {
     payload: Record<string, any>,
   ): Promise<{
     html: string;
-    attachments: Attachment[];
+    attachments: MailAttachment[];
   }> {
-    const attachments: Attachment[] = [];
-
     const tickets = await Promise.all(
       (payload.tickets ?? []).map(async (ticket: any, index: number) => {
-        const cid = `ticket-qr-${index}-${ticket.ticketCode}@ticketbox`;
-
         const qrBuffer = ticket.qrPayload
           ? await this.generateQrBuffer(ticket.qrPayload)
           : null;
-
-        if (qrBuffer) {
-          attachments.push({
-            filename: `${ticket.ticketCode}.png`,
-            content: qrBuffer,
-            cid,
-            contentType: "image/png",
-          });
-        }
+        const qrImageSrc = qrBuffer
+          ? `data:image/png;base64,${qrBuffer.toString("base64")}`
+          : null;
 
         return `
           <div style="background-color: #fafbfc; border: 1px solid #d0d7de; border-radius: 12px; padding: 20px; margin-bottom: 16px; border-left: 5px solid #e5484d;">
@@ -410,11 +408,11 @@ export class NotificationsProcessor extends WorkerHost {
                 </td>
                 <td align="right" style="vertical-align: middle; width: 140px;">
                   ${
-                    qrBuffer
+                    qrImageSrc
                       ? `
                         <div style="border: 1px solid #e1e4e6; padding: 6px; border-radius: 8px; background-color: #ffffff; display: inline-block; width: 120px; text-align: center;">
                           <img
-                            src="cid:${cid}"
+                            src="${qrImageSrc}"
                             alt="QR for ticket ${ticket.ticketCode}"
                             width="120"
                             height="120"
@@ -544,7 +542,7 @@ export class NotificationsProcessor extends WorkerHost {
 
     return {
       html,
-      attachments,
+      attachments: [],
     };
   }
 
