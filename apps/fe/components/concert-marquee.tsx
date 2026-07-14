@@ -29,7 +29,7 @@ export function ConcertMarquee({ concerts }: ConcertMarqueeProps) {
           }
         }
         .animate-marquee-images-new {
-          animation: marquee-scroll-images 40s linear infinite;
+          animation: marquee-scroll-images 25s linear infinite;
         }
         .animate-marquee-images-new:hover {
           animation-play-state: paused;

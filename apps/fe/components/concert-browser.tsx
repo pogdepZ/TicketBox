@@ -568,7 +568,7 @@ export function ConcertBrowser({ concerts, initialKeyword = '' }: ConcertBrowser
           }
         }
         .animate-marquee {
-          animation: marquee-scroll 25s linear infinite;
+          animation: marquee-scroll 16s linear infinite;
         }
         .animate-marquee:hover {
           animation-play-state: paused;
