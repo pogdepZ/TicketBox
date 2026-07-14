@@ -106,6 +106,21 @@ export class CheckinService {
         }
 
         const checkedInAt = new Date();
+        
+        await tx.checkinDevice.upsert({
+          where: { id: deviceId },
+          update: { lastSyncAt: checkedInAt },
+          create: {
+            id: deviceId,
+            deviceCode: deviceId,
+            staffUserId: staffId,
+            concertId: concertId,
+            gateName: 'Default',
+            status: 'ACTIVE',
+            lastSyncAt: checkedInAt,
+          }
+        });
+
         await tx.checkinEvent.create({
           data: {
             ticketId: ticket.id,
@@ -127,6 +142,8 @@ export class CheckinService {
           ticketCode: ticket.ticketCode,
           concertName: ticket.concert?.name || 'Unknown Concert',
           seat: ticket.seatNumber || undefined,
+          orderRef: ticket.order?.paymentRef || (ticket.orderId ? `ORD-${ticket.orderId.substring(0, 8).toUpperCase()}` : 'N/A'),
+          venue: ticket.concert?.venueName || 'Unknown Venue',
         };
       });
     }
@@ -187,6 +204,21 @@ export class CheckinService {
         }
 
         const checkedInAt = new Date();
+
+        await tx.checkinDevice.upsert({
+          where: { id: deviceId },
+          update: { lastSyncAt: checkedInAt },
+          create: {
+            id: deviceId,
+            deviceCode: deviceId,
+            staffUserId: staffId,
+            concertId: concertId,
+            gateName: 'Default',
+            status: 'ACTIVE',
+            lastSyncAt: checkedInAt,
+          }
+        });
+
         await tx.checkinEvent.create({
           data: {
             guestId: guest.id,
@@ -207,6 +239,8 @@ export class CheckinService {
           ticketType: guest.guestType || 'GUEST',
           ticketCode: guest.guestCode,
           concertName: guest.concert?.name || 'Unknown Concert',
+          orderRef: 'GUEST-LIST',
+          venue: guest.concert?.venueName || 'Unknown Venue',
         };
       });
     }
@@ -295,6 +329,7 @@ export class CheckinService {
       include: {
         ticketType: true,
         owner: true,
+        order: true,
       },
     });
 
@@ -321,6 +356,7 @@ export class CheckinService {
         ticketType: t.ticketType?.name || '---',
         seat: t.seatNumber || null,
         allowedGates: t.ticketType?.allowedGates || [],
+        orderRef: t.order?.paymentRef || (t.orderId ? `ORD-${t.orderId.substring(0, 8).toUpperCase()}` : 'N/A'),
       })),
       guests: guests.map((g) => ({
         id: g.id,

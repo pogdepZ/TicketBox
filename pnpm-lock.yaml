@@ -10844,6 +10844,10 @@ snapshots:
     dependencies:
       lru-cache: 10.4.3
 
+  html-to-image@1.11.13: {}
+
+  http-cache-semantics@4.2.0: {}
+
   http-errors@2.0.1:
     dependencies:
       depd: 2.0.0

@@ -195,9 +195,9 @@ export default function ResultScreen() {
           </View>
           <View style={styles.detailsList}>
             <DetailRow label="Ticket ID" value={ticket.ticketCode} mono />
-            <DetailRow label="Order" value="ORD-2026-9941" mono />
+            <DetailRow label="Order" value={ticket.orderRef || 'N/A'} mono />
             <DetailRow label="Event" value={ticket.concertName} />
-            <DetailRow label="Venue" value="The Warehouse" />
+            <DetailRow label="Venue" value={ticket.venue || 'N/A'} />
           </View>
         </View>
 

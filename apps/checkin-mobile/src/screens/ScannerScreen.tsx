@@ -200,6 +200,8 @@ export default function ScannerScreen() {
                guestName: 'Unknown',
                ticketType: '---',
                concertName: concert.name,
+               venue: concert.venueName || 'Unknown Venue',
+               orderRef: 'N/A',
                checkedInAt: checkedAt,
                status: isValid ? 'NOT_FOUND' : 'INVALID_GUEST',
              };
@@ -224,6 +226,8 @@ export default function ScannerScreen() {
                  ticketType: localTicket.ticketType,
                  seat: localTicket.seat || undefined,
                  concertName: concert.name,
+                 venue: concert.venueName || 'Unknown Venue',
+                 orderRef: localTicket.orderRef || 'N/A',
                  checkedInAt: checkedAt,
                  status: 'WRONG_ZONE',
                };
@@ -240,6 +244,8 @@ export default function ScannerScreen() {
                  ticketType: localTicket.ticketType,
                  seat: localTicket.seat || undefined,
                  concertName: concert.name,
+                 venue: concert.venueName || 'Unknown Venue',
+                 orderRef: localTicket.orderRef || 'N/A',
                  checkedInAt: checkedAt,
                  status: 'DUPLICATE',
                };
@@ -279,6 +285,8 @@ export default function ScannerScreen() {
               ticketType: localTicket.ticketType,
               seat: localTicket.seat || undefined,
               concertName: concert.name,
+              venue: concert.venueName || 'Unknown Venue',
+              orderRef: localTicket.orderRef || 'N/A',
               checkedInAt: checkedAt,
               status: 'TEMP_ACCEPTED',
             };
@@ -298,6 +306,8 @@ export default function ScannerScreen() {
                  guestName: localGuest.fullName,
                  ticketType: 'GUEST',
                  concertName: concert.name,
+                 venue: concert.venueName || 'Unknown Venue',
+                 orderRef: 'GUEST-LIST',
                  checkedInAt: checkedAt,
                  status: 'WRONG_ZONE',
                };
@@ -313,6 +323,8 @@ export default function ScannerScreen() {
                  guestName: localGuest.fullName,
                  ticketType: 'GUEST',
                  concertName: concert.name,
+                 venue: concert.venueName || 'Unknown Venue',
+                 orderRef: 'GUEST-LIST',
                  checkedInAt: checkedAt,
                  status: 'DUPLICATE_GUEST',
                };
@@ -351,6 +363,8 @@ export default function ScannerScreen() {
               guestName: localGuest.fullName,
               ticketType: 'GUEST',
               concertName: concert.name,
+              venue: concert.venueName || 'Unknown Venue',
+              orderRef: 'GUEST-LIST',
               checkedInAt: checkedAt,
               status: 'ACCEPTED_GUEST',
             };

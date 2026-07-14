@@ -27,6 +27,8 @@ export interface TicketInfo {
   ticketCode: string;
   seat?: string;
   concertName: string;
+  venue?: string;
+  orderRef?: string;
   checkedInAt: string;
   status: ScanStatus;
 }
