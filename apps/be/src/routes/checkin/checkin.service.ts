@@ -64,7 +64,21 @@ export class CheckinService {
       },
     });
     
-    if (ticket && ticket.order.concertId === concertId) {
+    if (ticket) {
+      if (ticket.order.concertId !== concertId) {
+        return {
+          ticketId: ticket.id,
+          status: 'WRONG_EVENT',
+          checkedInAt: new Date().toISOString(),
+          guestName: ticket.owner.fullName,
+          ticketType: ticket.ticketType?.name || 'Standard',
+          ticketCode: ticket.ticketCode,
+          concertName: ticket.concert?.name || 'Unknown Concert',
+          orderRef: ticket.order?.paymentRef || 'N/A',
+          venue: ticket.concert?.venueName || 'Unknown Venue',
+        };
+      }
+
       // Use a transaction to prevent race conditions on check-in
       return await this.prisma.$transaction(async (tx) => {
         // Implement Row Locking (SELECT FOR UPDATE) to prevent race condition
@@ -286,7 +300,8 @@ export class CheckinService {
           staffId: item.staffId,
           concertId: item.concertId,
           deviceId: item.sourceDeviceId,
-          clientEventId: item.clientEventId, // Use provided event ID
+          clientEventId: item.clientEventId,
+          gate: item.gate,
         });
 
         let syncStatus = 'FAILED';

@@ -48,6 +48,7 @@ export interface OfflineQueueItem {
   lastSyncError: string | null;
   serverCheckinId: string | null;
   createdAt: string;
+  gate?: string;
 }
 
 /** Sync history record */
@@ -109,6 +110,9 @@ export interface SnapshotResponse {
     status: string;
     guestName: string;
     ticketType: string;
+    seat?: string | null;
+    allowedGates?: string[];
+    orderRef?: string | null;
   }[];
   guests: {
     id: string;
@@ -116,6 +120,7 @@ export interface SnapshotResponse {
     fullName: string;
     email: string | null;
     status: string;
+    allowedGates?: string[];
   }[];
 }
 

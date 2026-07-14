@@ -79,6 +79,7 @@ export default function OfflineQueueScreen() {
           sourceDeviceId: item.sourceDeviceId,
           checkedAt: item.checkedAt,
           clientEventId: item.id,
+          gate: item.gate,
         }))
       });
 

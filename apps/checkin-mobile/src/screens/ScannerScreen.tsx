@@ -18,7 +18,7 @@ import { QrCode, Zap, Search, CloudOff, RefreshCw, Settings as SettingsIcon } fr
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
 import { apiService } from '../services/api';
 import { queueService } from '../services/queue';
-import type { RootStackParamList, TicketInfo, ScanStatus, OfflineQueueItem } from '../types';
+import type { RootStackParamList, TicketInfo, ScanStatus, OfflineQueueItem, Concert } from '../types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Scanner'>;
 
@@ -41,7 +41,7 @@ export default function ScannerScreen() {
   const [scanning, setScanning] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   
-  const [concert, setConcert] = useState({ id: '', name: 'No Active Concert' });
+  const [concert, setConcert] = useState<Partial<Concert>>({ id: '', name: 'No Active Concert' });
   const [selectedGate, setSelectedGate] = useState<string | null>(null);
   const [checkedIn, setCheckedIn] = useState(0);
   const [total, setTotal] = useState(0);
@@ -53,13 +53,16 @@ export default function ScannerScreen() {
       const loadData = async () => {
         try {
           const storedConcert = await AsyncStorage.getItem('selected_concert');
-          if (storedConcert && isMounted) {
-            setConcert(JSON.parse(storedConcert));
+          let activeConcertId = '';
+          if (storedConcert) {
+            const parsed = JSON.parse(storedConcert);
+            activeConcertId = parsed.id;
+            if (isMounted) setConcert(parsed);
           }
 
           const { db } = require('../services/db');
-          const totalRes: any[] = await db.getAllAsync('SELECT COUNT(*) as c FROM ticket_snapshot');
-          const checkedRes: any[] = await db.getAllAsync('SELECT COUNT(*) as c FROM ticket_snapshot WHERE status IN ("USED", "TEMP_ACCEPTED")');
+          const totalRes: any[] = await db.getAllAsync('SELECT COUNT(*) as c FROM ticket_snapshot WHERE concertId = ?', [activeConcertId]);
+          const checkedRes: any[] = await db.getAllAsync('SELECT COUNT(*) as c FROM ticket_snapshot WHERE status IN ("USED", "TEMP_ACCEPTED") AND concertId = ?', [activeConcertId]);
           
           if (isMounted) {
             setTotal(totalRes[0]?.c || 0);
@@ -125,6 +128,16 @@ export default function ScannerScreen() {
 
       if (response.success && response.data) {
         setIsOffline(false);
+        try {
+          const { db } = require('../services/db');
+          const { ticketCode } = response.data;
+          if (ticketCode) {
+            await db.runAsync('UPDATE ticket_snapshot SET status = "USED" WHERE ticketCode = ?', [ticketCode]);
+            await db.runAsync('UPDATE guest_snapshot SET status = "CHECKED_IN" WHERE guestCode = ?', [ticketCode]);
+          }
+        } catch (e) {
+          console.error('Failed to update local db after online scan', e);
+        }
         navigation.navigate('Result', { ticket: response.data, isOffline: false });
       } else {
         const isNetworkError = !response.data || response.message?.toLowerCase().includes('fetch') || response.message?.toLowerCase().includes('timeout');
@@ -199,7 +212,7 @@ export default function ScannerScreen() {
                ticketCode: extractedTicketCode,
                guestName: 'Unknown',
                ticketType: '---',
-               concertName: concert.name,
+               concertName: concert.name || 'Unknown Concert',
                venue: concert.venueName || 'Unknown Venue',
                orderRef: 'N/A',
                checkedInAt: checkedAt,
@@ -225,7 +238,7 @@ export default function ScannerScreen() {
                  guestName: localTicket.guestName,
                  ticketType: localTicket.ticketType,
                  seat: localTicket.seat || undefined,
-                 concertName: concert.name,
+                 concertName: concert.name || 'Unknown Concert',
                  venue: concert.venueName || 'Unknown Venue',
                  orderRef: localTicket.orderRef || 'N/A',
                  checkedInAt: checkedAt,
@@ -243,7 +256,7 @@ export default function ScannerScreen() {
                  guestName: localTicket.guestName,
                  ticketType: localTicket.ticketType,
                  seat: localTicket.seat || undefined,
-                 concertName: concert.name,
+                 concertName: concert.name || 'Unknown Concert',
                  venue: concert.venueName || 'Unknown Venue',
                  orderRef: localTicket.orderRef || 'N/A',
                  checkedInAt: checkedAt,
@@ -264,7 +277,7 @@ export default function ScannerScreen() {
               ticketId: localTicket.id,
               ticketCode: extractedTicketCode,
               qrCodeData: qrData,
-              concertId: concert.id,
+              concertId: concert.id || '',
               staffId,
               sourceDeviceId: deviceId,
               checkedAt,
@@ -284,7 +297,7 @@ export default function ScannerScreen() {
               guestName: localTicket.guestName,
               ticketType: localTicket.ticketType,
               seat: localTicket.seat || undefined,
-              concertName: concert.name,
+              concertName: concert.name || 'Unknown Concert',
               venue: concert.venueName || 'Unknown Venue',
               orderRef: localTicket.orderRef || 'N/A',
               checkedInAt: checkedAt,
@@ -305,7 +318,7 @@ export default function ScannerScreen() {
                  ticketCode: extractedTicketCode,
                  guestName: localGuest.fullName,
                  ticketType: 'GUEST',
-                 concertName: concert.name,
+                 concertName: concert.name || 'Unknown Concert',
                  venue: concert.venueName || 'Unknown Venue',
                  orderRef: 'GUEST-LIST',
                  checkedInAt: checkedAt,
@@ -322,7 +335,7 @@ export default function ScannerScreen() {
                  ticketCode: extractedTicketCode,
                  guestName: localGuest.fullName,
                  ticketType: 'GUEST',
-                 concertName: concert.name,
+                 concertName: concert.name || 'Unknown Concert',
                  venue: concert.venueName || 'Unknown Venue',
                  orderRef: 'GUEST-LIST',
                  checkedInAt: checkedAt,
@@ -343,7 +356,7 @@ export default function ScannerScreen() {
               ticketId: localGuest.id,
               ticketCode: extractedTicketCode,
               qrCodeData: qrData,
-              concertId: concert.id,
+              concertId: concert.id || '',
               staffId,
               sourceDeviceId: deviceId,
               checkedAt,
@@ -362,7 +375,7 @@ export default function ScannerScreen() {
               ticketCode: extractedTicketCode,
               guestName: localGuest.fullName,
               ticketType: 'GUEST',
-              concertName: concert.name,
+              concertName: concert.name || 'Unknown Concert',
               venue: concert.venueName || 'Unknown Venue',
               orderRef: 'GUEST-LIST',
               checkedInAt: checkedAt,
@@ -667,7 +680,11 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   centerIcon: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },
