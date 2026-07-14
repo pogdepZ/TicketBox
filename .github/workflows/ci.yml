@@ -83,6 +83,8 @@ jobs:
       AWS_S3_FORCE_PATH_STYLE: "true"
       # Gemini API configuration for AI test cases
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # SendGrid API configuration for email delivery
+      SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
 
     steps:
       - name: Checkout repository
