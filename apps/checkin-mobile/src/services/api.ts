@@ -36,6 +36,24 @@ class ApiService {
     this.refreshToken = token;
   }
 
+  private isOffline = false;
+  private listeners: Set<(isOffline: boolean) => void> = new Set();
+
+  onConnectionStatusChange(listener: (isOffline: boolean) => void) {
+    this.listeners.add(listener);
+    listener(this.isOffline);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  setOfflineStatus(status: boolean) {
+    if (this.isOffline !== status) {
+      this.isOffline = status;
+      this.listeners.forEach(l => l(status));
+    }
+  }
+
   /** Generic request method with timeout and response formatting */
   private async request<T>(
     endpoint: string,
@@ -44,6 +62,9 @@ class ApiService {
     try {
       const currentToken = await this.getAccessToken();
       let result = await this.sendRequest(endpoint, options, currentToken);
+
+      // If we got a response, we are online
+      this.setOfflineStatus(false);
 
       if (this.shouldAttemptRefresh(endpoint, result.response)) {
         const newAccessToken = await this.refreshAccessToken();
@@ -57,6 +78,9 @@ class ApiService {
       return this.toApiResponse<T>(result.response, result.json);
     } catch (error) {
       console.error(`[API Error] request to ${endpoint} failed:`, error);
+
+      // Fetch threw an error, so we are offline
+      this.setOfflineStatus(true);
 
       return {
         success: false,
@@ -295,8 +319,12 @@ class ApiService {
         }
       }
 
+      // If we got a response, we are online
+      this.setOfflineStatus(false);
+
       return this.toApiResponse<T>(result.response, result.json);
     } catch (error) {
+      this.setOfflineStatus(true);
       return {
         success: false,
         data: null as T,

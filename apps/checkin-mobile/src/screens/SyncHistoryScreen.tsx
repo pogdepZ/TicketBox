@@ -16,9 +16,9 @@ import type { SyncHistoryRecord } from '../types';
 import { queueService } from '../services/queue';
 
 const syncStatusConfig: Record<string, { color: string; bg: string; label: string }> = {
-  SUCCESS: { color: COLORS.success, bg: COLORS.success + '1A', label: 'Synced' },
-  FAILED: { color: COLORS.error, bg: COLORS.error + '1A', label: 'Failed' },
-  PARTIAL: { color: COLORS.warning, bg: COLORS.warning + '1A', label: 'Partial' },
+  SUCCESS: { color: COLORS.success, bg: COLORS.success + '1A', label: 'Thành công' },
+  FAILED: { color: COLORS.error, bg: COLORS.error + '1A', label: 'Thất bại' },
+  PARTIAL: { color: COLORS.warning, bg: COLORS.warning + '1A', label: 'Một phần' },
 };
 
 export default function SyncHistoryScreen() {
@@ -91,13 +91,13 @@ export default function SyncHistoryScreen() {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <ChevronLeft color={COLORS.textMuted} size={20} />
-          <Text style={styles.backText}>Back</Text>
+          <Text style={styles.backText}>Quay lại</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.titleContainer}>
-        <Text style={styles.subtitle}>DATA SYNC</Text>
-        <Text style={styles.title}>Synchronisation</Text>
+        <Text style={styles.subtitle}>ĐỒNG BỘ DỮ LIỆU</Text>
+        <Text style={styles.title}>Lịch sử đồng bộ</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -109,7 +109,7 @@ export default function SyncHistoryScreen() {
                 <Wifi color={COLORS.primary} size={16} />
               </View>
               <View>
-                <Text style={styles.networkStatusText}>Connected</Text>
+                <Text style={styles.networkStatusText}>Đã kết nối</Text>
                 <Text style={styles.networkDetailsText}>staff-net-5G · 42ms</Text>
               </View>
             </View>
@@ -122,15 +122,15 @@ export default function SyncHistoryScreen() {
           <View style={styles.statusCardStats}>
             <View style={styles.statBox}>
               <Text style={[styles.statVal, { color: COLORS.warning }]}>{unsynced}</Text>
-              <Text style={styles.statLabel}>Pending</Text>
+              <Text style={styles.statLabel}>Chờ sync</Text>
             </View>
             <View style={[styles.statBox, styles.statBoxBorder]}>
               <Text style={[styles.statVal, { color: COLORS.primary }]}>{total - unsynced}</Text>
-              <Text style={styles.statLabel}>Synced</Text>
+              <Text style={styles.statLabel}>Đã sync</Text>
             </View>
             <View style={[styles.statBox, styles.statBoxBorder]}>
               <Text style={[styles.statVal, { color: COLORS.text }]}>{total}</Text>
-              <Text style={styles.statLabel}>Total</Text>
+              <Text style={styles.statLabel}>Tổng số</Text>
             </View>
           </View>
         </View>
@@ -140,48 +140,48 @@ export default function SyncHistoryScreen() {
           {syncing ? (
             <View style={styles.progressCard}>
               <View style={styles.progressHeader}>
-                <Text style={styles.progressTitle}>Uploading scans...</Text>
+                <Text style={styles.progressTitle}>Đang tải lượt quét lên...</Text>
                 <Text style={styles.progressPct}>{Math.min(progress, 100)}%</Text>
               </View>
               <View style={styles.progressBarBg}>
                 <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
               </View>
               <Text style={styles.progressDetails}>
-                {Math.floor(progress * unsynced / 100)}/{unsynced} records uploaded
+                Đã tải lên {Math.floor(progress * unsynced / 100)}/{unsynced} bản ghi
               </Text>
             </View>
           ) : (
             <TouchableOpacity style={styles.syncBtn} onPress={handleSync} activeOpacity={0.8}>
               <UploadCloud color="#000" size={20} style={{ marginRight: 8 }} />
-              <Text style={styles.syncBtnText}>Sync Now {unsynced > 0 && `(${unsynced} pending)`}</Text>
+              <Text style={styles.syncBtnText}>Đồng bộ ngay {unsynced > 0 && `(còn ${unsynced} vé)`}</Text>
             </TouchableOpacity>
           )}
         </View>
 
         {/* Sync history */}
         <View style={styles.historyHeader}>
-          <Text style={styles.historyTitle}>Sync History</Text>
-          <Text style={styles.historySubtitle}>TODAY</Text>
+          <Text style={styles.historyTitle}>Lịch sử đồng bộ</Text>
+          <Text style={styles.historySubtitle}>HÔM NAY</Text>
         </View>
 
         <View style={styles.historyList}>
           {history.length === 0 ? (
-            <Text style={{color: COLORS.textMuted, textAlign: 'center', marginTop: 20}}>No sync history</Text>
+            <Text style={{color: COLORS.textMuted, textAlign: 'center', marginTop: 20}}>Không có lịch sử đồng bộ</Text>
           ) : 
             history.map((ev, i) => {
             const cfg = syncStatusConfig[ev.status];
-            const time = new Date(ev.syncedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const time = new Date(ev.syncedAt).toLocaleTimeString('vi-VN', { hour: 'numeric', minute: '2-digit' });
             
             return (
               <View key={ev.id} style={styles.historyItem}>
                 <View style={[styles.historyDot, { backgroundColor: cfg.color }]} />
                 <View style={styles.historyContent}>
                   <View style={styles.historyTitleRow}>
-                    <Text style={styles.historyTickets}>{ev.recordCount} tickets</Text>
+                    <Text style={styles.historyTickets}>{ev.recordCount} vé</Text>
                     <Text style={[styles.historyStatusText, { color: cfg.color }]}>· {cfg.label}</Text>
                   </View>
                   {ev.status !== 'FAILED' && (
-                    <Text style={styles.historyDuration}>Duration: 1.2s</Text>
+                    <Text style={styles.historyDuration}>Thời gian: 1.2s</Text>
                   )}
                   {ev.errorMessage && (
                     <Text style={[styles.historyDuration, { color: COLORS.error }]}>{ev.errorMessage}</Text>

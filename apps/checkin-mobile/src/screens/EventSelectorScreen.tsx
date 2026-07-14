@@ -35,10 +35,10 @@ export default function EventSelectorScreen() {
       if (response.success && response.data) {
         setConcerts(response.data);
       } else {
-        Alert.alert('Error', response.message || 'Failed to load events');
+        Alert.alert('Lỗi', response.message || 'Không tải được danh sách sự kiện');
       }
     } catch (error) {
-      Alert.alert('Error', 'Cannot connect to server. Please check your network.');
+      Alert.alert('Lỗi', 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại mạng.');
     } finally {
       setLoading(false);
     }
@@ -49,15 +49,15 @@ export default function EventSelectorScreen() {
       await AsyncStorage.setItem('selected_concert', JSON.stringify(concert));
       navigation.reset({ index: 0, routes: [{ name: 'Scanner' }] });
     } catch (error) {
-      Alert.alert('Error', 'Failed to save selected event');
+      Alert.alert('Lỗi', 'Không lưu được sự kiện đã chọn');
     }
   };
 
   const handleLogout = async () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?', [
+      { text: 'Hủy', style: 'cancel' },
       {
-        text: 'Logout',
+        text: 'Đăng xuất',
         style: 'destructive',
         onPress: async () => {
           await AsyncStorage.multiRemove(['auth_token', 'auth_user', 'selected_concert']);
@@ -103,8 +103,8 @@ export default function EventSelectorScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Select Event</Text>
-          <Text style={styles.headerSubtitle}>Choose the event you are assigned to</Text>
+          <Text style={styles.headerTitle}>Chọn sự kiện</Text>
+          <Text style={styles.headerSubtitle}>Chọn sự kiện bạn được phân công trực</Text>
         </View>
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <LogOut size={20} color={COLORS.error} />
@@ -117,9 +117,9 @@ export default function EventSelectorScreen() {
         </View>
       ) : concerts.length === 0 ? (
         <View style={styles.centerContainer}>
-          <Text style={styles.emptyText}>No active events found.</Text>
+          <Text style={styles.emptyText}>Không tìm thấy sự kiện nào đang diễn ra.</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={fetchConcerts}>
-            <Text style={styles.retryText}>Refresh</Text>
+            <Text style={styles.retryText}>Tải lại</Text>
           </TouchableOpacity>
         </View>
       ) : (

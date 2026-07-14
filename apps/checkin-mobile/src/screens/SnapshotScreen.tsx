@@ -49,24 +49,24 @@ export default function SnapshotScreen() {
 
   const handleDownloadSnapshot = async () => {
     Alert.alert(
-      'Download Snapshot',
-      'This will download all tickets to your device for offline scanning, overwriting existing local data. Continue?',
+      'Tải dữ liệu Offline',
+      'Thao tác này sẽ tải toàn bộ danh sách vé về thiết bị để soát vé offline, ghi đè lên dữ liệu cục bộ hiện có. Bạn có muốn tiếp tục?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Hủy', style: 'cancel' },
         {
-          text: 'Download',
+          text: 'Tải về',
           onPress: async () => {
             setLoading(true);
             try {
               const storedConcert = await AsyncStorage.getItem('selected_concert');
               if (!storedConcert) {
-                throw new Error('No concert selected');
+                throw new Error('Chưa chọn sự kiện');
               }
               const concertId = JSON.parse(storedConcert).id;
               const res = await apiService.get<SnapshotResponse>(`/checkin/events/${concertId}/snapshot`);
               
               if (!res.success || !res.data) {
-                 throw new Error(res.message || 'Failed to fetch snapshot');
+                 throw new Error(res.message || 'Không lấy được dữ liệu snapshot');
               }
               
               const { tickets, guests, version, publicKey } = res.data;
@@ -106,10 +106,10 @@ export default function SnapshotScreen() {
               console.log(JSON.stringify(allTickets, null, 2));
               console.log('---------------------------------');
 
-              Alert.alert('Success', 'Snapshot downloaded successfully.');
+              Alert.alert('Thành công', 'Tải dữ liệu Offline thành công.');
             } catch (e: any) {
               console.error(e);
-              Alert.alert('Error', e.message || 'Failed to save snapshot to local database.');
+              Alert.alert('Lỗi', e.message || 'Không lưu được dữ liệu snapshot vào cơ sở dữ liệu cục bộ.');
             } finally {
               setLoading(false);
             }
@@ -120,8 +120,8 @@ export default function SnapshotScreen() {
   };
 
   const formatDate = (isoString: string | null) => {
-    if (!isoString) return 'Never';
-    return new Date(isoString).toLocaleString('en-US');
+    if (!isoString) return 'Chưa cập nhật';
+    return new Date(isoString).toLocaleString('vi-VN');
   };
 
   return (
@@ -131,13 +131,13 @@ export default function SnapshotScreen() {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <ChevronLeft color={COLORS.textMuted} size={20} />
-          <Text style={styles.backText}>Back</Text>
+          <Text style={styles.backText}>Quay lại</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.titleContainer}>
-        <Text style={styles.subtitle}>DATABASE</Text>
-        <Text style={styles.title}>Offline Snapshot</Text>
+        <Text style={styles.subtitle}>CƠ SỞ DỮ LIỆU</Text>
+        <Text style={styles.title}>Dữ liệu Offline (Snapshot)</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -146,27 +146,27 @@ export default function SnapshotScreen() {
             <Database color={COLORS.primary} size={24} />
           </View>
           <Text style={styles.infoText}>
-            Download a local copy of all tickets and guests. This enables scanning even without an internet connection.
+            Tải xuống bản sao cục bộ của tất cả vé và danh sách khách mời. Điều này giúp bạn soát vé ngay cả khi không có kết nối internet.
           </Text>
         </View>
 
         <View style={styles.statsCard}>
           <View style={styles.statsHeader}>
-            <Text style={styles.cardTitle}>Neon Frequencies</Text>
+            <Text style={styles.cardTitle}>Dữ liệu đã lưu</Text>
             <View style={styles.livePill}>
-               <Text style={styles.livePillText}>READY</Text>
+               <Text style={styles.livePillText}>SẴN SÀNG</Text>
             </View>
           </View>
           <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Tickets cached:</Text>
+            <Text style={styles.statLabel}>Số vé đã lưu:</Text>
             <Text style={styles.statValue}>{stats.tickets}</Text>
           </View>
           <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Guests cached:</Text>
+            <Text style={styles.statLabel}>Khách mời đã lưu:</Text>
             <Text style={styles.statValue}>{stats.guests}</Text>
           </View>
           <View style={[styles.statRow, { borderBottomWidth: 0, marginBottom: 0 }]}>
-            <Text style={styles.statLabel}>Last update:</Text>
+            <Text style={styles.statLabel}>Cập nhật cuối:</Text>
             <Text style={styles.statValueDate}>{formatDate(stats.lastDownloadedAt)}</Text>
           </View>
         </View>
@@ -182,7 +182,7 @@ export default function SnapshotScreen() {
           ) : (
             <>
               <DownloadCloud color="#000" size={20} style={{ marginRight: 8 }} />
-              <Text style={styles.downloadButtonText}>Download Snapshot</Text>
+              <Text style={styles.downloadButtonText}>Tải dữ liệu Offline</Text>
             </>
           )}
         </TouchableOpacity>

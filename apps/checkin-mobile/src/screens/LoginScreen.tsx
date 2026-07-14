@@ -159,7 +159,7 @@ export default function LoginScreen() {
             <Text style={styles.inputLabel}>Mật khẩu</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nhap mat khau"
+              placeholder="Nhập mật khẩu"
               placeholderTextColor={COLORS.textMuted}
               value={password}
               onChangeText={setPassword}

@@ -14,7 +14,7 @@ import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/n
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { QrCode, Zap, Search, CloudOff, RefreshCw, Settings as SettingsIcon } from 'lucide-react-native';
+import { QrCode, Zap, Search, CloudOff, RefreshCw, Settings as SettingsIcon, ChevronDown } from 'lucide-react-native';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
 import { apiService } from '../services/api';
 import { queueService } from '../services/queue';
@@ -26,12 +26,12 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Scanner'>;
 
 // --- Mock Status ---
 const STATUS_CONFIG = {
-  SUCCESS: { label: 'VALID', dot: COLORS.success, bg: COLORS.success + '1A', border: COLORS.success + '40', color: COLORS.success },
-  TEMP_ACCEPTED: { label: 'TEMP ACCEPTED', dot: COLORS.success, bg: COLORS.success + '1A', border: COLORS.success + '40', color: COLORS.success },
-  DUPLICATE: { label: 'ALREADY USED', dot: COLORS.warning, bg: COLORS.warning + '1A', border: COLORS.warning + '40', color: COLORS.warning },
-  NOT_FOUND: { label: 'INVALID', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
-  WRONG_EVENT: { label: 'INVALID', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
-  WRONG_ZONE: { label: 'WRONG ZONE', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
+  SUCCESS: { label: 'HỢP LỆ', dot: COLORS.success, bg: COLORS.success + '1A', border: COLORS.success + '40', color: COLORS.success },
+  TEMP_ACCEPTED: { label: 'TẠM NHẬN', dot: COLORS.success, bg: COLORS.success + '1A', border: COLORS.success + '40', color: COLORS.success },
+  DUPLICATE: { label: 'ĐÃ DÙNG', dot: COLORS.warning, bg: COLORS.warning + '1A', border: COLORS.warning + '40', color: COLORS.warning },
+  NOT_FOUND: { label: 'KHÔNG TÌM THẤY', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
+  WRONG_EVENT: { label: 'SAI SỰ KIỆN', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
+  WRONG_ZONE: { label: 'SAI CỔNG', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
 };
 
 export default function ScannerScreen() {
@@ -43,6 +43,7 @@ export default function ScannerScreen() {
   
   const [concert, setConcert] = useState<Partial<Concert>>({ id: '', name: 'No Active Concert' });
   const [selectedGate, setSelectedGate] = useState<string | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [checkedIn, setCheckedIn] = useState(0);
   const [total, setTotal] = useState(0);
   const pct = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
@@ -89,6 +90,15 @@ export default function ScannerScreen() {
         Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
       ])
     ).start();
+
+    // Subscribe to connection status changes (e.g. from background sync)
+    const unsubscribe = apiService.onConnectionStatusChange((status) => {
+      setIsOffline(status);
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -436,15 +446,15 @@ export default function ScannerScreen() {
       <View style={styles.statsRow}>
         <View style={styles.statBox}>
           <Text style={[styles.statVal, { color: COLORS.primary }]}>{checkedIn}</Text>
-          <Text style={styles.statSub}>Checked in</Text>
+          <Text style={styles.statSub}>Đã check-in</Text>
         </View>
         <View style={styles.statBox}>
           <Text style={styles.statVal}>{total - checkedIn}</Text>
-          <Text style={styles.statSub}>Remaining</Text>
+          <Text style={styles.statSub}>Còn lại</Text>
         </View>
         <View style={styles.statBox}>
           <Text style={styles.statVal}>{pct}%</Text>
-          <Text style={styles.statSub}>Complete</Text>
+          <Text style={styles.statSub}>Hoàn thành</Text>
         </View>
       </View>
 
@@ -454,25 +464,40 @@ export default function ScannerScreen() {
       </View>
 
       {/* Gate Selector */}
-      <View style={styles.gateSelectorContainer}>
+      <View style={[styles.gateSelectorContainer, { zIndex: 1000 }]}>
         <TouchableOpacity 
           style={styles.gateSelectorBtn} 
-          onPress={() => {
-            Alert.alert(
-              'Select Gate',
-              'Choose your assigned gate for checking tickets',
-              [
-                { text: 'Gate A', onPress: () => setSelectedGate('Gate A') },
-                { text: 'Gate B', onPress: () => setSelectedGate('Gate B') },
-                { text: 'All Gates (Admin)', onPress: () => setSelectedGate(null) }
-              ]
-            );
-          }}
+          onPress={() => setDropdownOpen(!dropdownOpen)}
+          activeOpacity={0.7}
         >
           <Text style={styles.gateSelectorText}>
-            📍 Current Gate: <Text style={{ color: COLORS.primary, fontWeight: '700' }}>{selectedGate || 'All Gates'}</Text>
+            📍 Cổng hiện tại: <Text style={{ color: COLORS.primary, fontWeight: '700' }}>{selectedGate === 'Gate A' ? 'Cổng A' : selectedGate === 'Gate B' ? 'Cổng B' : 'Tất cả cổng'}</Text>
           </Text>
+          <ChevronDown color={COLORS.textMuted} size={16} />
         </TouchableOpacity>
+
+        {dropdownOpen && (
+          <View style={styles.dropdownMenu}>
+            <TouchableOpacity 
+              style={styles.dropdownItem} 
+              onPress={() => { setSelectedGate('Gate A'); setDropdownOpen(false); }}
+            >
+              <Text style={[styles.dropdownItemText, selectedGate === 'Gate A' && styles.dropdownItemActive]}>Cổng A</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.dropdownItem} 
+              onPress={() => { setSelectedGate('Gate B'); setDropdownOpen(false); }}
+            >
+              <Text style={[styles.dropdownItemText, selectedGate === 'Gate B' && styles.dropdownItemActive]}>Cổng B</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.dropdownItem, { borderBottomWidth: 0 }]} 
+              onPress={() => { setSelectedGate(null); setDropdownOpen(false); }}
+            >
+              <Text style={[styles.dropdownItemText, selectedGate === null && styles.dropdownItemActive]}>Tất cả cổng</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Viewfinder */}
@@ -502,7 +527,7 @@ export default function ScannerScreen() {
             )}
           </View>
           <View style={styles.bottomLabel}>
-            <Text style={styles.bottomLabelText}>{scanning ? 'SCANNING...' : 'POINT AT QR CODE'}</Text>
+            <Text style={styles.bottomLabelText}>{scanning ? 'ĐANG QUÉT...' : 'HÃY HƯỚNG CAMERA VÀO QR CODE'}</Text>
           </View>
         </View>
       </View>
@@ -514,15 +539,15 @@ export default function ScannerScreen() {
       <View style={styles.bottomNav}>
         <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('OfflineQueue')}>
           <CloudOff color={COLORS.textMuted} size={24} />
-          <Text style={styles.navItemText}>Queue</Text>
+          <Text style={styles.navItemText}>Hàng đợi</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Scanner')}>
           <QrCode color={COLORS.primary} size={24} />
-          <Text style={[styles.navItemText, { color: COLORS.primary }]}>Scan</Text>
+          <Text style={[styles.navItemText, { color: COLORS.primary }]}>Quét vé</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Settings')}>
           <SettingsIcon color={COLORS.textMuted} size={24} />
-          <Text style={styles.navItemText}>Settings</Text>
+          <Text style={styles.navItemText}>Cài đặt</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -627,12 +652,43 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
   },
   gateSelectorText: {
     color: COLORS.text,
     fontSize: FONT_SIZES.md,
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 56, // height of button + padding
+    left: SPACING.xl,
+    right: SPACING.xl,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.md,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    zIndex: 9999,
+  },
+  dropdownItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  dropdownItemText: {
+    color: COLORS.text,
+    fontSize: 14,
+  },
+  dropdownItemActive: {
+    color: COLORS.primary,
+    fontWeight: 'bold',
   },
   viewfinderWrapper: {
     flex: 1,
