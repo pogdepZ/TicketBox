@@ -46,12 +46,22 @@ export default function SettingsScreen() {
           setUserName(user.fullName || user.email || "Staff Member");
           setUserRole(user.role || "Gate Operator");
         }
+        
+        const autoSyncStr = await AsyncStorage.getItem('auto_sync_enabled');
+        if (autoSyncStr !== null) {
+          setAutoSync(autoSyncStr === 'true');
+        }
       } catch (e) {
         console.error(e);
       }
     };
     loadUser();
   }, []);
+
+  const handleAutoSyncToggle = async (v: boolean) => {
+    setAutoSync(v);
+    await AsyncStorage.setItem('auto_sync_enabled', v ? 'true' : 'false');
+  };
 
   const handleLogout = async () => {
     Alert.alert("Logout", "Are you sure you want to log out?", [
@@ -159,7 +169,7 @@ export default function SettingsScreen() {
               icon={<Cloud color={COLORS.textMuted} size={18} />}
               label="Background Auto-Sync"
               value={autoSync}
-              onValueChange={setAutoSync}
+              onValueChange={handleAutoSyncToggle}
             />
           </View>
         </View>

@@ -116,7 +116,8 @@ export default function ResultScreen() {
 
   const s = STATUS_CONFIG[ticket.status as ScanStatus] || STATUS_CONFIG.NOT_FOUND;
   const Icon = s.icon;
-  const isInvalid = ticket.status === 'NOT_FOUND' || ticket.status === 'WRONG_EVENT';
+  const isNotFound = ticket.status === 'NOT_FOUND';
+  const isWrongEvent = ticket.status === 'WRONG_EVENT';
   const isUsed = ticket.status === 'DUPLICATE';
   const checkinTime = ticket.checkedInAt ? new Date(ticket.checkedInAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
 
@@ -165,8 +166,8 @@ export default function ResultScreen() {
           ) : null}
         </View>
 
-        {/* Attendee card (not for invalid) */}
-        {!isInvalid && (
+        {/* Attendee card (not for NOT_FOUND) */}
+        {!isNotFound && ticket.guestName && (
           <TouchableOpacity 
             style={styles.attendeeCard} 
             activeOpacity={0.7}
@@ -202,10 +203,18 @@ export default function ResultScreen() {
         </View>
 
         {/* Invalid notice */}
-        {isInvalid && (
+        {isNotFound && (
           <View style={styles.invalidNotice}>
             <Text style={styles.invalidNoticeText}>
-              This ticket was not found in the system. It may be counterfeit, expired, or belong to a different event. Do not allow entry and flag for supervisor review.
+              This ticket was not found in the system. It may be counterfeit or expired. Do not allow entry and flag for supervisor review.
+            </Text>
+          </View>
+        )}
+
+        {isWrongEvent && (
+          <View style={styles.invalidNotice}>
+            <Text style={styles.invalidNoticeText}>
+              This ticket belongs to a DIFFERENT event{ticket.concertName ? ` (${ticket.concertName})` : ''}. Do not allow entry.
             </Text>
           </View>
         )}
