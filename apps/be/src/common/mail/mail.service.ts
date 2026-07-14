@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import sgMail from "@sendgrid/mail";
+import { classes } from "@sendgrid/helpers";
 
 export type MailAttachment = {
   filename: string;
@@ -43,15 +44,32 @@ export class MailService {
         subject: options.subject,
         html: options.html,
         text: options.text,
-        attachments: options.attachments?.map((attachment) => ({
-          filename: attachment.filename,
-          content: Buffer.isBuffer(attachment.content)
+        attachments: options.attachments?.map((attachment) => {
+          const rawContent = Buffer.isBuffer(attachment.content)
             ? attachment.content.toString("base64")
-            : attachment.content,
-          type: attachment.contentType,
-          disposition: attachment.cid ? "inline" : "attachment",
-          content_id: attachment.cid,
-        })),
+            : attachment.content;
+
+          // Strip base64 data URI prefix
+          const cleanContent = typeof rawContent === "string"
+            ? rawContent.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '')
+            : rawContent;
+
+          const isInline = !!attachment.cid;
+          if (isInline) {
+            this.logger.log(
+              `Attachment inline log: contentId=${attachment.cid}, length=${cleanContent.length}, base64Prefix20=${cleanContent.substring(0, 20)}`
+            );
+          }
+
+          return {
+            filename: attachment.filename,
+            content: cleanContent,
+            type: attachment.contentType || "image/png",
+            disposition: isInline ? "inline" : "attachment",
+            content_id: attachment.cid,
+            contentId: attachment.cid,
+          } as any;
+        }),
       });
 
       this.logger.log(

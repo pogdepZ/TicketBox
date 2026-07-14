@@ -380,14 +380,28 @@ export class NotificationsProcessor extends WorkerHost {
     html: string;
     attachments: MailAttachment[];
   }> {
+    const attachments: MailAttachment[] = [];
     const tickets = await Promise.all(
       (payload.tickets ?? []).map(async (ticket: any, index: number) => {
         const qrBuffer = ticket.qrPayload
           ? await this.generateQrBuffer(ticket.qrPayload)
           : null;
-        const qrImageSrc = qrBuffer
-          ? `data:image/png;base64,${qrBuffer.toString("base64")}`
-          : null;
+        let qrImageSrc = null;
+        if (qrBuffer) {
+          const cid = `ticket-qr-${index + 1}`;
+          const base64Len = qrBuffer.toString("base64").length;
+          this.logger.log(
+            `Generating QR code for ticket [${ticket.ticketCode}]: buffer size = ${qrBuffer.length} bytes, base64 length = ${base64Len}, cid = ${cid}`
+          );
+
+          attachments.push({
+            filename: `ticket-qr-${index + 1}.png`,
+            content: qrBuffer,
+            contentType: "image/png",
+            cid,
+          });
+          qrImageSrc = `cid:${cid}`;
+        }
 
         return `
           <div style="background-color: #fafbfc; border: 1px solid #d0d7de; border-radius: 12px; padding: 20px; margin-bottom: 16px; border-left: 5px solid #e5484d;">
@@ -542,7 +556,7 @@ export class NotificationsProcessor extends WorkerHost {
 
     return {
       html,
-      attachments: [],
+      attachments,
     };
   }
 
@@ -633,7 +647,7 @@ export class NotificationsProcessor extends WorkerHost {
   }
 
   private buildETicketUrl(orderId: string): string {
-    return `${this.config.get<string>("mail.appBaseUrl")}/tickets/orders/${orderId}`;
+    return `${this.config.get<string>("mail.appBaseUrl")}/success?orderId=${orderId}`;
   }
 
   private dedupeKey(

@@ -1,0 +1,36 @@
+name: Deploy to Azure VM
+
+on:
+  push:
+    branches:
+      - main  # Tự động deploy khi push lên nhánh main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Executing remote ssh commands using ssh key
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 40.82.145.30
+          username: azureuser
+          key: ${{ secrets.AZURE_SSH_KEY }}
+          script: |
+            cd ~/TicketBox
+            git pull origin main
+            
+            # Cài đặt các thư viện mới nếu có thay đổi
+            pnpm install
+            
+            # Sinh lại Prisma Client và chạy migration
+            pnpm --filter @repo/be run migrate:gen
+            pnpm --filter @repo/be run migrate:deploy
+            
+            # Biên dịch lại mã nguồn Backend & Frontend
+            pnpm build
+            
+            # Khởi động lại các tiến trình chạy ngầm qua PM2
+            pm2 restart all
