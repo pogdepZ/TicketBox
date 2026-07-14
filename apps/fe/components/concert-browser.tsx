@@ -570,10 +570,7 @@ export function ConcertBrowser({ concerts, initialKeyword = '' }: ConcertBrowser
         .animate-marquee {
           animation: marquee-scroll 25s linear infinite;
         }
-        .animate-marquee-images {
-          animation: marquee-scroll 35s linear infinite;
-        }
-        .animate-marquee:hover, .animate-marquee-images:hover {
+        .animate-marquee:hover {
           animation-play-state: paused;
         }
       `}</style>
@@ -608,53 +605,6 @@ export function ConcertBrowser({ concerts, initialKeyword = '' }: ConcertBrowser
           </div>
         </div>
       </div>
-
-      {/* Concert Images Marquee */}
-      {concerts && concerts.length > 0 && (
-        <div className="mt-8 pb-10 overflow-hidden relative">
-          <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
-          
-          <h4 className="text-center text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground/80 mb-8">
-            Khoảnh khắc sự kiện nổi bật
-          </h4>
-
-          <div className="w-full overflow-hidden flex">
-            <div className="flex gap-6 min-w-full animate-marquee-images whitespace-nowrap">
-              <div className="flex gap-6 shrink-0">
-                {concerts.map((c) => (
-                  <Link href={`/concert/${c.slug || c.id}`} key={`m1-${c.id}`} className="w-56 h-36 relative rounded-2xl overflow-hidden border border-border/60 bg-muted shrink-0 group/img shadow-md block">
-                    <img
-                      src={c.image}
-                      alt={c.title}
-                      className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3.5 text-left">
-                      <p className="text-xs font-black text-white truncate leading-tight">{c.title}</p>
-                      <p className="text-[10px] font-bold text-primary truncate mt-1">{c.artist}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-              <div className="flex gap-6 shrink-0" aria-hidden="true">
-                {concerts.map((c) => (
-                  <Link href={`/concert/${c.slug || c.id}`} key={`m2-${c.id}`} className="w-56 h-36 relative rounded-2xl overflow-hidden border border-border/60 bg-muted shrink-0 group/img shadow-md block">
-                    <img
-                      src={c.image}
-                      alt={c.title}
-                      className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3.5 text-left">
-                      <p className="text-xs font-black text-white truncate leading-tight">{c.title}</p>
-                      <p className="text-[10px] font-bold text-primary truncate mt-1">{c.artist}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   );
 }
