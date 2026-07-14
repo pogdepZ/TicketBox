@@ -10,6 +10,7 @@ import {
   fetchApi,
   getFriendlyErrorMessage,
   addLocalNotification,
+  getOrderById,
 } from "@/lib/api";
 
 function CheckoutResultContent() {
@@ -34,7 +35,7 @@ function CheckoutResultContent() {
   const momoPayType = searchParams.get("payType");
 
   const provider = momoResultCode !== null ? "MOMO" : "VNPAY";
-  const txnRef = provider === "MOMO" ? momoTxnRef : vnpTxnRef;
+  const txnRef = momoTxnRef || vnpTxnRef || searchParams.get("orderId") || searchParams.get("vnp_TxnRef");
   const transactionNo =
     provider === "MOMO" ? momoTransactionNo : vnpTransactionNo;
   const amountStr = provider === "MOMO" ? momoAmountStr : vnpAmountStr;
@@ -43,6 +44,7 @@ function CheckoutResultContent() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [backendSuccess, setBackendSuccess] = useState<boolean>(false);
+  const [order, setOrder] = useState<any>(null);
 
   useEffect(() => {
     let active = true;
@@ -65,6 +67,16 @@ function CheckoutResultContent() {
 
         if (!active) return;
 
+        // Tải thêm thông tin chi tiết đơn hàng từ Database
+        try {
+          const orderData = await getOrderById(txnRef);
+          if (orderData && active) {
+            setOrder(orderData);
+          }
+        } catch (orderErr) {
+          console.error("Failed to load order info:", orderErr);
+        }
+
         const success =
           res?.orderStatus === "PAID" || res?.paymentStatus === "PAID";
 
@@ -78,6 +90,7 @@ function CheckoutResultContent() {
             addLocalNotification(
               "Thanh toán thành công!",
               `Đơn đặt vé #${txnRef?.substring(0, 8).toUpperCase()} của bạn đã được thanh toán thành công.`,
+              `/success?orderId=${txnRef}`,
             );
             if (typeof window !== "undefined") {
               window.sessionStorage.setItem(sessionKey, "true");
@@ -85,16 +98,30 @@ function CheckoutResultContent() {
           }
         } else {
           setBackendSuccess(false);
+          let localMsg = "Thanh toán thất bại từ cổng thanh toán hoặc chữ ký không hợp lệ.";
           if (
             responseCode === "24" ||
             searchParams.get("status") === "failed" ||
             momoResultCode === "49"
           ) {
-            setErrorMsg("Giao dịch đã bị hủy bởi người dùng.");
-          } else {
-            setErrorMsg(
-              "Thanh toán thất bại từ cổng thanh toán hoặc chữ ký không hợp lệ.",
+            localMsg = "Giao dịch đã bị hủy bởi người dùng.";
+          }
+          setErrorMsg(localMsg);
+
+          const sessionKey = `notified-order-${txnRef}`;
+          const alreadyNotified =
+            typeof window !== "undefined" &&
+            window.sessionStorage.getItem(sessionKey);
+          if (!alreadyNotified && txnRef) {
+            addLocalNotification(
+              "Thanh toán thất bại!",
+              `Đơn đặt vé #${txnRef.substring(0, 8).toUpperCase()}: ${localMsg}`,
+              `/checkout/result?orderId=${txnRef}&status=failed`,
+              "error"
             );
+            if (typeof window !== "undefined") {
+              window.sessionStorage.setItem(sessionKey, "true");
+            }
           }
         }
       } catch (err: any) {
@@ -115,8 +142,8 @@ function CheckoutResultContent() {
     };
   }, [provider, txnRef, searchParams]);
 
-  // Format amount
-  const rawAmount = amountStr ? Number(amountStr) : 0;
+  // Format amount (lấy từ query hoặc fallback từ DB order)
+  const rawAmount = amountStr ? Number(amountStr) : (order ? Number(order.totalAmount) * (provider === "VNPAY" ? 100 : 1) : 0);
   const amountInVnd = provider === "MOMO" ? rawAmount : rawAmount / 100;
 
   // Format payDate (YYYYMMDDHHmmss -> DD/MM/YYYY HH:mm:ss)
@@ -204,6 +231,54 @@ function CheckoutResultContent() {
             </div>
           )}
 
+          {order?.concertTitle && (
+            <div className="flex justify-between border-b border-border/50 pb-3">
+              <span className="text-muted-foreground">Sự kiện</span>
+              <span className="font-bold text-foreground text-right max-w-[240px] truncate">
+                {order.concertTitle}
+              </span>
+            </div>
+          )}
+
+          {order?.items && order.items.length > 0 && (
+            <div className="flex justify-between border-b border-border/50 pb-3">
+              <span className="text-muted-foreground">Chi tiết vé</span>
+              <span className="font-semibold text-foreground text-right max-w-[240px]">
+                {order.items.map((item: any) => `${item.name} (x${item.quantity})`).join(", ")}
+              </span>
+            </div>
+          )}
+
+          {(amountStr || order?.totalAmount) && (
+            <div className="flex justify-between border-b border-border/50 pb-3">
+              <span className="text-muted-foreground">Số tiền thanh toán</span>
+              <span className="text-lg font-black text-primary">
+                {amountInVnd.toLocaleString("vi-VN")}đ
+              </span>
+            </div>
+          )}
+
+          {order?.status && (
+            <div className="flex justify-between border-b border-border/50 pb-3">
+              <span className="text-muted-foreground">Trạng thái đơn hàng</span>
+              <span className={`font-bold inline-flex items-center ${
+                order.status === "PAID"
+                  ? "text-emerald-500"
+                  : order.status === "CANCELLED"
+                  ? "text-rose-500"
+                  : "text-amber-500"
+              }`}>
+                {order.status === "PAID"
+                  ? "Đã thanh toán"
+                  : order.status === "CANCELLED"
+                  ? "Đã bị hủy"
+                  : order.status === "PAYMENT_FAILED"
+                  ? "Thanh toán thất bại"
+                  : "Chờ thanh toán"}
+              </span>
+            </div>
+          )}
+
           {transactionNo && (
             <div className="flex justify-between border-b border-border/50 pb-3">
               <span className="text-muted-foreground">
@@ -211,15 +286,6 @@ function CheckoutResultContent() {
               </span>
               <span className="font-mono font-bold text-foreground">
                 {transactionNo}
-              </span>
-            </div>
-          )}
-
-          {amountStr && (
-            <div className="flex justify-between border-b border-border/50 pb-3">
-              <span className="text-muted-foreground">Số tiền thanh toán</span>
-              <span className="text-lg font-black text-primary">
-                {amountInVnd.toLocaleString("vi-VN")}đ
               </span>
             </div>
           )}

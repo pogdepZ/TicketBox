@@ -48,6 +48,10 @@ export class NotificationsProcessor extends WorkerHost {
     switch (job.name) {
       case "payment.completed":
         return this.handlePaymentCompleted(job.data as PaymentCompletedPayload);
+      case "payment.failed":
+        return this.handlePaymentFailed(job.data as { orderId: string; reason: string });
+      case "payment.cancelled":
+        return this.handlePaymentCancelled(job.data as { orderId: string });
       case "send-single":
         return this.handleSendSingle(job.data as SendSinglePayload);
       case "concert.reminder":
@@ -115,14 +119,28 @@ export class NotificationsProcessor extends WorkerHost {
       sentAt: new Date(),
     });
 
-    await this.prisma.inAppNotification.create({
-      data: {
+    const existingCompletedNotif = await this.prisma.inAppNotification.findFirst({
+      where: {
         userId: order.userId,
         title: "Thanh toán đơn hàng thành công",
-        message: `Thanh toán thành công đơn hàng vé concert "${order.concert.name}". Mã vé QR của bạn đã sẵn sàng!`,
-        read: false,
+        message: {
+          contains: `route:/success?orderId=${order.id}`,
+        },
       },
     });
+
+    if (!existingCompletedNotif) {
+      await this.prisma.inAppNotification.create({
+        data: {
+          userId: order.userId,
+          title: "Thanh toán đơn hàng thành công",
+          message: `Thanh toán thành công đơn hàng vé concert "${order.concert.name}". Mã vé QR của bạn đã sẵn sàng!|route:/success?orderId=${order.id}`,
+          read: false,
+        },
+      });
+    } else {
+      this.logger.warn(`InAppNotification for completed order #${order.id.substring(0, 8).toUpperCase()} already exists. Skipping.`);
+    }
 
     const email = await this.createNotification({
       userId: order.userId,
@@ -231,7 +249,7 @@ export class NotificationsProcessor extends WorkerHost {
           data: {
             userId: order.userId,
             title: "Sự kiện sắp diễn ra",
-            message: `Chỉ còn chưa đầy 24 giờ nữa là concert "${concert.name}" sẽ bắt đầu. Đừng bỏ lỡ nhé!`,
+            message: `Chỉ còn chưa đầy 24 giờ nữa là concert "${concert.name}" sẽ bắt đầu. Đừng bỏ lỡ nhé!|route:/my-tickets`,
             read: false,
           },
         });
@@ -306,9 +324,12 @@ export class NotificationsProcessor extends WorkerHost {
       );
       return { success: true, notificationId: notification.id };
     } catch (error) {
+      const isConnRefused = error instanceof Error && error.message.includes("ECONNREFUSED");
+
       this.logger.error(
         `Failed processing notificationId=${notification.id}: ${error instanceof Error ? error.message : String(error)}`,
       );
+
       await this.prisma.notification.update({
         where: { id: notification.id },
         data: {
@@ -317,8 +338,113 @@ export class NotificationsProcessor extends WorkerHost {
           errorMessage: error instanceof Error ? error.message : String(error),
         },
       });
+
+      if (isConnRefused) {
+        this.logger.warn(
+          `[Notice] Mailpit/SMTP server is not running. Email simulation skipped. In-app notifications are unaffected.`
+        );
+        return { success: false, reason: "Mail server offline" }; // Do not throw so BullMQ/Outbox does not retry endlessly
+      }
+
       throw error;
     }
+  }
+
+  private async handlePaymentFailed(payload: { orderId: string; reason: string }) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: payload.orderId },
+      include: {
+        concert: { select: { name: true } },
+        items: {
+          include: {
+            ticketType: { select: { name: true } },
+          },
+        },
+      },
+    });
+    if (!order) return { success: false, reason: "Order not found" };
+
+    const orderCode = order.id.substring(0, 8).toUpperCase();
+    const formattedAmount = new Intl.NumberFormat("vi-VN").format(Number(order.totalAmount)) + "đ";
+    const ticketDetails = order.items.map(item => `${item.ticketType.name} (x${item.quantity})`).join(", ");
+
+    const title = payload.reason === "EXPIRED" ? "Thanh toán thất bại - Đơn hàng bị hủy" : "Thanh toán thất bại";
+    const message = payload.reason === "EXPIRED"
+      ? `Đơn hàng #${orderCode} - ${order.concert.name} (${ticketDetails}) giá trị ${formattedAmount}: Giao dịch thanh toán thất bại và thời gian giữ chỗ đã hết hạn. Đơn đặt vé đã bị hủy tự động.|route:/checkout/result?orderId=${payload.orderId}&status=failed`
+      : `Đơn hàng #${orderCode} - ${order.concert.name} (${ticketDetails}) giá trị ${formattedAmount}: Giao dịch thanh toán thất bại. Bạn có thể thực hiện thanh toán lại trước khi hết hạn giữ ghế.|route:/checkout/result?orderId=${payload.orderId}&status=failed`;
+
+    const existingFailedNotif = await this.prisma.inAppNotification.findFirst({
+      where: {
+        userId: order.userId,
+        title,
+        message: {
+          contains: `route:/checkout/result?orderId=${payload.orderId}`,
+        },
+      },
+    });
+
+    if (!existingFailedNotif) {
+      await this.prisma.inAppNotification.create({
+        data: {
+          userId: order.userId,
+          title,
+          message,
+          read: false,
+        },
+      });
+    } else {
+      this.logger.warn(`InAppNotification for failed order #${orderCode} already exists. Skipping.`);
+    }
+
+    this.logger.log(`[Worker] Handled payment.failed for orderId=${payload.orderId}`);
+    return { success: true };
+  }
+
+  private async handlePaymentCancelled(payload: { orderId: string }) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: payload.orderId },
+      include: {
+        concert: { select: { name: true } },
+        items: {
+          include: {
+            ticketType: { select: { name: true } },
+          },
+        },
+      },
+    });
+    if (!order) return { success: false, reason: "Order not found" };
+
+    const orderCode = order.id.substring(0, 8).toUpperCase();
+    const formattedAmount = new Intl.NumberFormat("vi-VN").format(Number(order.totalAmount)) + "đ";
+    const ticketDetails = order.items.map(item => `${item.ticketType.name} (x${item.quantity})`).join(", ");
+
+    const message = `Đơn hàng #${orderCode} - ${order.concert.name} (${ticketDetails}) giá trị ${formattedAmount}: Giao dịch thanh toán đã bị hủy bỏ theo yêu cầu.|route:/checkout/result?orderId=${payload.orderId}&status=failed`;
+
+    const existingCancelledNotif = await this.prisma.inAppNotification.findFirst({
+      where: {
+        userId: order.userId,
+        title: "Thanh toán bị hủy",
+        message: {
+          contains: `route:/checkout/result?orderId=${payload.orderId}`,
+        },
+      },
+    });
+
+    if (!existingCancelledNotif) {
+      await this.prisma.inAppNotification.create({
+        data: {
+          userId: order.userId,
+          title: "Thanh toán bị hủy",
+          message,
+          read: false,
+        },
+      });
+    } else {
+      this.logger.warn(`InAppNotification for cancelled order #${orderCode} already exists. Skipping.`);
+    }
+
+    this.logger.log(`[Worker] Handled payment.cancelled for orderId=${payload.orderId}`);
+    return { success: true };
   }
 
   private async sendEmail(notification: any) {

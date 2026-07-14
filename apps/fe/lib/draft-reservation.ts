@@ -47,6 +47,7 @@ export interface StoredMockOrder {
   concertId: string;
   concertTitle: string;
   concertVenue?: string;
+  concertDate?: string;
   reservationId: string;
   status: 'PAID';
   totalAmount: number;
