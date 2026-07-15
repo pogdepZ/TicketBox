@@ -9,11 +9,11 @@ Hệ thống TicketBox được xây dựng theo kiến trúc **Monorepo** sử 
 
 Hệ thống bao gồm các thành phần:
 1.  **Frontend (Web App):** Viết bằng Next.js (App Router), đảm nhận toàn bộ giao diện cho Khán giả duyệt concert, đặt vé, thanh toán giả lập và hiển thị E-ticket QR Code; đồng thời cung cấp giao diện quản trị cho Admin quản lý concert và xem thống kê doanh thu.
-2.  **Backend (API Server):** Viết bằng NestJS (TypeScript), xử lý toàn bộ logic nghiệp vụ, bảo vệ hệ thống (Idempotency, Rate Limiting, Waiting Room, Circuit Breaker) và giao tiếp cơ sở dữ liệu qua Prisma ORM.
+2.  **Backend (API Server):** Viết bằng NestJS (TypeScript), xử lý logic nghiệp vụ, Idempotency, Rate Limiting, Circuit Breaker và giao tiếp PostgreSQL qua Prisma ORM. Waiting Room là hướng mở rộng, chưa có trong code hiện tại.
 3.  **Mobile App soát vé (Checkin App):** Chạy trên thiết bị di động của Checker, sử dụng SQLite local để lưu trữ log check-in tạm thời khi offline và đồng bộ hàng loạt (Bulk Sync) lên Backend khi có kết nối mạng.
 4.  **Cơ sở dữ liệu:**
     *   **PostgreSQL:** Đóng vai trò là nguồn dữ liệu đúng cuối cùng (Single Source of Truth - SSOT), lưu trữ dữ liệu nghiệp vụ có tính nhất quán cao (Concerts, Orders, Tickets, Quotas...).
-    *   **Redis:** Đóng vai trò làm lớp đệm cache thông tin concert, quản lý hàng đợi phòng chờ (Waiting Room), lưu trữ token rate limiting và bản ghi idempotency tạm thời.
+    *   **Redis:** Làm cache, lưu token rate limiting/idempotency/circuit breaker và làm broker cho BullMQ. Thiết kế Waiting Room có thể dùng Redis Sorted Set khi được triển khai sau.
 
 ---
 
@@ -43,8 +43,8 @@ graph TB
     Checker -->|"Quét mã QR soát vé (Online/Offline)"| TicketBoxSystem
 
     TicketBoxSystem -->|"Gửi yêu cầu & nhận webhook"| PaymentGateway
-    TicketBoxSystem -->|"Gửi văn bản PDF nhờ sinh Bio"| AIModel
-    TicketBoxSystem -->|"Đọc danh sách VIP định kỳ"| CSVFile
+    TicketBoxSystem -->|"Gửi text đã trích xuất để sinh Bio"| AIModel
+    CSVFile -->|"Admin upload; hệ thống validate và import"| TicketBoxSystem
 
     classDef system fill:#117A65,stroke:#114B3E,stroke-width:2px,color:#fff;
     classDef actor fill:#2874A6,stroke:#1B4F72,stroke-width:2px,color:#fff;
@@ -54,6 +54,19 @@ graph TB
     class PaymentGateway,AIModel,CSVFile external;
 ```
 
+#### Mô tả actor và hệ thống ngoài
+
+| Đối tượng | Loại | Trách nhiệm và dữ liệu trao đổi |
+|---|---|---|
+| Khán giả (Customer) | Actor | Duyệt concert, tạo đơn giữ vé, chọn VNPAY/MoMo, theo dõi thanh toán và nhận e-ticket QR. |
+| Ban tổ chức (Admin) | Actor | Quản lý concert/loại vé, theo dõi doanh thu, tải PDF press kit và upload CSV khách VIP. |
+| Nhân viên soát vé (Checker) | Actor | Tải snapshot vé, quét QR online/offline và đồng bộ sự kiện check-in bằng ứng dụng mobile. |
+| VNPAY/MoMo | External system | Nhận yêu cầu tạo giao dịch qua HTTPS và gọi return URL/IPN/webhook về Backend. Backend xác minh chữ ký và xử lý callback theo idempotency. |
+| Google Gemini | External system | Nhận văn bản đã trích xuất từ PDF press kit để sinh tiểu sử nghệ sĩ; chỉ được gọi bất đồng bộ bởi Worker. |
+| CSV khách VIP | External data source | File không tin cậy do Admin tải lên. Backend lưu file vào Object Storage rồi tạo job để Worker kiểm tra và nhập dữ liệu. CSV không chủ động gọi TicketBox. |
+
+> **Trust boundary:** Khán giả, Admin và Checker đều nằm ngoài trust boundary của Backend; mọi request phải được xác thực và phân quyền. Payment gateway và Gemini là dependency ngoài nên phải có timeout và cô lập lỗi. CSV phải được giới hạn kích thước, kiểm tra header và nội dung trước khi nhập.
+
 ---
 
 ### Level 2 — Container
@@ -62,44 +75,51 @@ Phân rã hệ thống TicketBox thành các container logic và các kênh giao
 ```mermaid
 graph TB
     subgraph Clients ["Ứng dụng Client"]
-        FEApp["Web App - Next.js (Khán giả & Admin)"]
-        MobileApp["Mobile Checkin App (Checker)"]
+        FEApp["Web App<br/>Next.js 16 + React 19<br/>(Khán giả & Admin)"]
+        MobileApp["Check-in Mobile App<br/>Expo 56 + React Native 0.85<br/>(Checker)"]
     end
 
     subgraph TicketBoxService ["Hệ thống Backend & Services"]
-        APIServer["Backend API Server (NestJS)"]
-        BackgroundWorker["Background Worker (Cron/Jobs)"]
+        APIServer["Backend API<br/>NestJS 11 + TypeScript<br/>JWT/RBAC, REST"]
+        BackgroundWorker["Background Worker<br/>NestJS 11 + BullMQ + Cron<br/>tiến trình worker.js riêng"]
     end
 
     subgraph Storage ["Lưu trữ dữ liệu"]
-        PostgresDB[("PostgreSQL Database\n(Prisma ORM)")]
-        RedisDB[("Redis DB\n(Cache, Queue, Limit)")]
-        SQLiteDB[("SQLite Local DB\n(Mobile Offline Log)")]
-        ObjectStorage[("Object Storage\n(MinIO / S3)")]
+        PostgresDB[("PostgreSQL 16<br/>SSOT nghiệp vụ<br/>Prisma 7 / pg")]
+        RedisDB[("Redis 7<br/>Cache, Rate Limit, Idempotency,<br/>BullMQ broker")]
+        SQLiteDB[("Expo SQLite<br/>Snapshot và log offline")]
+        AsyncStorage[("AsyncStorage<br/>Pending sync queue")]
+        ObjectStorage[("MinIO / S3-compatible<br/>PDF và CSV")]
     end
 
     subgraph Ext ["Dịch vụ ngoài"]
-        MockPay["Mock Payment Gateway"]
-        LLM["AI Service (LLM)"]
+        VNPAY["VNPAY / Mock VNPAY"]
+        MoMo["MoMo / Mock MoMo"]
+        LLM["Google Gemini API"]
+        Email["SendGrid<br/>(MailHog khi local)"]
     end
 
     %% Giao tiếp của Client
-    FEApp -->|"REST API (HTTPS, JWT)"| APIServer
-    FEApp -->|"WebSockets (Realtime Alerts)"| APIServer
-    MobileApp -->|"REST API /checkin/sync"| APIServer
-    MobileApp -->|"Đọc/ghi dữ liệu offline"| SQLiteDB
+    FEApp -->|"REST/HTTPS + JWT"| APIServer
+    MobileApp -->|"REST/HTTPS + JWT<br/>snapshot, verify, /checkin/sync"| APIServer
+    MobileApp -->|"SQL local"| SQLiteDB
+    MobileApp -->|"Key-value local"| AsyncStorage
 
     %% Giao tiếp của APIServer
-    APIServer -->|"Đọc/ghi dữ liệu nghiệp vụ"| PostgresDB
-    APIServer -->|"Cache, Rate Limit, Queue"| RedisDB
-    APIServer -->|"Upload PDF & CSV"| ObjectStorage
-    APIServer -->|"Tạo link, nhận webhook"| MockPay
+    APIServer -->|"SQL/TCP qua Prisma"| PostgresDB
+    APIServer -->|"RESP/TCP: cache, rate limit,<br/>circuit breaker, enqueue BullMQ"| RedisDB
+    APIServer -->|"S3 API/HTTPS: upload PDF, CSV"| ObjectStorage
+    APIServer -->|"REST/HTTPS: tạo giao dịch"| VNPAY
+    APIServer -->|"REST/HTTPS: tạo giao dịch"| MoMo
+    VNPAY -->|"HTTPS return/IPN/webhook"| APIServer
+    MoMo -->|"HTTPS return/IPN/webhook"| APIServer
 
     %% Giao tiếp của BackgroundWorker
-    BackgroundWorker -->|"Tải PDF/CSV & cập nhật kết quả"| PostgresDB
-    BackgroundWorker -->|"Xử lý hàng đợi"| RedisDB
-    BackgroundWorker -->|"Đọc PDF & CSV"| ObjectStorage
-    BackgroundWorker -->|"Tách text & gửi press kit"| LLM
+    RedisDB -->|"BullMQ jobs: ai, csv, notification"| BackgroundWorker
+    BackgroundWorker -->|"SQL/TCP qua Prisma<br/>đọc job state, ghi kết quả"| PostgresDB
+    BackgroundWorker -->|"S3 API/HTTPS: đọc PDF, CSV"| ObjectStorage
+    BackgroundWorker -->|"REST/HTTPS: prompt + extracted text"| LLM
+    BackgroundWorker -->|"HTTPS/SMTP: gửi thông báo"| Email
 
     classDef client fill:#2E4053,stroke:#1A252F,stroke-width:2px,color:#fff;
     classDef server fill:#1A5276,stroke:#113851,stroke-width:2px,color:#fff;
@@ -107,23 +127,107 @@ graph TB
     classDef ext fill:#626567,stroke:#424949,stroke-width:2px,color:#fff;
     class FEApp,MobileApp client;
     class APIServer,BackgroundWorker server;
-    class PostgresDB,RedisDB,SQLiteDB,ObjectStorage db;
-    class MockPay,LLM ext;
+    class PostgresDB,RedisDB,SQLiteDB,AsyncStorage,ObjectStorage db;
+    class VNPAY,MoMo,LLM,Email ext;
 ```
+
+#### Trách nhiệm và dependency giữa container
+
+- **Web App** chỉ gọi Backend API; không truy cập trực tiếp database, Redis hoặc Object Storage bằng credential nội bộ.
+- **Mobile App** duy trì SQLite và AsyncStorage cục bộ để tiếp tục soát vé khi mất mạng. PostgreSQL vẫn là nguồn quyết định cuối cùng khi đồng bộ.
+- **Backend API** xử lý request đồng bộ, transaction đặt vé/thanh toán và phát job `ai`, `csv`, `notification` vào BullMQ.
+- **Background Worker** là tiến trình NestJS riêng, nhận job từ BullMQ và chạy cron hết hạn order/nhắc concert. Worker không nhận traffic từ client.
+- **PostgreSQL** là SSOT. **Redis** là dependency hiệu năng và message broker, không thay thế dữ liệu giao dịch bền vững; Outbox trong PostgreSQL hỗ trợ khôi phục việc enqueue khi Redis tạm lỗi.
+- **MinIO/S3** lưu binary; database chỉ lưu metadata và object key.
+
+> Sơ đồ phản ánh code hiện tại trong `apps/fe`, `apps/checkin-mobile`, `apps/be` và `docker-compose.yml`. WebSocket và Waiting Room là hướng mở rộng, chưa được coi là luồng đã triển khai.
 
 
 ---
 
 ## High-Level Architecture Diagram
 
-Sơ đồ dưới đây biểu diễn chi tiết luồng dữ liệu của 3 nghiệp vụ quan trọng nhất trong hệ thống: **Mua vé**, **Soát vé offline & Đồng bộ**, và **Nhập CSV VIP**:
+Sơ đồ dưới đây thể hiện dependency, luồng dữ liệu chính và các failure boundary. Mỗi khung là một vùng có thể lỗi độc lập; lỗi external service không được lan sang lõi bán vé/check-in.
+
+```mermaid
+flowchart LR
+    subgraph FB1["Failure Boundary A — Client"]
+        Web["Web<br/>Next.js"]
+        Mobile["Mobile<br/>Expo / React Native"]
+        Local[("SQLite + AsyncStorage")]
+        Mobile <-->|"offline read/write"| Local
+    end
+
+    subgraph FB2["Failure Boundary B — Stateless Application"]
+        API["NestJS API"]
+        Worker["NestJS Worker"]
+    end
+
+    subgraph FB3["Failure Boundary C — Stateful Core"]
+        PG[("PostgreSQL<br/>SSOT + Outbox")]
+        Redis[("Redis + BullMQ")]
+        S3[("MinIO / S3")]
+    end
+
+    subgraph FB4["Failure Boundary D — External Services"]
+        Pay["VNPAY / MoMo"]
+        Gemini["Google Gemini"]
+        Mail["SendGrid"]
+    end
+
+    Web -->|"HTTPS REST"| API
+    Mobile -->|"HTTPS REST / bulk sync"| API
+    API -->|"transaction + row lock"| PG
+    API -->|"cache, limiter, circuit state"| Redis
+    API -->|"upload"| S3
+    PG -.->|"Outbox retry enqueue"| Redis
+    Redis -->|"BullMQ jobs"| Worker
+    Worker -->|"job result"| PG
+    Worker -->|"download"| S3
+    API <-->|"timeout + verify signature<br/>circuit breaker"| Pay
+    Worker -->|"timeout + bounded retry"| Gemini
+    Worker -->|"bounded retry"| Mail
+
+    classDef failure fill:#FDEDEC,stroke:#C0392B,stroke-width:2px,color:#641E16;
+    class Pay,Gemini,Mail failure;
+```
+
+### Failure boundary và cách hệ thống suy thoái
+
+| Boundary bị lỗi | Ảnh hưởng | Phần vẫn hoạt động | Cơ chế cô lập/khôi phục |
+|---|---|---|---|
+| Web hoặc thiết bị mobile | Một client không sử dụng được | Backend và client khác | Retry có kiểm soát; mobile tiếp tục dùng snapshot/queue local khi offline. |
+| API instance | Request trên instance đó thất bại | Dữ liệu bền vững và Worker | API stateless có thể khởi động/thay thế; idempotency ngăn client retry tạo giao dịch trùng. |
+| Worker | AI/CSV/email/cron bị trì hoãn | Duyệt concert, đặt vé, thanh toán và API check-in | BullMQ giữ job; job retry. Outbox lưu intent bền vững để phát lại. |
+| Redis/BullMQ | Cache, rate limit, circuit state và xử lý job suy giảm | Dữ liệu giao dịch trong PostgreSQL | Không dùng cache để quyết định bán vé; Outbox giữ message chờ enqueue lại. Endpoint phụ thuộc limiter/queue áp dụng chính sách fail-safe. |
+| PostgreSQL | Nghiệp vụ ghi và xác nhận trạng thái dừng | Mobile vẫn có thể tạm check-in offline | Transaction rollback; không phát hành vé nếu chưa commit; phục hồi DB rồi sync/retry idempotent. |
+| MinIO/S3 | Upload/đọc PDF, CSV thất bại | Mua vé, thanh toán, check-in | Không enqueue job khi upload chưa hoàn tất; retry upload/download. |
+| Một payment provider | Không thể tạo/xác nhận giao dịch qua provider đó | Provider còn lại và chức năng phi thanh toán | Timeout, kiểm tra chữ ký, circuit breaker theo từng provider; trả `503` có kiểm soát. |
+| Gemini/SendGrid | Bio hoặc email bị trì hoãn | Toàn bộ lõi bán vé/check-in | Chỉ gọi từ Worker; retry giới hạn và ghi trạng thái lỗi để vận hành xử lý. |
+
+### Các luồng dữ liệu quan trọng
+
+Sequence diagram sau chi tiết hóa ba nghiệp vụ: **Mua vé**, **Soát vé offline & Đồng bộ**, và **Nhập CSV VIP**:
 
 ```mermaid
 sequenceDiagram
     autonumber
+    actor Customer as Khán giả
+    actor Checker as Nhân viên soát vé
+    participant FEApp as Web App
+    participant MobileApp as Mobile App
+    participant AsyncStorage as AsyncStorage
+    participant SQLiteDB as SQLite
+    participant APIServer as Backend API
+    participant RedisDB as Redis/BullMQ
+    participant BackgroundWorker as Background Worker
+    participant PostgresDB as PostgreSQL
+    participant ObjectStorage as MinIO/S3
+    participant MockPay as VNPAY/MoMo
     
     %% Mua vé
     Note over FEApp, PostgresDB: LUỒNG MUA VÉ & GIỮ CHỖ TẠM THỜI (TEMPORARY RESERVATION)
+    Customer->>FEApp: Chọn vé và xác nhận đặt hàng
     FEApp->>APIServer: POST /orders (Idempotency-Key, items)
     APIServer->>RedisDB: Kiểm tra Rate Limit & Idempotency Key
     RedisDB-->>APIServer: Khớp key / cho phép qua
@@ -147,7 +251,7 @@ sequenceDiagram
     Note over MobileApp, PostgresDB: LUỒNG SOÁT VÉ OFFLINE & ĐỒNG BỘ (OFFLINE CHECK-IN & SYNC)
     Note over MobileApp: Mất kết nối mạng (Offline)
     Checker->>MobileApp: Quét QR e-ticket
-    MobileApp->>MobileApp: Xác thực chữ ký QR Code (JWS/Symmetric) bằng ticketSecret/publicKey (HS256)
+    MobileApp->>MobileApp: Xác thực chữ ký QR (HS256) bằng shared ticket secret
     MobileApp->>SQLiteDB: Check local duplicate trong ticket_snapshot (status = 'USED'/'TEMP_ACCEPTED')
     SQLiteDB-->>MobileApp: Chưa quét (Chấp nhận quét offline)
     MobileApp->>SQLiteDB: UPDATE ticket_snapshot SET status = 'TEMP_ACCEPTED'
@@ -179,24 +283,28 @@ sequenceDiagram
     APIServer->>APIServer: Validate file (size < 5MB, format CSV, check header)
     APIServer->>PostgresDB: Check trùng file bằng File Hash (SHA-256)
     APIServer->>PostgresDB: Tạo csv_import_batches (status = 'processing')
-    APIServer->>PostgresDB: Lưu toàn bộ CSV raw vào guest_list_staging (validation_status = 'pending')
+    APIServer->>ObjectStorage: Upload file CSV qua S3 API
     APIServer-->>FEApp: Trả kết quả 202 Accepted (Batch processing in background)
+    APIServer->>PostgresDB: Tạo OutboxMessage cho queue csv
+    APIServer->>RedisDB: Enqueue BullMQ job csv
+    RedisDB->>BackgroundWorker: Deliver CSV import job
+    BackgroundWorker->>ObjectStorage: Download CSV theo object key
+    BackgroundWorker->>PostgresDB: Parse và lưu guest_import_rows (PENDING)
     
-    loop Xử lý từng dòng guest_list_staging trong Background Worker
-        APIServer->>PostgresDB: Validate hàng: Check rỗng, check email/phone, check ticketType hợp lệ
+    loop Xử lý từng guest_import_row trong Background Worker
+        BackgroundWorker->>PostgresDB: Validate full_name, guest_code, email/phone và trùng lặp
         alt Dòng Hợp Lệ
-            APIServer->>PostgresDB: Check trùng khách mời (email/phone + concertId trong guest_list)
+            BackgroundWorker->>PostgresDB: Check guest_code/email/phone theo concert
             alt Chưa tồn tại
-                APIServer->>PostgresDB: INSERT INTO guest_list (status = 'active', guest_code)
-                APIServer->>PostgresDB: UPDATE guest_list_staging (validation_status = 'valid')
+                BackgroundWorker->>PostgresDB: UPSERT guest_list và đánh dấu row VALID
             else Đã tồn tại
-                APIServer->>PostgresDB: UPDATE guest_list_staging (validation_status = 'duplicate')
+                BackgroundWorker->>PostgresDB: Đánh dấu row DUPLICATE kèm lý do
             end
         else Dòng Lỗi
-            APIServer->>PostgresDB: UPDATE guest_list_staging (validation_status = 'invalid', error_message = errorMessage)
+            BackgroundWorker->>PostgresDB: Đánh dấu row INVALID kèm errorMessage
         end
     end
-    APIServer->>PostgresDB: Cập nhật csv_import_batches (status = 'completed'/'partial', counts)
+    BackgroundWorker->>PostgresDB: Cập nhật batch COMPLETED/PARTIAL/FAILED và counts
 
 ```
 
@@ -219,7 +327,7 @@ Hệ thống TicketBox lựa chọn **PostgreSQL** làm cơ sở dữ liệu qua
 *   **PaymentEvent:** Lưu vết lịch sử webhook và transaction từ cổng thanh toán bên thứ ba (để đối soát và thực hiện idempotency).
 *   **Ticket:** Vé điện tử chính thức được phát hành sau khi thanh toán thành công, chứa mã QR được ký số (`qrPayload`) và thông tin check-in thực tế.
 *   **CheckinDevice & CheckinEvent:** Quản lý thiết bị soát vé của nhân viên và lịch sử check-in (mode `ONLINE` / `OFFLINE_SYNC`, kết quả `ACCEPTED`, `REJECTED`, `CONFLICT`).
-*   **CsvImportBatch, GuestListStaging & GuestList:** Quản lý danh sách khách mời VIP được import từ file CSV.
+*   **GuestImportBatch, GuestImportRow & GuestList:** Quản lý batch, từng dòng staging/validation và danh sách khách VIP được import từ file CSV.
 
 ### Ràng buộc và index quan trọng
 
@@ -330,7 +438,7 @@ Luồng kiểm tra quyền:
     *   Triển khai Token Bucket sử dụng Redis để lưu số lượng token còn lại và timestamp cập nhật của mỗi user/IP.
     *   Khi có request gửi đến `POST /orders`, Redis kiểm tra và nạp token tự động dựa trên thời gian trôi qua.
     *   *Ngưỡng:* Tối đa 5 requests tạo order/phút đối với mỗi User, và 60 requests/phút đối với mỗi IP. Vượt ngưỡng trả về `429 Too Many Requests`.
-*   **Waiting Room (Phòng xếp hàng ảo):**
+*   **Waiting Room (Phòng xếp hàng ảo — thiết kế dự kiến, chưa triển khai):**
     *   Nếu số lượng request tạo order vượt quá ngưỡng chịu tải của database (ví dụ > 500 orders/giây), hệ thống tự động đưa các request mới vào một phòng chờ.
     *   Sử dụng Redis Sorted Set (`ZADD`) lưu token của user làm hàng đợi dựa trên timestamp.
     *   Khách hàng ở frontend sẽ nhận trạng thái xếp hàng và thực hiện polling định kỳ để biết vị trí của mình.
@@ -341,8 +449,8 @@ Luồng kiểm tra quyền:
 *   **Circuit Breaker (Trình ngắt mạch):**
     *   Mỗi provider (VNPAY/MoMo) được giám sát bởi một Circuit Breaker lưu ở Redis (chia sẻ giữa các instance backend).
     *   *Trạng thái CLOSED:* Cổng thanh toán hoạt động bình thường. Mọi request `POST /payments/create` được gửi đi.
-    *   *Trạng thái OPEN:* Nếu có 5 lỗi liên tiếp xảy ra khi gọi API của cổng thanh toán trong 1 phút, mạch tự động chuyển sang `OPEN`. Mọi request tạo thanh toán mới qua cổng này lập tức bị từ chối và trả về lỗi `503 Service Unavailable` mà không gọi ra ngoài. Giữ trạng thái này trong 60 giây.
-    *   *Trạng thái HALF-OPEN:* Sau 60 giây, cho phép 3 request thử nghiệm đi qua. Nếu cả 3 thành công, chuyển mạch về `CLOSED`. Nếu bất kỳ request nào lỗi, quay lại trạng thái `OPEN`.
+    *   *Trạng thái OPEN:* Nếu có 5 lỗi trong cửa sổ 60 giây, circuit của riêng provider đó được ghi vào Redis và mở trong 30 giây. Request mới bị từ chối bằng `503 Service Unavailable` mà không gọi ra ngoài.
+    *   *Khôi phục hiện tại:* Sau TTL 30 giây, khóa `OPEN` hết hạn và provider được phép nhận request lại. Một lần gọi thành công sẽ xóa failure counter. Code hiện tại chưa có trạng thái `HALF_OPEN` và probe concurrency riêng; đây là cải tiến có thể bổ sung khi triển khai production.
 *   **Graceful Degradation (Suy thoái có kiểm soát):**
     *   Khi cổng VNPAY bị sập (OPEN), nút chọn thanh toán VNPAY trên giao diện Frontend sẽ bị mờ đi và thông báo bảo trì, nhưng khách hàng vẫn có thể chọn MoMo (nếu MoMo đang CLOSED) để tiếp tục mua vé.
     *   Tất cả các API phi thanh toán (xem concert, xem danh sách vé đã mua, check-in) hoàn toàn không bị ảnh hưởng.
@@ -430,7 +538,7 @@ Giảm tải truy vấn cho PostgreSQL:
         *   Client nhận phản hồi cập nhật trạng thái log local tương ứng (`SYNCED` hoặc `CONFLICT` / `FAILED` kèm lý do lỗi), cập nhật trạng thái `ticket_snapshot` trong SQLite thành `USED`, thêm bản ghi vào `sync_log`, và xóa item khỏi queue trong `AsyncStorage`.
 *   **Xử lý Cảnh báo Conflict muộn (Late Conflict Resolution):**
     *   Do tính chất check-in offline, hệ thống không thể ngăn chặn hoàn toàn việc một vé QR giả/trùng lặp được quét thành công ở hai thiết bị offline khác nhau tại thời điểm mất mạng.
-    *   Khi thiết bị thực hiện sync dữ liệu và server phát hiện ra trạng thái `CONFLICT`, hệ thống sẽ kích hoạt một sự kiện bất đồng bộ gửi thông báo Realtime (qua WebSockets) đến bảng điều khiển của Admin (Admin Dashboard).
+    *   Khi sync phát hiện `CONFLICT`, hệ thống ghi `CheckinEvent` và Audit để Admin tra cứu. Realtime push qua WebSocket là hướng mở rộng; code hiện tại chưa có WebSocket gateway.
     *   Thông báo hiển thị chi tiết: mã vé, thông tin khách hàng, ID thiết bị quét A (được chấp nhận), ID thiết bị quét B (báo conflict), và vị trí cửa soát vé (Gate Name). Từ đó, đội an ninh sự kiện có thể tiếp cận ngay cổng quét B để xử lý thực tế với khách hàng sở hữu vé quét sau.
 
 
@@ -439,7 +547,7 @@ Giảm tải truy vấn cho PostgreSQL:
 ## Các quyết định kỹ thuật quan trọng (ADR)
 
 ### 1. Cơ sở dữ liệu: PostgreSQL kết hợp Redis và SQLite
-*   **Quyết định:** Sử dụng PostgreSQL cho dữ liệu nghiệp vụ chính, Redis cho caching/rate limit/waiting room queue, và SQLite cho Mobile App soát vé offline.
+*   **Quyết định:** Sử dụng PostgreSQL cho dữ liệu nghiệp vụ chính và Outbox, Redis cho caching/rate limit/BullMQ, và SQLite cho Mobile App soát vé offline. Waiting Room dùng Redis là hướng mở rộng.
 *   **Lý do:** Dữ liệu bán vé concert đòi hỏi tính toàn vẹn dữ liệu cực kỳ cao (ACID) để tránh oversell, do đó cơ sở dữ liệu quan hệ như PostgreSQL là lựa chọn tối ưu nhờ hỗ trợ row-level locking và transaction mạnh mẽ. Redis cung cấp tốc độ đọc/ghi bộ nhớ cực nhanh để làm giảm tải cho PostgreSQL ở các tính năng đọc nhiều hoặc các nghiệp vụ cần tốc độ phản hồi tính bằng mili-giây (Rate Limiting). SQLite là hệ quản trị cơ sở dữ liệu nhúng nhẹ nhất, không cần cài đặt server, lưu trữ trực tiếp dưới dạng tệp tin trên thiết bị di động, hoàn hảo cho việc lưu trữ offline log trên Mobile App.
 
 ### 2. Quản lý trạng thái khóa: Pessimistic Locking (Khóa bi quan) thay vì Optimistic Locking (Khóa lạc quan)
