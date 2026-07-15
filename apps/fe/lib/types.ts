@@ -40,10 +40,10 @@ export interface Seat {
 export const paymentMethods = [
   {
     id: 'momo',
-    gateway: 'CARD' as PaymentMethod,
-    name: 'Thẻ tín dụng',
-    description: 'Thanh toán qua thẻ quốc tế (Visa, Mastercard, JCB)',
-    icon: 'CreditCard',
+    gateway: 'WALLET' as PaymentMethod,
+    name: 'Ví MoMo',
+    description: 'Thanh toán qua ví điện tử MoMo',
+    icon: 'Wallet',
   },
   {
     id: 'vnpay',

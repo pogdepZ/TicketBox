@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AlertCircle, ArrowLeft, CreditCard, Landmark } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CreditCard, Landmark, Wallet } from 'lucide-react';
 import { CheckoutSummary } from '@/components/checkout-summary';
 import { paymentMethods } from '@/lib/types';
 import { createDraftReservation, DraftReservation, getDraftReservation } from '@/lib/draft-reservation';
@@ -413,7 +413,9 @@ export function CheckoutFlow() {
                           ? 'bg-primary/10 text-primary' 
                           : 'bg-muted text-muted-foreground'
                       }`}>
-                        {method.icon === 'CreditCard' ? (
+                        {method.icon === 'Wallet' ? (
+                          <Wallet className="size-5" />
+                        ) : method.icon === 'CreditCard' ? (
                           <CreditCard className="size-5" />
                         ) : (
                           <Landmark className="size-5" />

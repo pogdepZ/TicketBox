@@ -321,7 +321,7 @@ export default function SuccessPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Phương thức thanh toán</span>
-              <span className="font-semibold text-foreground">{order.paymentMethod === 'MOMO' ? 'Thẻ tín dụng' : 'VNPay'}</span>
+              <span className="font-semibold text-foreground">{order.paymentMethod === 'MOMO' ? 'Ví MoMo' : 'VNPay'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tổng tiền</span>
