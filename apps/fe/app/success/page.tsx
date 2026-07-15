@@ -14,6 +14,7 @@ export default function SuccessPage() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
   const status = searchParams.get('status');
+  const fromNotif = searchParams.get('fromNotif') === 'true';
 
   const [order, setOrder] = useState<StoredMockOrder | null>(null);
   const [loading, setLoading] = useState(true);
@@ -120,7 +121,7 @@ export default function SuccessPage() {
               
               const sessionKey = `notified-order-${orderId}`;
               const alreadyNotified = typeof window !== 'undefined' && window.sessionStorage.getItem(sessionKey);
-              if (!alreadyNotified) {
+              if (!alreadyNotified && !fromNotif) {
                 addLocalNotification(
                   'Đặt vé thành công!',
                   `Đơn hàng #${actualOrderNumber} cho sự kiện "${mappedOrder.concertTitle}" đã được đặt thành công.`,
@@ -144,7 +145,7 @@ export default function SuccessPage() {
               
               const sessionKey = `notified-order-${orderId}`;
               const alreadyNotified = typeof window !== 'undefined' && window.sessionStorage.getItem(sessionKey);
-              if (!alreadyNotified) {
+              if (!alreadyNotified && !fromNotif) {
                 addLocalNotification(
                   'Đặt vé thành công!',
                   `Đơn hàng #${actualOrderNumber} cho sự kiện "${concertTitle}" đã được đặt thành công.`,
@@ -171,7 +172,7 @@ export default function SuccessPage() {
     if (!loading && isFailed && orderId) {
       const sessionKey = `notified-order-failed-${orderId}`;
       const alreadyNotified = typeof window !== 'undefined' && window.sessionStorage.getItem(sessionKey);
-      if (!alreadyNotified) {
+      if (!alreadyNotified && !fromNotif) {
         addLocalNotification(
           'Thanh toán thất bại!',
           `Đơn đặt vé #${orderId.substring(0, 8).toUpperCase()} của bạn thanh toán thất bại hoặc đã bị hủy.`,
@@ -183,7 +184,7 @@ export default function SuccessPage() {
         }
       }
     }
-  }, [loading, isFailed, orderId]);
+  }, [loading, isFailed, orderId, fromNotif]);
 
   if (loading) {
     return (
@@ -324,7 +325,7 @@ export default function SuccessPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tổng tiền</span>
-              <span className="text-lg font-black text-primary">{order.totalAmount.toLocaleString('vi-VN')}đ</span>
+              <span className="text-lg font-black text-primary">{Number(order.totalAmount).toLocaleString('vi-VN')}đ</span>
             </div>
           </div>
         </div>
