@@ -17,7 +17,7 @@ import {
   uploadConcertPoster,
   getGuestList,
 } from "@/lib/api";
-import { VIETNAM_PROVINCES } from "@/lib/constants";
+import { VIETNAM_PROVINCES, CONCERT_TYPES } from "@/lib/constants";
 import {
   ArrowLeft,
   Plus,
@@ -69,6 +69,7 @@ export default function AdminConcertDetailPage({
   // Concert Details Form State
   const [editName, setEditName] = useState("");
   const [editArtistName, setEditArtistName] = useState("");
+  const [editType, setEditType] = useState("Live Music");
   const [editDescription, setEditDescription] = useState("");
   const [editEventDate, setEditEventDate] = useState("");
   const [editEventTime, setEditEventTime] = useState("");
@@ -201,6 +202,7 @@ export default function AdminConcertDetailPage({
         // Populate edit details form
         setEditName(concertData.title || "");
         setEditArtistName(concertData.artist || "");
+        setEditType(concertData.genre || "Live Music");
         setEditDescription(concertData.description || "");
         setEditVenueName(concertData.venue || "");
         setEditVenueAddress(concertData.address || "");
@@ -346,6 +348,7 @@ export default function AdminConcertDetailPage({
           name: editName.trim(),
           description: editDescription.trim() || undefined,
           artistName: editArtistName.trim() || undefined,
+          type: editType,
           venueName: editVenueName.trim(),
           venueAddress: editVenueAddress.trim(),
           city: editCity,
@@ -779,6 +782,29 @@ export default function AdminConcertDetailPage({
                       />
                     </div>
                     <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Loại sự kiện <span className="text-destructive">*</span>
+                      </label>
+                      <select
+                        disabled={isBasicInfoReadOnly}
+                        value={editType}
+                        onChange={(e) => setEditType(e.target.value)}
+                        className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15 cursor-pointer appearance-none disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
+                          backgroundPosition: "right 1rem center",
+                          backgroundSize: "1.25rem",
+                          backgroundRepeat: "no-repeat",
+                        }}
+                      >
+                        {CONCERT_TYPES.map((t) => (
+                          <option key={t} value={t} className="bg-card text-foreground">
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-foreground mb-2">
                         Poster sự kiện (URL hoặc tải lên)
                       </label>

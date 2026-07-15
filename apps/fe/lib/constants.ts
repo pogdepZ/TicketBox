@@ -34,3 +34,15 @@ export const VIETNAM_PROVINCES = [
   "Tỉnh Cà Mau",
   "Tỉnh An Giang",
 ];
+
+export const CONCERT_TYPES = [
+  "Live Music",
+  "Music Festival",
+  "Festival",
+  "Fan Meeting",
+  "Gaming",
+  "Sport",
+  "Event",
+  "Theatre",
+  "Fan Concert",
+];

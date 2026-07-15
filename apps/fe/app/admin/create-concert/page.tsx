@@ -19,12 +19,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { DatePicker, TimePicker } from "@/components/date-time-picker";
-import { VIETNAM_PROVINCES } from "@/lib/constants";
+import { VIETNAM_PROVINCES, CONCERT_TYPES } from "@/lib/constants";
 
 export default function CreateConcertPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [artistName, setArtistName] = useState("");
+  const [type, setType] = useState("Live Music");
   const [description, setDescription] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
@@ -171,6 +172,7 @@ export default function CreateConcertPage() {
         name: name.trim(),
         description: description.trim() || undefined,
         artistName: artistName.trim() || undefined,
+        type: type,
         venueName: venueName.trim(),
         venueAddress: venueAddress.trim(),
         city: city,
@@ -268,6 +270,28 @@ export default function CreateConcertPage() {
                     />
                   </div>
                   <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Loại sự kiện <span className="text-destructive">*</span>
+                    </label>
+                    <select
+                      value={type}
+                      onChange={(e) => setType(e.target.value)}
+                      className="h-11 w-full rounded-2xl border border-border bg-background px-4 text-foreground focus:outline-none focus:ring-4 focus:ring-primary/15 cursor-pointer appearance-none"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
+                        backgroundPosition: "right 1rem center",
+                        backgroundSize: "1.25rem",
+                        backgroundRepeat: "no-repeat",
+                      }}
+                    >
+                      {CONCERT_TYPES.map((t) => (
+                        <option key={t} value={t} className="bg-card text-foreground">
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-foreground mb-2">
                       Poster sự kiện (URL hoặc tải lên)
                     </label>

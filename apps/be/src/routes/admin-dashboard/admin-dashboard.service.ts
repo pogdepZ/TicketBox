@@ -279,32 +279,42 @@ export class AdminDashboardService {
       const ticketsSold = soldTickets.length;
       const sellThroughRate = capacity > 0 ? Math.round((ticketsSold / capacity) * 100) : 0;
 
-      // Generate dates from concert creation (sales open) to 1 day before event
-      const endDate = new Date(new Date(concert.eventDate).getTime() - 24 * 60 * 60 * 1000);
-      const startDate = new Date(concert.createdAt);
+      // Determine initial start and end dates
+      let startDate = new Date(concert.createdAt);
+      let endDate = new Date(concert.eventDate);
 
-      if (startDate >= endDate) {
-        startDate.setTime(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+      // Expand range if tickets were sold outside the window (e.g. mock data, timezones)
+      if (soldTickets.length > 0) {
+        const ticketTimes = soldTickets.map(t => new Date(t.createdAt).getTime());
+        const minTicketTime = Math.min(...ticketTimes);
+        const maxTicketTime = Math.max(...ticketTimes);
+
+        if (minTicketTime < startDate.getTime()) {
+          startDate = new Date(minTicketTime);
+        }
+        if (maxTicketTime > endDate.getTime()) {
+          endDate = new Date(maxTicketTime);
+        }
       }
 
-      // Tính số ngày chênh lệch thực tế để đảm bảo có tối thiểu 7 ngày hiển thị
+      // Ensure we display at least 7 days for the chart
       const diffTime = endDate.getTime() - startDate.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       if (diffDays < 7) {
-        startDate.setTime(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+        startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
       }
 
       const dateList: string[] = [];
       const tempDate = new Date(startDate);
-      const endDateStr = getLocalDateString(endDate);
+      tempDate.setHours(0, 0, 0, 0);
+      const endLimit = new Date(endDate);
+      endLimit.setHours(23, 59, 59, 999);
 
-      while (true) {
-        const currentDateStr = getLocalDateString(tempDate);
-        dateList.push(currentDateStr);
-        if (currentDateStr === endDateStr) {
-          break;
-        }
+      let iterations = 0;
+      while (tempDate <= endLimit && iterations < 1000) {
+        dateList.push(getLocalDateString(tempDate));
         tempDate.setDate(tempDate.getDate() + 1);
+        iterations++;
       }
 
       // Group tickets by ticketTypeId and day for the dateList
