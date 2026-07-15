@@ -11,7 +11,7 @@ export interface ApiResponse<T = unknown> {
 }
 
 /** Check-in scan result status */
-export type ScanStatus = 'SUCCESS' | 'DUPLICATE' | 'NOT_FOUND' | 'WRONG_EVENT' | 'TEMP_ACCEPTED';
+export type ScanStatus = 'SUCCESS' | 'DUPLICATE' | 'NOT_FOUND' | 'WRONG_EVENT' | 'WRONG_ZONE' | 'TEMP_ACCEPTED' | 'ACCEPTED_GUEST' | 'DUPLICATE_GUEST' | 'INVALID_GUEST';
 
 /** Sync status for offline queue items */
 export type SyncStatus = 'PENDING' | 'SYNCED' | 'FAILED' | 'CONFLICT' | 'REJECTED';
@@ -25,7 +25,10 @@ export interface TicketInfo {
   guestName: string;
   ticketType: string;
   ticketCode: string;
+  seat?: string;
   concertName: string;
+  venue?: string;
+  orderRef?: string;
   checkedInAt: string;
   status: ScanStatus;
 }
@@ -45,6 +48,7 @@ export interface OfflineQueueItem {
   lastSyncError: string | null;
   serverCheckinId: string | null;
   createdAt: string;
+  gate?: string;
 }
 
 /** Sync history record */
@@ -106,6 +110,9 @@ export interface SnapshotResponse {
     status: string;
     guestName: string;
     ticketType: string;
+    seat?: string | null;
+    allowedGates?: string[];
+    orderRef?: string | null;
   }[];
   guests: {
     id: string;
@@ -113,12 +120,23 @@ export interface SnapshotResponse {
     fullName: string;
     email: string | null;
     status: string;
+    allowedGates?: string[];
   }[];
+}
+
+/** Concert */
+export interface Concert {
+  id: string;
+  name: string;
+  eventDate: string;
+  venueName: string;
+  posterUrl: string | null;
 }
 
 /** Navigation params */
 export type RootStackParamList = {
   Login: undefined;
+  EventSelector: undefined;
   Scanner: undefined;
   Result: { ticket: TicketInfo; isOffline: boolean };
   OfflineQueue: undefined;

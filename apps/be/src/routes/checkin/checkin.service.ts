@@ -17,22 +17,40 @@ export class CheckinService {
   async scan(dto: ScanCheckinDto) {
     const { qrCodeData, staffId, concertId, deviceId, clientEventId } = dto;
 
+    if (deviceId && concertId && staffId) {
+      try {
+        const existingDevice = await this.prisma.checkinDevice.findUnique({
+          where: { id: deviceId }
+        });
+        if (!existingDevice) {
+          await this.prisma.checkinDevice.create({
+            data: {
+              id: deviceId,
+              deviceCode: `DEV-${deviceId.substring(0, 6)}`,
+              staffUserId: staffId,
+              concertId: concertId,
+            }
+          });
+        }
+      } catch (e: any) {
+        this.logger.warn(`Failed to create CheckinDevice: ${e.message}`);
+      }
+    }
+
     let extractedTicketCode = qrCodeData;
     const ticketSecret = this.config.get<string>('JWT_TICKET_SECRET', 'ticket-secret');
 
+    let isJwt = false;
     // 1. Verify JWS and extract ticket_code
     try {
       const decoded = jwt.verify(qrCodeData, ticketSecret) as any;
       if (decoded && decoded.ticket_code) {
         extractedTicketCode = decoded.ticket_code;
+        isJwt = true;
       }
     } catch (e: any) {
       this.logger.warn(`Failed to verify JWT for checkin: ${e.message}`);
-      return {
-        ticketId: 'unknown',
-        status: 'INVALID_TICKET',
-        checkedInAt: new Date().toISOString(),
-      };
+      // Don't return INVALID_TICKET yet, it might be a raw Guest Code
     }
 
     // 2. Resolve ticket
@@ -40,76 +58,213 @@ export class CheckinService {
       where: { ticketCode: extractedTicketCode },
       include: {
         order: true,
+        owner: true,
+        ticketType: true,
+        concert: true,
       },
     });
     
-    if (!ticket || ticket.order.concertId !== concertId) {
-      return {
-        ticketId: ticket ? ticket.id : 'unknown',
-        status: 'INVALID_CONCERT',
-        checkedInAt: new Date().toISOString(),
-      };
-    }
-
-    // Use a transaction to prevent race conditions on check-in
-    return await this.prisma.$transaction(async (tx) => {
-      // Re-fetch ticket with lock if needed, but simple read is often ok 
-      // or we just rely on the status update condition.
-      const currentTicket = await tx.ticket.findUnique({
-        where: { id: ticket.id },
-      });
-
-      if (!currentTicket) throw new Error('Ticket not found');
-
-      let checkinResult: 'ACCEPTED' | 'DUPLICATE' | 'REJECTED' = 'REJECTED';
-      let returnStatus = 'REJECTED';
-
-      if (currentTicket.status === 'USED') {
-        checkinResult = 'DUPLICATE';
-        returnStatus = 'ALREADY_CHECKED_IN';
-      } else if (currentTicket.status !== 'ACTIVE') {
-        checkinResult = 'REJECTED';
-        returnStatus = 'INVALID_TICKET';
-      } else {
-        checkinResult = 'ACCEPTED';
-        returnStatus = 'ACCEPTED';
-        
-        // Update ticket
-        await tx.ticket.update({
-          where: { id: ticket.id },
-          data: {
-            status: 'USED',
-            scannedAt: new Date(),
-            scannedById: staffId,
-            scannedDevice: deviceId,
-          },
-        });
+    if (ticket) {
+      if (ticket.order.concertId !== concertId) {
+        return {
+          ticketId: ticket.id,
+          status: 'WRONG_EVENT',
+          checkedInAt: new Date().toISOString(),
+          guestName: ticket.owner.fullName,
+          ticketType: ticket.ticketType?.name || 'Standard',
+          ticketCode: ticket.ticketCode,
+          concertName: ticket.concert?.name || 'Unknown Concert',
+          orderRef: ticket.order?.paymentRef || 'N/A',
+          venue: ticket.concert?.venueName || 'Unknown Venue',
+        };
       }
 
-      const checkedInAt = new Date();
-      // Record the checkin event
-      await tx.checkinEvent.create({
-        data: {
+      // Use a transaction to prevent race conditions on check-in
+      return await this.prisma.$transaction(async (tx) => {
+        // Implement Row Locking (SELECT FOR UPDATE) to prevent race condition
+        await tx.$queryRaw`SELECT 1 FROM tickets WHERE id = ${ticket.id}::uuid FOR UPDATE`;
+        
+        const currentTicket = await tx.ticket.findUnique({
+          where: { id: ticket.id },
+        });
+
+        if (!currentTicket) throw new Error('Ticket not found');
+
+        let checkinResult: 'ACCEPTED' | 'DUPLICATE' | 'REJECTED' = 'REJECTED';
+        let returnStatus = 'REJECTED';
+
+        const ticketGateCheck = ticket.ticketType?.allowedGates || [];
+        
+        if (dto.gate && ticketGateCheck.length > 0 && !ticketGateCheck.includes(dto.gate)) {
+          checkinResult = 'REJECTED';
+          returnStatus = 'WRONG_ZONE';
+        } else if (currentTicket.status === 'USED') {
+          checkinResult = 'DUPLICATE';
+          returnStatus = 'DUPLICATE';
+        } else if (currentTicket.status !== 'ACTIVE') {
+          checkinResult = 'REJECTED';
+          returnStatus = 'NOT_FOUND';
+        } else {
+          checkinResult = 'ACCEPTED';
+          returnStatus = 'SUCCESS';
+          
+          await tx.ticket.update({
+            where: { id: ticket.id },
+            data: {
+              status: 'USED',
+              scannedAt: new Date(),
+              scannedById: staffId,
+              scannedDevice: deviceId,
+            },
+          });
+        }
+
+        const checkedInAt = new Date();
+        
+        await tx.checkinDevice.upsert({
+          where: { id: deviceId },
+          update: { lastSyncAt: checkedInAt },
+          create: {
+            id: deviceId,
+            deviceCode: deviceId,
+            staffUserId: staffId,
+            concertId: concertId,
+            gateName: 'Default',
+            status: 'ACTIVE',
+            lastSyncAt: checkedInAt,
+          }
+        });
+
+        await tx.checkinEvent.create({
+          data: {
+            ticketId: ticket.id,
+            staffUserId: staffId,
+            deviceId: deviceId,
+            clientEventId: clientEventId || `scan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            mode: 'ONLINE',
+            result: checkinResult,
+            scannedAtClient: checkedInAt,
+          },
+        });
+
+        return {
           ticketId: ticket.id,
-          staffUserId: staffId,
-          deviceId: deviceId,
-          clientEventId: clientEventId || `scan-${Date.now()}`,
-          mode: 'ONLINE',
-          result: checkinResult,
-          scannedAtClient: checkedInAt,
+          status: returnStatus,
+          checkedInAt: checkedInAt.toISOString(),
+          guestName: ticket.owner?.fullName || 'Unknown',
+          ticketType: ticket.ticketType?.name || 'Unknown',
+          ticketCode: ticket.ticketCode,
+          concertName: ticket.concert?.name || 'Unknown Concert',
+          seat: ticket.seatNumber || undefined,
+          orderRef: ticket.order?.paymentRef || (ticket.orderId ? `ORD-${ticket.orderId.substring(0, 8).toUpperCase()}` : 'N/A'),
+          venue: ticket.concert?.venueName || 'Unknown Venue',
+        };
+      });
+    }
+
+    // 3. Resolve Guest
+    let guest = null;
+    if (concertId && concertId !== '') {
+      guest = await this.prisma.guestList.findUnique({
+        where: {
+          concertId_guestCode: {
+            concertId: concertId,
+            guestCode: extractedTicketCode,
+          },
+        },
+        include: {
+          concert: true,
         },
       });
+    }
 
-      return {
-        ticketId: ticket.id,
-        status: returnStatus,
-        checkedInAt: checkedInAt.toISOString(),
-        guestName: 'Guest (Resolved)', // Normally resolved from ticket.owner
-        ticketType: 'Resolved Type',
-        ticketCode: ticket.ticketCode,
-        concertName: 'Resolved Concert',
-      };
-    });
+    if (guest) {
+      return await this.prisma.$transaction(async (tx) => {
+        // Implement Row Locking (SELECT FOR UPDATE) to prevent race condition
+        await tx.$queryRaw`SELECT 1 FROM guest_list WHERE id = ${guest.id}::uuid FOR UPDATE`;
+        
+        const currentGuest = await tx.guestList.findUnique({
+          where: { id: guest.id },
+        });
+
+        if (!currentGuest) throw new Error('Guest not found');
+
+        let checkinResult: 'ACCEPTED' | 'DUPLICATE' | 'REJECTED' = 'REJECTED';
+        let returnStatus = 'REJECTED';
+
+        const guestGateCheck = currentGuest.allowedGates || [];
+        
+        if (dto.gate && guestGateCheck.length > 0 && !guestGateCheck.includes(dto.gate)) {
+          checkinResult = 'REJECTED';
+          returnStatus = 'WRONG_ZONE';
+        } else if (currentGuest.status === 'CHECKED_IN') {
+          checkinResult = 'DUPLICATE';
+          returnStatus = 'DUPLICATE_GUEST';
+        } else if (currentGuest.status !== 'ACTIVE') {
+          checkinResult = 'REJECTED';
+          returnStatus = 'INVALID_GUEST';
+        } else {
+          checkinResult = 'ACCEPTED';
+          returnStatus = 'ACCEPTED_GUEST';
+          
+          await tx.guestList.update({
+            where: { id: guest.id },
+            data: {
+              status: 'CHECKED_IN',
+              scannedAt: new Date(),
+              scannedById: staffId,
+            },
+          });
+        }
+
+        const checkedInAt = new Date();
+
+        await tx.checkinDevice.upsert({
+          where: { id: deviceId },
+          update: { lastSyncAt: checkedInAt },
+          create: {
+            id: deviceId,
+            deviceCode: deviceId,
+            staffUserId: staffId,
+            concertId: concertId,
+            gateName: 'Default',
+            status: 'ACTIVE',
+            lastSyncAt: checkedInAt,
+          }
+        });
+
+        await tx.checkinEvent.create({
+          data: {
+            guestId: guest.id,
+            staffUserId: staffId,
+            deviceId: deviceId,
+            clientEventId: clientEventId || `scan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            mode: 'ONLINE',
+            result: checkinResult,
+            scannedAtClient: checkedInAt,
+          },
+        });
+
+        return {
+          ticketId: guest.id,
+          status: returnStatus,
+          checkedInAt: checkedInAt.toISOString(),
+          guestName: guest.fullName,
+          ticketType: guest.guestType || 'GUEST',
+          ticketCode: guest.guestCode,
+          concertName: guest.concert?.name || 'Unknown Concert',
+          orderRef: 'GUEST-LIST',
+          venue: guest.concert?.venueName || 'Unknown Venue',
+        };
+      });
+    }
+
+    // 4. Not found in Ticket nor Guest
+    return {
+      ticketId: 'unknown',
+      status: isJwt ? 'WRONG_EVENT' : 'INVALID_GUEST',
+      checkedInAt: new Date().toISOString(),
+    };
   }
 
   async sync(dto: SyncCheckinDto) {
@@ -145,13 +300,14 @@ export class CheckinService {
           staffId: item.staffId,
           concertId: item.concertId,
           deviceId: item.sourceDeviceId,
-          clientEventId: item.clientEventId, // Use provided event ID
+          clientEventId: item.clientEventId,
+          gate: item.gate,
         });
 
         let syncStatus = 'FAILED';
-        if (result.status === 'ACCEPTED') {
+        if (result.status === 'SUCCESS' || result.status === 'ACCEPTED_GUEST') {
           syncStatus = 'SYNCED';
-        } else if (result.status === 'ALREADY_CHECKED_IN') {
+        } else if (result.status === 'DUPLICATE' || result.status === 'DUPLICATE_GUEST') {
           syncStatus = 'CONFLICT';
         } else {
           syncStatus = 'REJECTED';
@@ -188,6 +344,7 @@ export class CheckinService {
       include: {
         ticketType: true,
         owner: true,
+        order: true,
       },
     });
 
@@ -212,6 +369,9 @@ export class CheckinService {
         status: t.status,
         guestName: t.owner?.fullName || 'Khách Hàng',
         ticketType: t.ticketType?.name || '---',
+        seat: t.seatNumber || null,
+        allowedGates: t.ticketType?.allowedGates || [],
+        orderRef: t.order?.paymentRef || (t.orderId ? `ORD-${t.orderId.substring(0, 8).toUpperCase()}` : 'N/A'),
       })),
       guests: guests.map((g) => ({
         id: g.id,
@@ -219,7 +379,29 @@ export class CheckinService {
         fullName: g.fullName,
         email: g.email || null,
         status: g.status,
+        allowedGates: g.allowedGates || [],
       })),
     };
+  }
+
+  async getConcerts() {
+    const concerts = await this.prisma.concert.findMany({
+      where: {
+        status: {
+          in: ['PUBLISHED'],
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        eventDate: true,
+        venueName: true,
+        posterUrl: true,
+      },
+      orderBy: {
+        eventDate: 'asc',
+      },
+    });
+    return concerts;
   }
 }

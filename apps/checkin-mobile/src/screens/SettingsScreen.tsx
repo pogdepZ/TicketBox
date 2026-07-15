@@ -18,8 +18,6 @@ import {
   LogOut,
   Database,
   User,
-  Bell,
-  Smartphone,
   Cloud,
   Info,
 } from "lucide-react-native";
@@ -31,8 +29,6 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Settings">;
 
 export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const [notifications, setNotifications] = useState(true);
-  const [haptics, setHaptics] = useState(true);
   const [autoSync, setAutoSync] = useState(true);
   const [userName, setUserName] = useState("Staff Member");
   const [userRole, setUserRole] = useState("Gate Operator");
@@ -46,6 +42,11 @@ export default function SettingsScreen() {
           setUserName(user.fullName || user.email || "Staff Member");
           setUserRole(user.role || "Gate Operator");
         }
+        
+        const autoSyncStr = await AsyncStorage.getItem('auto_sync_enabled');
+        if (autoSyncStr !== null) {
+          setAutoSync(autoSyncStr === 'true');
+        }
       } catch (e) {
         console.error(e);
       }
@@ -53,11 +54,16 @@ export default function SettingsScreen() {
     loadUser();
   }, []);
 
+  const handleAutoSyncToggle = async (v: boolean) => {
+    setAutoSync(v);
+    await AsyncStorage.setItem('auto_sync_enabled', v ? 'true' : 'false');
+  };
+
   const handleLogout = async () => {
-    Alert.alert("Logout", "Are you sure you want to log out?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert("Đăng xuất", "Bạn có chắc chắn muốn đăng xuất?", [
+      { text: "Hủy", style: "cancel" },
       {
-        text: "Logout",
+        text: "Đăng xuất",
         style: "destructive",
         onPress: async () => {
           apiService.setToken(null);
@@ -82,7 +88,7 @@ export default function SettingsScreen() {
         console.log(`${key}:`, value);
       });
       console.log("--------------------------");
-      Alert.alert("Storage Dumped", "Check terminal logs.");
+      Alert.alert("Đã xuất bộ nhớ", "Vui lòng kiểm tra log trên terminal.");
     } catch (error) {
       console.error("Error reading AsyncStorage:", error);
     }
@@ -99,13 +105,13 @@ export default function SettingsScreen() {
           style={styles.backButton}
         >
           <ChevronLeft color={COLORS.textMuted} size={20} />
-          <Text style={styles.backText}>Back</Text>
+          <Text style={styles.backText}>Quay lại</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.titleContainer}>
-        <Text style={styles.subtitle}>CONFIGURATION</Text>
-        <Text style={styles.title}>Settings</Text>
+        <Text style={styles.subtitle}>CẤU HÌNH</Text>
+        <Text style={styles.title}>Cài đặt</Text>
       </View>
 
       <ScrollView
@@ -114,7 +120,7 @@ export default function SettingsScreen() {
       >
         {/* Account Settings */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
+          <Text style={styles.sectionTitle}>Tài khoản</Text>
           <View style={styles.card}>
             <View style={styles.profileRow}>
               <View style={styles.avatar}>
@@ -132,41 +138,27 @@ export default function SettingsScreen() {
                 size={18}
                 style={{ marginRight: 12 }}
               />
-              <Text style={styles.actionTextError}>Sign Out</Text>
+              <Text style={styles.actionTextError}>Đăng xuất</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* App Settings */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Preferences</Text>
+          <Text style={styles.sectionTitle}>Tùy chọn</Text>
           <View style={styles.card}>
             <SettingToggle
-              icon={<Bell color={COLORS.textMuted} size={18} />}
-              label="Push Notifications"
-              value={notifications}
-              onValueChange={setNotifications}
-            />
-            <View style={styles.divider} />
-            <SettingToggle
-              icon={<Smartphone color={COLORS.textMuted} size={18} />}
-              label="Haptic Feedback"
-              value={haptics}
-              onValueChange={setHaptics}
-            />
-            <View style={styles.divider} />
-            <SettingToggle
               icon={<Cloud color={COLORS.textMuted} size={18} />}
-              label="Background Auto-Sync"
+              label="Tự động đồng bộ nền"
               value={autoSync}
-              onValueChange={setAutoSync}
+              onValueChange={handleAutoSyncToggle}
             />
           </View>
         </View>
 
         {/* Database / Debug */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>System Data</Text>
+          <Text style={styles.sectionTitle}>Dữ liệu hệ thống</Text>
           <View style={styles.card}>
             <TouchableOpacity
               style={styles.actionRow}
@@ -178,9 +170,9 @@ export default function SettingsScreen() {
                 style={{ marginRight: 12 }}
               />
               <View>
-                <Text style={styles.actionText}>Download Offline Snapshot</Text>
+                <Text style={styles.actionText}>Tải dữ liệu Offline (Snapshot)</Text>
                 <Text style={styles.actionSubtext}>
-                  Update local database for offline scanning
+                  Cập nhật cơ sở dữ liệu cục bộ để soát vé offline
                 </Text>
               </View>
             </TouchableOpacity>
@@ -191,7 +183,7 @@ export default function SettingsScreen() {
                 size={18}
                 style={{ marginRight: 12 }}
               />
-              <Text style={styles.actionText}>Dump Storage (Debug)</Text>
+              <Text style={styles.actionText}>Xuất bộ nhớ (Debug)</Text>
             </TouchableOpacity>
           </View>
         </View>

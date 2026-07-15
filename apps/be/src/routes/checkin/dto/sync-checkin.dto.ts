@@ -6,6 +6,7 @@ export class SyncCheckinItemDto {
   sourceDeviceId!: string;
   checkedAt!: string;
   clientEventId!: string;
+  gate?: string;
 }
 
 export class SyncCheckinDto {

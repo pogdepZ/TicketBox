@@ -4,4 +4,5 @@ export class ScanCheckinDto {
   concertId!: string;
   deviceId!: string;
   clientEventId!: string;
+  gate?: string;
 }

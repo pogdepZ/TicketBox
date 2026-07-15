@@ -318,6 +318,8 @@ model TicketType {
   saleStartAt DateTime? @map("sale_start_at") @db.Timestamptz(6)
   saleEndAt   DateTime? @map("sale_end_at") @db.Timestamptz(6)
 
+  allowedGates String[] @default([]) @map("allowed_gates")
+
   status TicketTypeStatus @default(ACTIVE)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -587,9 +589,10 @@ model CheckinDevice {
 model CheckinEvent {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  ticketId    String @map("ticket_id") @db.Uuid
-  staffUserId String @map("staff_user_id") @db.Uuid
-  deviceId    String @map("device_id") @db.Uuid
+  ticketId    String? @map("ticket_id") @db.Uuid
+  guestId     String? @map("guest_id") @db.Uuid
+  staffUserId String  @map("staff_user_id") @db.Uuid
+  deviceId    String  @map("device_id") @db.Uuid
 
   clientEventId String @map("client_event_id") @db.VarChar(100)
 
@@ -603,12 +606,14 @@ model CheckinEvent {
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  ticket    Ticket        @relation(fields: [ticketId], references: [id])
+  ticket    Ticket?       @relation(fields: [ticketId], references: [id])
+  guest     GuestList?    @relation(fields: [guestId], references: [id])
   staffUser User          @relation(fields: [staffUserId], references: [id])
   device    CheckinDevice @relation(fields: [deviceId], references: [id])
 
   @@unique([deviceId, clientEventId])
   @@index([ticketId])
+  @@index([guestId])
   @@index([deviceId])
   @@index([result])
   @@index([createdAt])
@@ -692,6 +697,8 @@ model GuestList {
   guestType String? @map("guest_type") @db.VarChar(50)
   guestCode String  @map("guest_code") @db.VarChar(50)
 
+  allowedGates String[] @default([]) @map("allowed_gates")
+
   status GuestStatus @default(ACTIVE)
 
   csvBatchId String? @map("csv_batch_id") @db.Uuid
@@ -704,6 +711,8 @@ model GuestList {
   concert   Concert           @relation(fields: [concertId], references: [id])
   csvBatch  GuestImportBatch? @relation(fields: [csvBatchId], references: [id])
   scannedBy User?             @relation("GuestScannedBy", fields: [scannedById], references: [id])
+
+  checkinEvents CheckinEvent[]
 
   @@unique([concertId, guestCode])
   @@unique([concertId, email])

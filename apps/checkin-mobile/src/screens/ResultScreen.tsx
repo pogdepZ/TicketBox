@@ -20,40 +20,72 @@ type ResultRouteProp = RouteProp<RootStackParamList, 'Result'>;
 
 const STATUS_CONFIG: Record<ScanStatus, { label: string; sublabel: string; color: string; bg: string; border: string; icon: any }> = {
   SUCCESS: {
-    label: 'VALID',
-    sublabel: 'Allow entry',
+    label: 'HỢP LỆ',
+    sublabel: 'Cho phép vào cổng',
     color: COLORS.success,
     bg: COLORS.success + '1A', // 10% opacity
     border: COLORS.success + '40', // 25% opacity
     icon: CheckCircle2,
   },
   TEMP_ACCEPTED: {
-    label: 'TEMP ACCEPTED',
-    sublabel: 'Allow entry (Offline)',
+    label: 'TẠM NHẬN',
+    sublabel: 'Cho phép vào cổng (Ngoại tuyến)',
     color: COLORS.success,
     bg: COLORS.success + '1A',
     border: COLORS.success + '40',
     icon: CheckCircle2,
   },
   DUPLICATE: {
-    label: 'ALREADY USED',
-    sublabel: 'Deny entry — already scanned',
+    label: 'ĐÃ DÙNG',
+    sublabel: 'Từ chối — Vé đã được quét trước đó',
     color: COLORS.warning,
     bg: COLORS.warning + '1A',
     border: COLORS.warning + '40',
     icon: AlertTriangle,
   },
   NOT_FOUND: {
-    label: 'INVALID',
-    sublabel: 'Deny entry — not recognised',
+    label: 'KHÔNG HỢP LỆ',
+    sublabel: 'Từ chối — Vé không tồn tại',
     color: COLORS.error,
     bg: COLORS.error + '1A',
     border: COLORS.error + '40',
     icon: XCircle,
   },
   WRONG_EVENT: {
-    label: 'INVALID',
-    sublabel: 'Deny entry — wrong event',
+    label: 'SAI SỰ KIỆN',
+    sublabel: 'Từ chối — Vé thuộc sự kiện khác',
+    color: COLORS.error,
+    bg: COLORS.error + '1A',
+    border: COLORS.error + '40',
+    icon: XCircle,
+  },
+  WRONG_ZONE: {
+    label: 'SAI CỔNG',
+    sublabel: 'Từ chối — Vé sai cổng/khu vực',
+    color: COLORS.error,
+    bg: COLORS.error + '1A',
+    border: COLORS.error + '40',
+    icon: XCircle,
+  },
+  ACCEPTED_GUEST: {
+    label: 'KHÁCH MỜI HỢP LỆ',
+    sublabel: 'Cho phép vào cổng (Danh sách khách mời)',
+    color: COLORS.success,
+    bg: COLORS.success + '1A',
+    border: COLORS.success + '40',
+    icon: CheckCircle2,
+  },
+  DUPLICATE_GUEST: {
+    label: 'KHÁCH MỜI ĐÃ DÙNG',
+    sublabel: 'Từ chối — Khách mời đã check-in',
+    color: COLORS.warning,
+    bg: COLORS.warning + '1A',
+    border: COLORS.warning + '40',
+    icon: AlertTriangle,
+  },
+  INVALID_GUEST: {
+    label: 'KHÁCH MỜI KHÔNG HỢP LỆ',
+    sublabel: 'Từ chối — Không có trong danh sách',
     color: COLORS.error,
     bg: COLORS.error + '1A',
     border: COLORS.error + '40',
@@ -84,9 +116,10 @@ export default function ResultScreen() {
 
   const s = STATUS_CONFIG[ticket.status as ScanStatus] || STATUS_CONFIG.NOT_FOUND;
   const Icon = s.icon;
-  const isInvalid = ticket.status === 'NOT_FOUND' || ticket.status === 'WRONG_EVENT';
+  const isNotFound = ticket.status === 'NOT_FOUND';
+  const isWrongEvent = ticket.status === 'WRONG_EVENT';
   const isUsed = ticket.status === 'DUPLICATE';
-  const checkinTime = ticket.checkedInAt ? new Date(ticket.checkedInAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+  const checkinTime = ticket.checkedInAt ? new Date(ticket.checkedInAt).toLocaleTimeString('vi-VN', { hour: 'numeric', minute: '2-digit' }) : '';
 
   const photoInitials = getInitials(ticket.guestName);
   const photoColor = getAvatarColor(ticket.guestName);
@@ -100,14 +133,14 @@ export default function ResultScreen() {
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <ChevronLeft color={COLORS.textMuted} size={20} />
-            <Text style={styles.backText}>Scanner</Text>
+            <Text style={styles.backText}>Quét vé</Text>
           </TouchableOpacity>
         </View>
 
         {/* Offline Badge */}
         {isOffline && (
           <View style={styles.offlineNotice}>
-            <Text style={styles.offlineNoticeText}>Recorded Offline. Will sync when online.</Text>
+            <Text style={styles.offlineNoticeText}>Đã ghi nhận ngoại tuyến. Sẽ đồng bộ khi có mạng.</Text>
           </View>
         )}
 
@@ -127,19 +160,17 @@ export default function ResultScreen() {
             <View style={[styles.usedTimeRow, { borderTopColor: s.border }]}>
               <Clock color={s.color} size={14} />
               <Text style={styles.usedTimeText}>
-                Previously checked in at <Text style={[styles.usedTimeBold, { color: s.color }]}>{checkinTime}</Text>
+                Đã được check-in trước đó vào lúc <Text style={[styles.usedTimeBold, { color: s.color }]}>{checkinTime}</Text>
               </Text>
             </View>
           ) : null}
         </View>
 
-        {/* Attendee card (not for invalid) */}
-        {!isInvalid && (
+        {/* Attendee card (not for NOT_FOUND) */}
+        {!isNotFound && ticket.guestName && (
           <TouchableOpacity 
             style={styles.attendeeCard} 
             activeOpacity={0.7}
-            // In a full app, this would navigate to a detailed Attendee info screen
-            // onPress={() => navigation.navigate('AttendeeDetails', { ticket })}
           >
             <View style={[styles.avatar, { backgroundColor: photoColor }]}>
               <Text style={styles.avatarText}>{photoInitials}</Text>
@@ -149,8 +180,8 @@ export default function ResultScreen() {
               <Text style={styles.attendeeType}>{ticket.ticketType}</Text>
             </View>
             <View style={styles.seatInfo}>
-              <Text style={styles.seatLabel}>Seat</Text>
-              <Text style={styles.seatValue}>A-14</Text> 
+              <Text style={styles.seatLabel}>Ghế</Text>
+              <Text style={styles.seatValue}>{ticket.seat || 'N/A'}</Text> 
             </View>
             <ChevronRight color={COLORS.textMuted} size={16} style={{ marginLeft: 4 }} />
           </TouchableOpacity>
@@ -159,21 +190,29 @@ export default function ResultScreen() {
         {/* Ticket details */}
         <View style={styles.detailsCard}>
           <View style={styles.detailsHeader}>
-            <Text style={styles.detailsHeaderText}>Ticket Details</Text>
+            <Text style={styles.detailsHeaderText}>Chi tiết vé</Text>
           </View>
           <View style={styles.detailsList}>
-            <DetailRow label="Ticket ID" value={ticket.ticketCode} mono />
-            <DetailRow label="Order" value="ORD-2026-9941" mono />
-            <DetailRow label="Event" value={ticket.concertName} />
-            <DetailRow label="Venue" value="The Warehouse" />
+            <DetailRow label="Mã vé" value={ticket.ticketCode || 'N/A'} mono />
+            <DetailRow label="Đơn hàng" value={ticket.orderRef || 'N/A'} mono />
+            <DetailRow label="Sự kiện" value={ticket.concertName || 'N/A'} />
+            <DetailRow label="Địa điểm" value={ticket.venue || 'N/A'} />
           </View>
         </View>
 
         {/* Invalid notice */}
-        {isInvalid && (
+        {isNotFound && (
           <View style={styles.invalidNotice}>
             <Text style={styles.invalidNoticeText}>
-              This ticket was not found in the system. It may be counterfeit, expired, or belong to a different event. Do not allow entry and flag for supervisor review.
+              Vé này không tìm thấy trên hệ thống. Vé có thể là giả hoặc đã hết hạn. Vui lòng từ chối vào cổng và báo cho quản lý.
+            </Text>
+          </View>
+        )}
+
+        {isWrongEvent && (
+          <View style={styles.invalidNotice}>
+            <Text style={styles.invalidNoticeText}>
+              Vé này thuộc về một sự kiện KHÁC{ticket.concertName ? ` (${ticket.concertName})` : ''}. Vui lòng từ chối vào cổng.
             </Text>
           </View>
         )}
@@ -188,7 +227,7 @@ export default function ResultScreen() {
           activeOpacity={0.8}
         >
           <RotateCcw color={COLORS.text} size={18} style={{ marginRight: 8 }} />
-          <Text style={styles.scanNextBtnText}>Scan Next</Text>
+          <Text style={styles.scanNextBtnText}>Quét tiếp</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

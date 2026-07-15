@@ -36,6 +36,8 @@ export const queueService = {
         current[idx].syncAttempts += 1;
         if (error) {
           current[idx].lastSyncError = error;
+        } else {
+          current[idx].lastSyncError = null;
         }
         await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(current));
       }

@@ -12,6 +12,7 @@ import type { RootStackParamList } from '../types';
 import { apiService } from '../services/api';
 
 import LoginScreen from '../screens/LoginScreen';
+import EventSelectorScreen from '../screens/EventSelectorScreen';
 import ScannerScreen from '../screens/ScannerScreen';
 import ResultScreen from '../screens/ResultScreen';
 import OfflineQueueScreen from '../screens/OfflineQueueScreen';
@@ -79,6 +80,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Login"
           component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="EventSelector"
+          component={EventSelectorScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen

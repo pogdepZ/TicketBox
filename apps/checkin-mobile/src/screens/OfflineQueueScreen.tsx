@@ -45,12 +45,12 @@ export default function OfflineQueueScreen() {
 
   const handleClearQueue = () => {
     Alert.alert(
-      "Clear Queue",
-      "Are you sure you want to clear all offline scans? Unsynced data will be lost.",
+      "Xóa hàng đợi",
+      "Bạn có chắc muốn xóa tất cả lượt quét ngoại tuyến? Dữ liệu chưa đồng bộ sẽ bị mất.",
       [
-        { text: "Cancel", style: "cancel" },
+        { text: "Hủy", style: "cancel" },
         { 
-          text: "Clear", 
+          text: "Xóa", 
           style: "destructive", 
           onPress: async () => {
             await queueService.clearQueue();
@@ -70,63 +70,10 @@ export default function OfflineQueueScreen() {
 
     setSyncing(true);
     try {
-      const response = await apiService.post<{ results: SyncResultItem[] }>('/checkin/sync', {
-        items: toSync.map(item => ({
-          ticketId: item.ticketId,
-          qrCodeData: item.qrCodeData,
-          concertId: item.concertId,
-          staffId: item.staffId,
-          sourceDeviceId: item.sourceDeviceId,
-          checkedAt: item.checkedAt,
-          clientEventId: item.id,
-        }))
-      });
-
-      if (response.success && response.data) {
-        let db: any = null;
-        try {
-          db = require('../services/db').db;
-        } catch (e) {}
-
-        let successCount = 0;
-        let failCount = 0;
-
-        for (const res of response.data.results) {
-          const item = toSync.find((i) => i.ticketId === res.ticketId);
-          if (res.status === 'SYNCED' || res.status === 'CONFLICT') successCount++;
-          else failCount++;
-
-          if (item) {
-            await queueService.updateItemStatus(item.id, res.status);
-            if ((res.status === 'SYNCED' || res.status === 'CONFLICT') && db) {
-              try {
-                await db.runAsync('UPDATE ticket_snapshot SET status = ? WHERE ticketCode = ?', ['USED', item.ticketCode]);
-              } catch (e) {
-                console.error("Failed to update snapshot after sync", e);
-              }
-            }
-          }
-        }
-
-        if (db) {
-          try {
-            await db.runAsync(
-              'INSERT INTO sync_log (id, batchId, syncTime, totalItems, successCount, failCount, errorMessage) VALUES (?, ?, ?, ?, ?, ?, ?)',
-              [`sync-${Date.now()}`, `batch-${Date.now()}`, new Date().toISOString(), toSync.length, successCount, failCount, null]
-            );
-          } catch (e) {
-            console.error('Failed to insert sync_log', e);
-          }
-        }
-      } else {
-        for (const item of toSync) {
-          await queueService.updateItemStatus(item.id, 'FAILED', response.message || 'Error');
-        }
-      }
+      const { syncQueue } = require('../services/sync');
+      await syncQueue();
     } catch (e) {
-      for (const item of toSync) {
-        await queueService.updateItemStatus(item.id, 'FAILED', 'Network error');
-      }
+      console.error(e);
     } finally {
       await loadQueue();
       setSyncing(false);
@@ -180,7 +127,7 @@ export default function OfflineQueueScreen() {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <ChevronLeft color={COLORS.textMuted} size={20} />
-          <Text style={styles.backText}>Back</Text>
+          <Text style={styles.backText}>Quay lại</Text>
         </TouchableOpacity>
         {queue.length > 0 && (
           <TouchableOpacity onPress={handleClearQueue} style={{ marginLeft: 'auto' }}>
@@ -190,27 +137,27 @@ export default function OfflineQueueScreen() {
       </View>
 
       <View style={styles.titleContainer}>
-        <Text style={styles.subtitle}>LOCAL BUFFER</Text>
-        <Text style={styles.title}>Offline Queue</Text>
+        <Text style={styles.subtitle}>BỘ NHỚ TẠM</Text>
+        <Text style={styles.title}>Hàng đợi Offline</Text>
       </View>
 
       {/* Summary cards */}
       <View style={styles.summaryGrid}>
         <View style={styles.summaryCard}>
           <Text style={[styles.summaryVal, { color: COLORS.text }]}>{counts.total}</Text>
-          <Text style={styles.summaryLabel}>Total</Text>
+          <Text style={styles.summaryLabel}>Tổng số</Text>
         </View>
         <View style={styles.summaryCard}>
           <Text style={[styles.summaryVal, { color: COLORS.warning }]}>{counts.pending}</Text>
-          <Text style={styles.summaryLabel}>Pending</Text>
+          <Text style={styles.summaryLabel}>Chờ sync</Text>
         </View>
         <View style={styles.summaryCard}>
           <Text style={[styles.summaryVal, { color: COLORS.error }]}>{counts.failed}</Text>
-          <Text style={styles.summaryLabel}>Failed</Text>
+          <Text style={styles.summaryLabel}>Lỗi</Text>
         </View>
         <View style={styles.summaryCard}>
           <Text style={[styles.summaryVal, { color: COLORS.success }]}>{counts.synced}</Text>
-          <Text style={styles.summaryLabel}>Synced</Text>
+          <Text style={styles.summaryLabel}>Đã sync</Text>
         </View>
       </View>
 
@@ -219,9 +166,9 @@ export default function OfflineQueueScreen() {
         <View style={styles.unsyncedBanner}>
           <CloudOff color={COLORS.warning} size={16} style={{ marginRight: 8 }} />
           <Text style={styles.unsyncedText}>
-            <Text style={{ fontWeight: 'bold' }}>{unsyncedCount} scans</Text> pending upload
+            Có <Text style={{ fontWeight: 'bold' }}>{unsyncedCount} vé</Text> chưa được đồng bộ
           </Text>
-          <Text style={styles.notSavedBadge}>NOT SAVED</Text>
+          <Text style={styles.notSavedBadge}>CHƯA LƯU</Text>
         </View>
       )}
 
@@ -232,7 +179,7 @@ export default function OfflineQueueScreen() {
           onPress={() => setFilter('all')}
         >
           <Text style={[styles.tabBtnText, filter === 'all' ? styles.tabBtnTextActive : styles.tabBtnTextInactive]}>
-            All ({counts.total})
+            Tất cả ({counts.total})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity 
@@ -240,7 +187,7 @@ export default function OfflineQueueScreen() {
           onPress={() => setFilter('unsynced')}
         >
           <Text style={[styles.tabBtnText, filter === 'unsynced' ? styles.tabBtnTextActive : styles.tabBtnTextInactive]}>
-            Unsynced ({unsyncedCount})
+            Chưa sync ({unsyncedCount})
           </Text>
         </TouchableOpacity>
         
@@ -251,7 +198,7 @@ export default function OfflineQueueScreen() {
             disabled={syncing}
           >
             {syncing ? <ActivityIndicator size="small" color="#000" /> : <RefreshCw color="#000" size={14} />}
-            <Text style={styles.syncBtnText}>{syncing ? '...' : 'Sync'}</Text>
+            <Text style={styles.syncBtnText}>{syncing ? '...' : 'Đồng bộ'}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -265,7 +212,7 @@ export default function OfflineQueueScreen() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No items found</Text>
+            <Text style={styles.emptyText}>Không tìm thấy dữ liệu</Text>
           </View>
         )}
       />

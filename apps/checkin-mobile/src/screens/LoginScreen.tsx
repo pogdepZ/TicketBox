@@ -85,7 +85,7 @@ export default function LoginScreen() {
         apiService.setToken(accessToken);
         apiService.setRefreshToken(refreshToken || null);
 
-        navigation.reset({ index: 0, routes: [{ name: "Scanner" }] });
+        navigation.reset({ index: 0, routes: [{ name: 'EventSelector' }] });
       } else {
         Alert.alert(
           "Đăng nhập thất bại",
@@ -111,7 +111,6 @@ export default function LoginScreen() {
         <View style={styles.topBar}>
           <View>
             <Text style={styles.kicker}>TICKETBOX GATE</Text>
-            <Text style={styles.shiftText}>Ca tối · Cổng A2</Text>
           </View>
           <View style={styles.networkBadge}>
             <View
@@ -160,7 +159,7 @@ export default function LoginScreen() {
             <Text style={styles.inputLabel}>Mật khẩu</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nhap mat khau"
+              placeholder="Nhập mật khẩu"
               placeholderTextColor={COLORS.textMuted}
               value={password}
               onChangeText={setPassword}

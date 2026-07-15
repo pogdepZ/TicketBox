@@ -16,11 +16,20 @@ export const AUTH_STORAGE_KEYS = {
 
 const CHECKIN_CLIENT_HEADER = "checkin-mobile";
 
+type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+
 class ApiService {
   private baseUrl: string;
   private token: string | null = null;
   private refreshToken: string | null = null;
   private refreshPromise: Promise<string | null> | null = null;
+
+  // Circuit Breaker State
+  private circuitState: CircuitState = 'CLOSED';
+  private consecutiveFailures = 0;
+  private readonly FAILURE_THRESHOLD = 3;
+  private nextAttemptTime = 0;
+  private readonly RESET_TIMEOUT_MS = 60000; // 1 minute
 
   constructor() {
     this.baseUrl = API_BASE_URL;
@@ -36,14 +45,52 @@ class ApiService {
     this.refreshToken = token;
   }
 
+  private isOffline = false;
+  private listeners: Set<(isOffline: boolean) => void> = new Set();
+
+  onConnectionStatusChange(listener: (isOffline: boolean) => void) {
+    this.listeners.add(listener);
+    listener(this.isOffline);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  setOfflineStatus(status: boolean) {
+    if (this.isOffline !== status) {
+      this.isOffline = status;
+      this.listeners.forEach(l => l(status));
+    }
+  }
+
   /** Generic request method with timeout and response formatting */
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
   ): Promise<ApiResponse<T>> {
+    // 1. Check Circuit Breaker
+    if (this.circuitState === 'OPEN') {
+      if (Date.now() > this.nextAttemptTime) {
+        this.circuitState = 'HALF_OPEN';
+      } else {
+        // Fast fail -> immediately return offline error without waiting for timeout
+        this.setOfflineStatus(true);
+        return {
+          success: false,
+          data: null as T,
+          message: 'Circuit Breaker OPEN: Network is too slow/unstable.',
+        };
+      }
+    }
+
     try {
       const currentToken = await this.getAccessToken();
       let result = await this.sendRequest(endpoint, options, currentToken);
+
+      // Success -> Reset circuit breaker
+      this.consecutiveFailures = 0;
+      this.circuitState = 'CLOSED';
+      this.setOfflineStatus(false);
 
       if (this.shouldAttemptRefresh(endpoint, result.response)) {
         const newAccessToken = await this.refreshAccessToken();
@@ -58,11 +105,26 @@ class ApiService {
     } catch (error) {
       console.error(`[API Error] request to ${endpoint} failed:`, error);
 
+      // Update Circuit Breaker
+      this.recordFailure();
+
+      // Fetch threw an error, so we are offline
+      this.setOfflineStatus(true);
+
       return {
         success: false,
         data: null as T,
         message: this.getErrorMessage(error),
       };
+    }
+  }
+
+  private recordFailure() {
+    this.consecutiveFailures++;
+    if (this.circuitState === 'HALF_OPEN' || this.consecutiveFailures >= this.FAILURE_THRESHOLD) {
+      this.circuitState = 'OPEN';
+      this.nextAttemptTime = Date.now() + this.RESET_TIMEOUT_MS;
+      console.warn(`[Circuit Breaker] Tripped! State is now OPEN. Next attempt in ${this.RESET_TIMEOUT_MS}ms.`);
     }
   }
 
@@ -227,6 +289,26 @@ class ApiService {
     return error.name === "AbortError" ? "Request timeout" : error.message;
   }
 
+  async restoreAuthSession(): Promise<boolean> {
+    try {
+      const token = await this.getAccessToken();
+      if (!token) return false;
+      
+      // Try to fetch profile to verify token is still valid
+      const result = await this.get("/auth/profile");
+      if (result.success) {
+         return true;
+      }
+      
+      // If profile fails (e.g. 401), token is invalid
+      await this.clearAuthState();
+      return false;
+    } catch (error) {
+      console.warn("restoreAuthSession error:", error);
+      return false;
+    }
+  }
+
   async get<T>(endpoint: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: "GET" });
   }
@@ -275,8 +357,12 @@ class ApiService {
         }
       }
 
+      // If we got a response, we are online
+      this.setOfflineStatus(false);
+
       return this.toApiResponse<T>(result.response, result.json);
     } catch (error) {
+      this.setOfflineStatus(true);
       return {
         success: false,
         data: null as T,

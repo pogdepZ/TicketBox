@@ -10,15 +10,15 @@ import {
   Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { QrCode, Zap, Search, CloudOff, RefreshCw, Settings as SettingsIcon } from 'lucide-react-native';
+import { QrCode, Zap, Search, CloudOff, RefreshCw, Settings as SettingsIcon, ChevronDown } from 'lucide-react-native';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../constants/theme';
 import { apiService } from '../services/api';
 import { queueService } from '../services/queue';
-import type { RootStackParamList, TicketInfo, ScanStatus, OfflineQueueItem } from '../types';
+import type { RootStackParamList, TicketInfo, ScanStatus, OfflineQueueItem, Concert } from '../types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Scanner'>;
 
@@ -26,20 +26,24 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Scanner'>;
 
 // --- Mock Status ---
 const STATUS_CONFIG = {
-  SUCCESS: { label: 'VALID', dot: COLORS.success, bg: COLORS.success + '1A', border: COLORS.success + '40', color: COLORS.success },
-  TEMP_ACCEPTED: { label: 'TEMP ACCEPTED', dot: COLORS.success, bg: COLORS.success + '1A', border: COLORS.success + '40', color: COLORS.success },
-  DUPLICATE: { label: 'ALREADY USED', dot: COLORS.warning, bg: COLORS.warning + '1A', border: COLORS.warning + '40', color: COLORS.warning },
-  NOT_FOUND: { label: 'INVALID', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
-  WRONG_EVENT: { label: 'INVALID', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
+  SUCCESS: { label: 'HỢP LỆ', dot: COLORS.success, bg: COLORS.success + '1A', border: COLORS.success + '40', color: COLORS.success },
+  TEMP_ACCEPTED: { label: 'TẠM NHẬN', dot: COLORS.success, bg: COLORS.success + '1A', border: COLORS.success + '40', color: COLORS.success },
+  DUPLICATE: { label: 'ĐÃ DÙNG', dot: COLORS.warning, bg: COLORS.warning + '1A', border: COLORS.warning + '40', color: COLORS.warning },
+  NOT_FOUND: { label: 'KHÔNG TÌM THẤY', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
+  WRONG_EVENT: { label: 'SAI SỰ KIỆN', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
+  WRONG_ZONE: { label: 'SAI CỔNG', dot: COLORS.error, bg: COLORS.error + '1A', border: COLORS.error + '40', color: COLORS.error },
 };
 
 export default function ScannerScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const isFocused = useIsFocused();
   const [isOffline, setIsOffline] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   
-  const [concert, setConcert] = useState({ id: '', name: 'No Active Concert' });
+  const [concert, setConcert] = useState<Partial<Concert>>({ id: '', name: 'No Active Concert' });
+  const [selectedGate, setSelectedGate] = useState<string | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [checkedIn, setCheckedIn] = useState(0);
   const [total, setTotal] = useState(0);
   const pct = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
@@ -49,14 +53,17 @@ export default function ScannerScreen() {
       let isMounted = true;
       const loadData = async () => {
         try {
-          const { db } = require('../services/db');
-          const cache: any[] = await db.getAllAsync('SELECT id, name FROM concert_cache LIMIT 1');
-          if (cache && cache.length > 0 && isMounted) {
-            setConcert({ id: cache[0].id, name: cache[0].name });
+          const storedConcert = await AsyncStorage.getItem('selected_concert');
+          let activeConcertId = '';
+          if (storedConcert) {
+            const parsed = JSON.parse(storedConcert);
+            activeConcertId = parsed.id;
+            if (isMounted) setConcert(parsed);
           }
 
-          const totalRes: any[] = await db.getAllAsync('SELECT COUNT(*) as c FROM ticket_snapshot');
-          const checkedRes: any[] = await db.getAllAsync('SELECT COUNT(*) as c FROM ticket_snapshot WHERE status IN ("USED", "TEMP_ACCEPTED")');
+          const { db } = require('../services/db');
+          const totalRes: any[] = await db.getAllAsync('SELECT COUNT(*) as c FROM ticket_snapshot WHERE concertId = ?', [activeConcertId]);
+          const checkedRes: any[] = await db.getAllAsync('SELECT COUNT(*) as c FROM ticket_snapshot WHERE status IN ("USED", "TEMP_ACCEPTED") AND concertId = ?', [activeConcertId]);
           
           if (isMounted) {
             setTotal(totalRes[0]?.c || 0);
@@ -83,6 +90,15 @@ export default function ScannerScreen() {
         Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
       ])
     ).start();
+
+    // Subscribe to connection status changes (e.g. from background sync)
+    const unsubscribe = apiService.onConnectionStatusChange((status) => {
+      setIsOffline(status);
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -100,7 +116,7 @@ export default function ScannerScreen() {
   }, [scanning]);
 
   const handleScan = async (qrData: string) => {
-    if (scanning) return;
+    if (scanning || !isFocused) return;
     setScanning(true);
 
     try {
@@ -114,13 +130,24 @@ export default function ScannerScreen() {
         staffId,
         concertId: concert.id,
         deviceId,
-        clientEventId: `scan-${Date.now()}`,
+        clientEventId: `scan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        gate: selectedGate || undefined,
       };
 
       const response = await apiService.post<TicketInfo>('/checkin/scan', payload);
 
       if (response.success && response.data) {
         setIsOffline(false);
+        try {
+          const { db } = require('../services/db');
+          const { ticketCode } = response.data;
+          if (ticketCode) {
+            await db.runAsync('UPDATE ticket_snapshot SET status = "USED" WHERE ticketCode = ?', [ticketCode]);
+            await db.runAsync('UPDATE guest_snapshot SET status = "CHECKED_IN" WHERE guestCode = ?', [ticketCode]);
+          }
+        } catch (e) {
+          console.error('Failed to update local db after online scan', e);
+        }
         navigation.navigate('Result', { ticket: response.data, isOffline: false });
       } else {
         const isNetworkError = !response.data || response.message?.toLowerCase().includes('fetch') || response.message?.toLowerCase().includes('timeout');
@@ -164,97 +191,208 @@ export default function ScannerScreen() {
              console.error("Offline verify error", e);
           }
 
-          if (!isValid) {
-             const notFoundTicket: TicketInfo = {
-               ticketId: 'unknown',
-               ticketCode: extractedTicketCode,
-               guestName: 'Unknown',
-               ticketType: '---',
-               concertName: concert.name,
-               checkedInAt: checkedAt,
-               status: 'NOT_FOUND',
-             };
-             navigation.navigate('Result', { ticket: notFoundTicket, isOffline: true });
-             setTimeout(() => setScanning(false), 2000);
-             return;
-          }
-
           let localTicket = null;
+          let localGuest = null;
           try {
             const { db } = require('../services/db');
-            const tickets: any[] = await db.getAllAsync(
-              'SELECT * FROM ticket_snapshot WHERE ticketCode = ?',
-              [extractedTicketCode]
-            );
-            if (tickets && tickets.length > 0) {
-              localTicket = tickets[0];
+            if (isValid) {
+              const tickets: any[] = await db.getAllAsync(
+                'SELECT * FROM ticket_snapshot WHERE ticketCode = ?',
+                [extractedTicketCode]
+              );
+              if (tickets && tickets.length > 0) {
+                localTicket = tickets[0];
+              }
+            } else {
+              // If not valid JWT, could be a Guest Code
+              const guests: any[] = await db.getAllAsync(
+                'SELECT * FROM guest_snapshot WHERE guestCode = ?',
+                [extractedTicketCode]
+              );
+              if (guests && guests.length > 0) {
+                localGuest = guests[0];
+                isValid = true; // Mark as valid guest code
+              }
             }
           } catch (e) {}
 
-          if (!localTicket) {
+          if (!isValid || (!localTicket && !localGuest)) {
              const notFoundTicket: TicketInfo = {
                ticketId: 'unknown',
                ticketCode: extractedTicketCode,
                guestName: 'Unknown',
                ticketType: '---',
-               concertName: concert.name,
+               concertName: concert.name || 'Unknown Concert',
+               venue: concert.venueName || 'Unknown Venue',
+               orderRef: 'N/A',
                checkedInAt: checkedAt,
-               status: 'NOT_FOUND',
+               status: isValid ? 'NOT_FOUND' : 'INVALID_GUEST',
              };
              navigation.navigate('Result', { ticket: notFoundTicket, isOffline: true });
              setTimeout(() => setScanning(false), 2000);
              return;
           }
 
-          if (localTicket.status === 'USED' || localTicket.status === 'TEMP_ACCEPTED') {
-             const duplicateTicket: TicketInfo = {
-               ticketId: localTicket.id,
-               ticketCode: extractedTicketCode,
-               guestName: localTicket.guestName,
-               ticketType: localTicket.ticketType,
-               concertName: concert.name,
-               checkedInAt: checkedAt,
-               status: 'DUPLICATE',
-             };
-             navigation.navigate('Result', { ticket: duplicateTicket, isOffline: true });
-             setTimeout(() => setScanning(false), 2000);
-             return;
+          if (localTicket) {
+            let allowedGates: string[] = [];
+            try {
+              if (localTicket.allowedGates) {
+                allowedGates = JSON.parse(localTicket.allowedGates);
+              }
+            } catch (e) {}
+
+            if (selectedGate && allowedGates.length > 0 && !allowedGates.includes(selectedGate)) {
+               const wrongZoneTicket: TicketInfo = {
+                 ticketId: localTicket.id,
+                 ticketCode: extractedTicketCode,
+                 guestName: localTicket.guestName,
+                 ticketType: localTicket.ticketType,
+                 seat: localTicket.seat || undefined,
+                 concertName: concert.name || 'Unknown Concert',
+                 venue: concert.venueName || 'Unknown Venue',
+                 orderRef: localTicket.orderRef || 'N/A',
+                 checkedInAt: checkedAt,
+                 status: 'WRONG_ZONE',
+               };
+               navigation.navigate('Result', { ticket: wrongZoneTicket, isOffline: true });
+               setTimeout(() => setScanning(false), 2000);
+               return;
+            }
+
+            if (localTicket.status === 'USED' || localTicket.status === 'TEMP_ACCEPTED') {
+               const duplicateTicket: TicketInfo = {
+                 ticketId: localTicket.id,
+                 ticketCode: extractedTicketCode,
+                 guestName: localTicket.guestName,
+                 ticketType: localTicket.ticketType,
+                 seat: localTicket.seat || undefined,
+                 concertName: concert.name || 'Unknown Concert',
+                 venue: concert.venueName || 'Unknown Venue',
+                 orderRef: localTicket.orderRef || 'N/A',
+                 checkedInAt: checkedAt,
+                 status: 'DUPLICATE',
+               };
+               navigation.navigate('Result', { ticket: duplicateTicket, isOffline: true });
+               setTimeout(() => setScanning(false), 2000);
+               return;
+            }
+
+            try {
+               const { db } = require('../services/db');
+               await db.runAsync('UPDATE ticket_snapshot SET status = ? WHERE ticketCode = ?', ['TEMP_ACCEPTED', extractedTicketCode]);
+            } catch (e) {}
+
+            const offlineItem: OfflineQueueItem = {
+              id: `q-${Date.now()}`,
+              ticketId: localTicket.id,
+              ticketCode: extractedTicketCode,
+              qrCodeData: qrData,
+              concertId: concert.id || '',
+              staffId,
+              sourceDeviceId: deviceId,
+              checkedAt,
+              syncStatus: 'PENDING',
+              syncAttempts: 0,
+              lastSyncError: null,
+              serverCheckinId: null,
+              createdAt: checkedAt,
+              gate: selectedGate || undefined,
+            };
+
+            await queueService.enqueue(offlineItem);
+
+            const displayTicket: TicketInfo = {
+              ticketId: localTicket.id,
+              ticketCode: extractedTicketCode,
+              guestName: localTicket.guestName,
+              ticketType: localTicket.ticketType,
+              seat: localTicket.seat || undefined,
+              concertName: concert.name || 'Unknown Concert',
+              venue: concert.venueName || 'Unknown Venue',
+              orderRef: localTicket.orderRef || 'N/A',
+              checkedInAt: checkedAt,
+              status: 'TEMP_ACCEPTED',
+            };
+            navigation.navigate('Result', { ticket: displayTicket, isOffline: true });
+          } else if (localGuest) {
+            let allowedGates: string[] = [];
+            try {
+              if (localGuest.allowedGates) {
+                allowedGates = JSON.parse(localGuest.allowedGates);
+              }
+            } catch (e) {}
+
+            if (selectedGate && allowedGates.length > 0 && !allowedGates.includes(selectedGate)) {
+               const wrongZoneTicket: TicketInfo = {
+                 ticketId: localGuest.id,
+                 ticketCode: extractedTicketCode,
+                 guestName: localGuest.fullName,
+                 ticketType: 'GUEST',
+                 concertName: concert.name || 'Unknown Concert',
+                 venue: concert.venueName || 'Unknown Venue',
+                 orderRef: 'GUEST-LIST',
+                 checkedInAt: checkedAt,
+                 status: 'WRONG_ZONE',
+               };
+               navigation.navigate('Result', { ticket: wrongZoneTicket, isOffline: true });
+               setTimeout(() => setScanning(false), 2000);
+               return;
+            }
+
+            if (localGuest.status === 'CHECKED_IN' || localGuest.status === 'TEMP_ACCEPTED') {
+               const duplicateTicket: TicketInfo = {
+                 ticketId: localGuest.id,
+                 ticketCode: extractedTicketCode,
+                 guestName: localGuest.fullName,
+                 ticketType: 'GUEST',
+                 concertName: concert.name || 'Unknown Concert',
+                 venue: concert.venueName || 'Unknown Venue',
+                 orderRef: 'GUEST-LIST',
+                 checkedInAt: checkedAt,
+                 status: 'DUPLICATE_GUEST',
+               };
+               navigation.navigate('Result', { ticket: duplicateTicket, isOffline: true });
+               setTimeout(() => setScanning(false), 2000);
+               return;
+            }
+
+            try {
+               const { db } = require('../services/db');
+               await db.runAsync('UPDATE guest_snapshot SET status = ? WHERE guestCode = ?', ['TEMP_ACCEPTED', extractedTicketCode]);
+            } catch (e) {}
+
+            const offlineItem: OfflineQueueItem = {
+              id: `q-${Date.now()}`,
+              ticketId: localGuest.id,
+              ticketCode: extractedTicketCode,
+              qrCodeData: qrData,
+              concertId: concert.id || '',
+              staffId,
+              sourceDeviceId: deviceId,
+              checkedAt,
+              syncStatus: 'PENDING',
+              syncAttempts: 0,
+              lastSyncError: null,
+              serverCheckinId: null,
+              createdAt: checkedAt,
+              gate: selectedGate || undefined,
+            };
+
+            await queueService.enqueue(offlineItem);
+
+            const displayTicket: TicketInfo = {
+              ticketId: localGuest.id,
+              ticketCode: extractedTicketCode,
+              guestName: localGuest.fullName,
+              ticketType: 'GUEST',
+              concertName: concert.name || 'Unknown Concert',
+              venue: concert.venueName || 'Unknown Venue',
+              orderRef: 'GUEST-LIST',
+              checkedInAt: checkedAt,
+              status: 'ACCEPTED_GUEST',
+            };
+            navigation.navigate('Result', { ticket: displayTicket, isOffline: true });
           }
-
-          try {
-             const { db } = require('../services/db');
-             await db.runAsync('UPDATE ticket_snapshot SET status = ? WHERE ticketCode = ?', ['TEMP_ACCEPTED', extractedTicketCode]);
-          } catch (e) {}
-
-          const offlineItem: OfflineQueueItem = {
-            id: `q-${Date.now()}`,
-            ticketId: localTicket.id,
-            ticketCode: extractedTicketCode,
-            qrCodeData: qrData,
-            concertId: concert.id,
-            staffId,
-            sourceDeviceId: deviceId,
-            checkedAt,
-            syncStatus: 'PENDING',
-            syncAttempts: 0,
-            lastSyncError: null,
-            serverCheckinId: null,
-            createdAt: checkedAt,
-          };
-
-          await queueService.enqueue(offlineItem);
-
-          const displayTicket: TicketInfo = {
-            ticketId: localTicket.id,
-            ticketCode: extractedTicketCode,
-            guestName: localTicket.guestName,
-            ticketType: localTicket.ticketType,
-            concertName: concert.name,
-            checkedInAt: checkedAt,
-            status: 'TEMP_ACCEPTED',
-          };
-
-          navigation.navigate('Result', { ticket: displayTicket, isOffline: true });
         } else {
           Alert.alert('Lỗi quét vé', response.message || 'Lỗi không xác định');
         }
@@ -291,8 +429,10 @@ export default function ScannerScreen() {
       {/* Top bar */}
       <View style={styles.topBar}>
         <View>
-          <Text style={styles.liveTag}>LIVE · JUN 22</Text>
-          <Text style={styles.concertName}>{concert.name}</Text>
+          <Text style={styles.liveTag}>LIVE · {new Date().toDateString().split(' ').slice(1, 3).join(' ').toUpperCase()}</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('EventSelector')}>
+            <Text style={[styles.concertName, { textDecorationLine: 'underline' }]}>{concert.name} ▾</Text>
+          </TouchableOpacity>
         </View>
         <View style={styles.statusPill}>
           <Animated.View style={[styles.statusDot, { opacity: pulseAnim, backgroundColor: isOffline ? COLORS.error : COLORS.primary }]} />
@@ -306,15 +446,15 @@ export default function ScannerScreen() {
       <View style={styles.statsRow}>
         <View style={styles.statBox}>
           <Text style={[styles.statVal, { color: COLORS.primary }]}>{checkedIn}</Text>
-          <Text style={styles.statSub}>Checked in</Text>
+          <Text style={styles.statSub}>Đã check-in</Text>
         </View>
         <View style={styles.statBox}>
           <Text style={styles.statVal}>{total - checkedIn}</Text>
-          <Text style={styles.statSub}>Remaining</Text>
+          <Text style={styles.statSub}>Còn lại</Text>
         </View>
         <View style={styles.statBox}>
           <Text style={styles.statVal}>{pct}%</Text>
-          <Text style={styles.statSub}>Complete</Text>
+          <Text style={styles.statSub}>Hoàn thành</Text>
         </View>
       </View>
 
@@ -323,15 +463,54 @@ export default function ScannerScreen() {
         <View style={[styles.progressBarFill, { width: `${pct}%` }]} />
       </View>
 
+      {/* Gate Selector */}
+      <View style={[styles.gateSelectorContainer, { zIndex: 1000 }]}>
+        <TouchableOpacity 
+          style={styles.gateSelectorBtn} 
+          onPress={() => setDropdownOpen(!dropdownOpen)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.gateSelectorText}>
+            📍 Cổng hiện tại: <Text style={{ color: COLORS.primary, fontWeight: '700' }}>{selectedGate === 'Gate A' ? 'Cổng A' : selectedGate === 'Gate B' ? 'Cổng B' : 'Tất cả cổng'}</Text>
+          </Text>
+          <ChevronDown color={COLORS.textMuted} size={16} />
+        </TouchableOpacity>
+
+        {dropdownOpen && (
+          <View style={styles.dropdownMenu}>
+            <TouchableOpacity 
+              style={styles.dropdownItem} 
+              onPress={() => { setSelectedGate('Gate A'); setDropdownOpen(false); }}
+            >
+              <Text style={[styles.dropdownItemText, selectedGate === 'Gate A' && styles.dropdownItemActive]}>Cổng A</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.dropdownItem} 
+              onPress={() => { setSelectedGate('Gate B'); setDropdownOpen(false); }}
+            >
+              <Text style={[styles.dropdownItemText, selectedGate === 'Gate B' && styles.dropdownItemActive]}>Cổng B</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.dropdownItem, { borderBottomWidth: 0 }]} 
+              onPress={() => { setSelectedGate(null); setDropdownOpen(false); }}
+            >
+              <Text style={[styles.dropdownItemText, selectedGate === null && styles.dropdownItemActive]}>Tất cả cổng</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
       {/* Viewfinder */}
       <View style={styles.viewfinderWrapper}>
         <View style={styles.viewfinderContainer}>
-          <CameraView
-            style={StyleSheet.absoluteFill}
-            facing="back"
-            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            onBarcodeScanned={({ data }) => handleScan(data)}
-          />
+          {isFocused && (
+            <CameraView
+              style={StyleSheet.absoluteFill}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+              onBarcodeScanned={({ data }) => handleScan(data)}
+            />
+          )}
           {/* Simulated Dark overlay and vignette can be added here if needed */}
           <View style={styles.finderBox}>
             <View style={[styles.corner, styles.cornerTL]} />
@@ -348,7 +527,7 @@ export default function ScannerScreen() {
             )}
           </View>
           <View style={styles.bottomLabel}>
-            <Text style={styles.bottomLabelText}>{scanning ? 'SCANNING...' : 'POINT AT QR CODE'}</Text>
+            <Text style={styles.bottomLabelText}>{scanning ? 'ĐANG QUÉT...' : 'HÃY HƯỚNG CAMERA VÀO QR CODE'}</Text>
           </View>
         </View>
       </View>
@@ -360,15 +539,15 @@ export default function ScannerScreen() {
       <View style={styles.bottomNav}>
         <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('OfflineQueue')}>
           <CloudOff color={COLORS.textMuted} size={24} />
-          <Text style={styles.navItemText}>Queue</Text>
+          <Text style={styles.navItemText}>Hàng đợi</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Scanner')}>
           <QrCode color={COLORS.primary} size={24} />
-          <Text style={[styles.navItemText, { color: COLORS.primary }]}>Scan</Text>
+          <Text style={[styles.navItemText, { color: COLORS.primary }]}>Quét vé</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Settings')}>
           <SettingsIcon color={COLORS.textMuted} size={24} />
-          <Text style={styles.navItemText}>Settings</Text>
+          <Text style={styles.navItemText}>Cài đặt</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -461,8 +640,59 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderRadius: 2,
   },
-  viewfinderWrapper: {
+  gateSelectorContainer: {
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.md,
+  },
+  gateSelectorBtn: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  gateSelectorText: {
+    color: COLORS.text,
+    fontSize: FONT_SIZES.md,
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 56, // height of button + padding
+    left: SPACING.xl,
+    right: SPACING.xl,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.md,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    zIndex: 9999,
+  },
+  dropdownItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  dropdownItemText: {
+    color: COLORS.text,
+    fontSize: 14,
+  },
+  dropdownItemActive: {
+    color: COLORS.primary,
+    fontWeight: 'bold',
+  },
+  viewfinderWrapper: {
+    flex: 1,
+    paddingHorizontal: SPACING.xl,
     marginBottom: SPACING.lg,
   },
   viewfinderContainer: {
@@ -506,7 +736,11 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   centerIcon: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },
